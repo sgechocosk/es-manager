@@ -38,6 +38,8 @@ import {
   Building2,
   AlignLeft,
   Calendar,
+  Download,
+  Upload,
 } from "lucide-react";
 
 // --- Firebase Setup ---
@@ -511,6 +513,52 @@ export default function App() {
     );
   };
 
+  const handleExport = () => {
+    const dataStr = JSON.stringify(entries, null, 2);
+    const blob = new Blob([dataStr], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+
+    // ダウンロード用リンクを作成してクリックさせる
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `es-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  // --- JSONインポート（バックアップ復元） ---
+  const handleImport = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const importedData = JSON.parse(e.target.result);
+        if (Array.isArray(importedData)) {
+          if (
+            confirm(
+              "現在のデータを上書きして、バックアップファイルを読み込みますか？"
+            )
+          ) {
+            setEntries(importedData);
+            saveToStorage(importedData);
+            alert("データを復元しました。");
+          }
+        } else {
+          alert("無効なファイル形式です。");
+        }
+      } catch (error) {
+        console.error(error);
+        alert("ファイルの読み込みに失敗しました。");
+      }
+    };
+    reader.readAsText(file);
+    event.target.value = "";
+  };
+
   const resetForm = () => {
     setView("list");
     setEditingId(null);
@@ -589,6 +637,25 @@ export default function App() {
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full pl-9 pr-4 py-2 bg-slate-100 border border-transparent focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 rounded-xl text-sm transition-all outline-none"
                 />
+              </div>
+              <div className="flex gap-1">
+                <button
+                  onClick={handleExport}
+                  className="bg-white text-slate-600 border border-slate-200 p-2 rounded-lg hover:bg-slate-50 hover:text-indigo-600 transition-colors"
+                  title="バックアップを保存"
+                >
+                  <Download size={18} />
+                </button>
+                <label className="bg-white text-slate-600QH border border-slate-200 p-2 rounded-lg hover:bg-slate-50 hover:text-indigo-600 transition-colors cursor-pointer">
+                  <Upload size={18} />
+                  <input
+                    type="file"
+                    accept=".json"
+                    onChange={handleImport}
+                    className="hidden"
+                    title="バックアップを復元"
+                  />
+                </label>
               </div>
             </div>
           )}
@@ -864,7 +931,7 @@ export default function App() {
                           selectionType: e.target.value,
                         })
                       }
-                      placeholder="例: 本選考、夏インターン"
+                      placeholder="例: 本選考、インターン"
                     />
                   </div>
                 </div>
