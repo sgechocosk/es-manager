@@ -521,7 +521,7 @@ export default function App() {
     // ダウンロード用リンクを作成してクリックさせる
     const link = document.createElement("a");
     link.href = url;
-    link.download = `es-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    link.download = `es-backup-${new Date().toISOString().slice(0, 19)}.json`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
