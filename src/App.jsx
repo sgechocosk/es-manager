@@ -42,13 +42,13 @@ import {
 
 // --- Firebase Setup ---
 const firebaseConfig = {
-  apiKey: "AIzaSyAxFrMbtWvDBzLVVvwc2mRZ6bzNjnObzlE",
-  authDomain: "es-manager-c99a3.firebaseapp.com",
-  projectId: "es-manager-c99a3",
-  storageBucket: "es-manager-c99a3.firebasestorage.app",
-  messagingSenderId: "861690787990",
-  appId: "1:861690787990:web:5d2b15f0d369a1dd166ab7",
-  measurementId: "G-MNB3J115WX"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -63,7 +63,7 @@ const splitTags = (tagString) => {
 };
 
 const callGeminiAPI = async (prompt) => {
-  const apiKey = ""; // Run environment injects this
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
 
   try {
@@ -229,7 +229,7 @@ const AIAssistant = ({ question, answer, onApply }) => {
       {loading && (
         <div className="mt-3 p-4 bg-slate-50 rounded-xl border border-slate-200 flex items-center gap-3 text-sm text-slate-500 animate-pulse">
           <Loader2 size={18} className="animate-spin text-indigo-500" />
-          <span>AIが思考中... (質問内容: {question.substring(0, 10)}...)</span>
+          <span>AIが思考中... (質問内容: {question.substring(0, 30)}...)</span>
         </div>
       )}
 
@@ -566,7 +566,7 @@ export default function App() {
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-20">
       {/* Header */}
       <header className="bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-0 z-20 px-4 py-3 shadow-sm">
-        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div
             className="flex items-center gap-2 cursor-pointer self-start sm:self-auto"
             onClick={() => setView("list")}
@@ -622,7 +622,7 @@ export default function App() {
 
         {/* View Mode Switcher (List View Only) */}
         {view === "list" && (
-          <div className="max-w-5xl mx-auto mt-3 flex gap-1 overflow-x-auto pb-1">
+          <div className="max-w-7xl mx-auto mt-3 flex gap-1 overflow-x-auto pb-1">
             {[
               { id: "company", icon: Building2, label: "会社別" },
               { id: "question", icon: LayoutList, label: "質問一覧" },
@@ -794,7 +794,7 @@ export default function App() {
           </div>
         ) : (
           // --- Edit Form ---
-          <div className="max-w-2xl mx-auto">
+          <div className="max-w-7xl mx-auto">
             <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden animate-in slide-in-from-bottom-4">
               <div className="px-6 py-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
                 <h2 className="text-lg font-bold text-slate-800">
