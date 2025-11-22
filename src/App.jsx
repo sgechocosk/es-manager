@@ -48,7 +48,7 @@ const firebaseConfig = {
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -58,7 +58,6 @@ const appId = typeof __app_id !== "undefined" ? __app_id : "es-manager-v4";
 // --- Utilities ---
 const splitTags = (tagString) => {
   if (!tagString) return [];
-  // 半角カンマ、全角カンマ、読点、スペースで分割
   return tagString.split(/[,\s、，]+/).filter((t) => t.length > 0);
 };
 
@@ -86,15 +85,14 @@ const callGeminiAPI = async (prompt) => {
 };
 
 // --- Components ---
-
 const StatusBadge = ({ status }) => {
   const colors = {
     未提出: "bg-gray-100 text-gray-600",
     作成中: "bg-blue-100 text-blue-600",
     提出済: "bg-emerald-100 text-emerald-600",
+    採用: "bg-amber-100 text-amber-700",
+    不採用: "bg-rose-50 text-rose-400",
     選考中: "bg-violet-100 text-violet-600",
-    お見送り: "bg-rose-50 text-rose-400",
-    内定: "bg-amber-100 text-amber-700",
   };
   return (
     <span
@@ -153,7 +151,7 @@ const AIAssistant = ({ question, answer, onApply }) => {
 
     let prompt = "";
     if (actionType === "refine") {
-      prompt = `あなたはプロのキャリアアドバイザーです。以下の就職活動のエントリーシート（ES）の回答を推敲してください。
+      prompt = `あなたはプロのキャリアアドバイザーです。以下の就職活動のエントリーシート(ES)の回答を推敲してください。
       
       【質問内容】
       ${question}
@@ -168,10 +166,10 @@ const AIAssistant = ({ question, answer, onApply }) => {
       }
       
       【条件】
-      1. 誤字脱字を修正し、適切な敬語表現を使うこと。
-      2. 出力は推敲後のテキストのみを表示してください（マークダウンや挨拶文は不要）。`;
+      1. 誤字脱字を修正し、適切な敬語表現を使い、改行は使用しないこと。
+      2. 出力は推敲後のテキストのみを、マークダウンや挨拶文無しで表示してください。`;
     } else if (actionType === "feedback") {
-      prompt = `あなたは企業の採用担当者です。以下のエントリーシート（ES）の回答に対してフィードバックをしてください。
+      prompt = `あなたは企業の採用担当者です。以下のエントリーシート(ES)の回答に対してフィードバックをしてください。
       
       【質問内容】
       ${question}
@@ -181,7 +179,7 @@ const AIAssistant = ({ question, answer, onApply }) => {
       
       【出力条件】
       1. 評価できる点と改善すべき点を具体的に挙げてください。
-      2. **重要: 出力はプレーンテキストのみで行ってください。マークダウン（**太字**や#見出し等）は一切使用しないでください。**
+      2. 重要: 出力はプレーンテキストのみで行ってください。マークダウン（**太字**や#見出し等）は一切使用しないでください。
       3. 箇条書き記号には「・」を使用してください。`;
     }
 
@@ -347,7 +345,7 @@ export default function App() {
     company: "",
     industry: "",
     status: "未提出",
-    selectionType: "", // Changed from deadline
+    selectionType: "",
     qas: [{ id: Date.now(), question: "", answer: "", tags: "" }],
   });
 
@@ -388,7 +386,6 @@ export default function App() {
   }, [user]);
 
   // --- Data Processing for Views ---
-
   // 共通の検索ロジック
   const isMatch = (text) => {
     if (!searchQuery) return true;
@@ -477,7 +474,6 @@ export default function App() {
   }, [flattenedQAs]);
 
   // --- Handlers ---
-
   const handleSave = async () => {
     if (!formData.company) return;
     if (!user) return;
@@ -522,7 +518,7 @@ export default function App() {
       company: "",
       industry: "",
       status: "未提出",
-      selectionType: "", // Reset
+      selectionType: "",
       qas: [{ id: Date.now(), question: "", answer: "", tags: "" }],
     });
   };
@@ -532,7 +528,7 @@ export default function App() {
       company: entry.company,
       industry: entry.industry,
       status: entry.status,
-      selectionType: entry.selectionType || "", // Edit
+      selectionType: entry.selectionType || "",
       qas: entry.qas || [],
     });
     setEditingId(entry.id);
@@ -844,9 +840,9 @@ export default function App() {
                         "未提出",
                         "作成中",
                         "提出済",
+                        "採用",
+                        "不採用",
                         "選考中",
-                        "内定",
-                        "お見送り",
                       ].map((s) => (
                         <option key={s} value={s}>
                           {s}
@@ -868,7 +864,7 @@ export default function App() {
                           selectionType: e.target.value,
                         })
                       }
-                      placeholder="例: 夏インターン、本選考"
+                      placeholder="例: 本選考、夏インターン"
                     />
                   </div>
                 </div>
@@ -895,7 +891,7 @@ export default function App() {
                           </div>
                           <input
                             className="w-full bg-transparent font-bold text-slate-800 placeholder-slate-300 outline-none border-b focus:border-indigo-500 pb-1"
-                            placeholder="質問内容 (例: ガクチカ)"
+                            placeholder="質問内容 (例: 自己PR、ガクチカ)"
                             value={qa.question}
                             onChange={(e) =>
                               updateQA(qa.id, "question", e.target.value)
@@ -924,7 +920,7 @@ export default function App() {
                         </div>
                         <input
                           className="w-full text-xs px-3 py-2 bg-white border rounded-md outline-none"
-                          placeholder="タグ (カンマ、読点区切り: ガクチカ、リーダー)"
+                          placeholder="タグ (カンマ区切り: 自己PR、ガクチカ)"
                           value={qa.tags}
                           onChange={(e) =>
                             updateQA(qa.id, "tags", e.target.value)

@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 :root {
-  color-scheme: light; /* 強制的にライトモードの配色（黒文字）を使用 */
+  color-scheme: light;
 }
 
 body {
