@@ -16,7 +16,7 @@ import {
   onSnapshot,
   serverTimestamp,
   query,
-  orderBy,
+  writeBatch, // 追加: 一括書き込み用
 } from "firebase/firestore";
 import {
   Search,
@@ -28,15 +28,12 @@ import {
   Briefcase,
   Save,
   X,
-  FileText,
-  Filter,
-  Sparkles,
   Bot,
   Loader2,
   LayoutList,
   Tags,
   Building2,
-  AlignLeft,
+  Sparkles,
   Calendar,
   Download,
   Upload,
@@ -142,7 +139,7 @@ const CopyButton = ({ text }) => {
 const AIAssistant = ({ question, answer, onApply }) => {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState("");
-  const [mode, setMode] = useState(null); // 'refine' | 'feedback'
+  const [mode, setMode] = useState(null);
   const [instruction, setInstruction] = useState("");
 
   const handleAction = async (actionType) => {
@@ -338,8 +335,8 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState("list"); // 'list' | 'form'
-  const [viewMode, setViewMode] = useState("company"); // 'company' | 'question' | 'tag'
+  const [view, setView] = useState("list");
+  const [viewMode, setViewMode] = useState("company");
   const [editingId, setEditingId] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -388,7 +385,6 @@ export default function App() {
   }, [user]);
 
   // --- Data Processing for Views ---
-  // 共通の検索ロジック
   const isMatch = (text) => {
     if (!searchQuery) return true;
     const lowerQ = searchQuery.toLowerCase();
@@ -397,7 +393,6 @@ export default function App() {
     return terms.every((term) => text.toLowerCase().includes(term));
   };
 
-  // 1. 会社別ビュー用のデータ処理
   const processedCompanyEntries = useMemo(() => {
     if (!searchQuery) return entries;
 
@@ -423,7 +418,6 @@ export default function App() {
       .filter(Boolean);
   }, [entries, searchQuery]);
 
-  // 2. 質問一覧ビュー用のデータ処理（フラット化）
   const flattenedQAs = useMemo(() => {
     let allItems = [];
     entries.forEach((entry) => {
@@ -452,7 +446,6 @@ export default function App() {
     return allItems;
   }, [entries, searchQuery]);
 
-  // 3. タグ別ビュー用のデータ処理
   const tagGroups = useMemo(() => {
     const groups = {};
     flattenedQAs.forEach((item) => {
@@ -518,7 +511,6 @@ export default function App() {
     const blob = new Blob([dataStr], { type: "application/json" });
     const url = URL.createObjectURL(blob);
 
-    // ダウンロード用リンクを作成してクリックさせる
     const link = document.createElement("a");
     link.href = url;
     link.download = `es-backup-${new Date().toISOString().slice(0, 19)}.json`;
@@ -532,9 +524,10 @@ export default function App() {
   const handleImport = (event) => {
     const file = event.target.files[0];
     if (!file) return;
+    if (!user) return;
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
         const importedData = JSON.parse(e.target.result);
         if (Array.isArray(importedData)) {
@@ -543,8 +536,28 @@ export default function App() {
               "現在のデータを上書きして、バックアップファイルを読み込みますか？"
             )
           ) {
-            setEntries(importedData);
-            saveToStorage(importedData);
+            // Firebaseへの一括書き込み処理
+            const batch = writeBatch(db);
+            const collectionRef = collection(
+              db,
+              "artifacts",
+              appId,
+              "users",
+              user.uid,
+              "es_entries"
+            );
+
+            importedData.forEach((item) => {
+              if (item.id) {
+                const docRef = doc(collectionRef, item.id);
+                // idフィールドを除外してデータを作成
+                const { id, ...data } = item;
+                // インポート時に更新日時のみ更新（またはそのまま復元）
+                batch.set(docRef, { ...data, updatedAt: serverTimestamp() });
+              }
+            });
+
+            await batch.commit();
             alert("データを復元しました。");
           }
         } else {
