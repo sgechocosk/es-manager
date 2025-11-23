@@ -488,9 +488,11 @@ export default function App() {
           ...payload,
           createdAt: serverTimestamp(),
         });
+      alert("保存しました！");
       resetForm();
     } catch (e) {
       console.error(e);
+      alert("保存に失敗しました。");
     }
   };
 
@@ -659,7 +661,7 @@ export default function App() {
                 >
                   <Download size={18} />
                 </button>
-                <label className="bg-white text-slate-600QH border border-slate-200 p-2 rounded-lg hover:bg-slate-50 hover:text-indigo-600 transition-colors cursor-pointer">
+                <label className="bg-white text-slate-600 border border-slate-200 p-2 rounded-lg hover:bg-slate-50 hover:text-indigo-600 transition-colors cursor-pointer">
                   <Upload size={18} />
                   <input
                     type="file"
