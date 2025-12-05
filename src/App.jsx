@@ -1,23 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
-import { initializeApp } from "firebase/app";
-import {
-  getAuth,
-  signInAnonymously,
-  onAuthStateChanged,
-  signInWithCustomToken,
-} from "firebase/auth";
-import {
-  getFirestore,
-  collection,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-  doc,
-  onSnapshot,
-  serverTimestamp,
-  query,
-  writeBatch,
-} from "firebase/firestore";
+import React, { useState, useMemo } from "react";
 import {
   Search,
   Plus,
@@ -39,21 +20,6 @@ import {
   Upload,
 } from "lucide-react";
 
-// --- Firebase Setup ---
-const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
-};
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-const appId = typeof __app_id !== "undefined" ? __app_id : "es-manager-v4";
-
 // --- Utilities ---
 const splitTags = (tagString) => {
   if (!tagString) return [];
@@ -61,6 +27,7 @@ const splitTags = (tagString) => {
 };
 
 const sanitizeEntry = (entry) => {
+  const now = new Date().toISOString();
   const sanitizedQas = Array.isArray(entry.qas)
     ? entry.qas.map((qa) => ({
         id: qa.id || Date.now() + Math.random(),
@@ -72,11 +39,16 @@ const sanitizeEntry = (entry) => {
     : [];
 
   return {
+    id:
+      entry.id ||
+      `entry_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
     company: entry.company || "名称未設定",
     industry: entry.industry || "",
     status: entry.status || "未提出",
     selectionType: entry.selectionType || "",
     qas: sanitizedQas,
+    createdAt: entry.createdAt || now,
+    updatedAt: now,
   };
 };
 
@@ -137,8 +109,8 @@ const CopyButton = ({ text }) => {
       document.body.removeChild(textArea);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error(err);
+    } catch (error) {
+      console.error(error);
     }
   };
   return (
@@ -208,7 +180,7 @@ const AIAssistant = ({ question, answer, onApply, charLimit }) => {
       
       【出力条件】
       1. 評価できる点と改善すべき点を具体的に挙げてください。
-      2. 重要: 出力はプレーンテキストのみで行ってください。マークダウン（**太字**や#見出し等）は一切使用しないでください。
+      2. 重要: 出力はプレーンテキストのみで行ってください。マークダウン(**太字**や#見出し等)は一切使用しないでください。
       3. 箇条書き記号には「・」を使用してください。
       4. 文字数制限がある場合は、過不足についてもコメントしてください。`;
     }
@@ -465,9 +437,7 @@ const ESEntryDisplay = ({ entry, onEdit, onDelete }) => {
 };
 
 export default function App() {
-  const [user, setUser] = useState(null);
   const [entries, setEntries] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [view, setView] = useState("list");
   const [viewMode, setViewMode] = useState("company");
   const [editingId, setEditingId] = useState(null);
@@ -480,42 +450,6 @@ export default function App() {
     selectionType: "",
     qas: [{ id: Date.now(), question: "", answer: "", tags: "" }],
   });
-
-  useEffect(() => {
-    const initAuth = async () => {
-      try {
-        if (
-          typeof __initial_auth_token !== "undefined" &&
-          __initial_auth_token
-        ) {
-          await signInWithCustomToken(auth, __initial_auth_token);
-        } else {
-          await signInAnonymously(auth);
-        }
-      } catch (error) {
-        console.error(error);
-      }
-    };
-    initAuth();
-    const unsubscribe = onAuthStateChanged(auth, setUser);
-    return () => unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    if (!user) return;
-    const q = query(
-      collection(db, "artifacts", appId, "users", user.uid, "es_entries")
-    );
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-      data.sort(
-        (a, b) => (b.updatedAt?.seconds || 0) - (a.updatedAt?.seconds || 0)
-      );
-      setEntries(data);
-      setLoading(false);
-    });
-    return () => unsubscribe();
-  }, [user]);
 
   // --- Data Processing for Views ---
   const isMatch = (text) => {
@@ -552,9 +486,13 @@ export default function App() {
         .filter(Boolean);
     }
 
-    return [...result].sort((a, b) =>
-      (a.company || "").localeCompare(b.company || "", "ja")
-    );
+    return [...result].sort((a, b) => {
+      // Sort by update time descending
+      if (a.updatedAt && b.updatedAt) {
+        return new Date(b.updatedAt) - new Date(a.updatedAt);
+      }
+      return (a.company || "").localeCompare(b.company || "", "ja");
+    });
   }, [entries, searchQuery]);
 
   const flattenedQAs = useMemo(() => {
@@ -620,46 +558,48 @@ export default function App() {
   }, [processedCompanyEntries]);
 
   // --- Handlers ---
-  const handleSave = async () => {
+  const resetForm = () => {
+    setView("list");
+    setEditingId(null);
+    setFormData({
+      company: "",
+      industry: "",
+      status: "未提出",
+      selectionType: "",
+      qas: [{ id: Date.now(), question: "", answer: "", tags: "" }],
+    });
+  };
+
+  const handleSave = () => {
     if (!formData.company) return;
-    if (!user) return;
-    const collectionRef = collection(
-      db,
-      "artifacts",
-      appId,
-      "users",
-      user.uid,
-      "es_entries"
-    );
-    const payload = {
-      ...sanitizeEntry(formData),
-      updatedAt: serverTimestamp(),
-    };
+
     try {
-      if (editingId) await updateDoc(doc(collectionRef, editingId), payload);
-      else
-        await addDoc(collectionRef, {
-          ...payload,
-          createdAt: serverTimestamp(),
-        });
-      alert("保存しました！");
+      const entryData = { ...formData, id: editingId };
+      const sanitized = sanitizeEntry(entryData);
+
+      setEntries((prev) => {
+        if (editingId) {
+          return prev.map((e) => (e.id === editingId ? sanitized : e));
+        } else {
+          return [sanitized, ...prev];
+        }
+      });
       resetForm();
-    } catch (e) {
-      console.error(e);
+    } catch (error) {
+      console.error(error);
       alert("保存に失敗しました。");
     }
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = (id) => {
     if (
       !confirm(
         "この企業のエントリーシートを削除しますか？\nこの操作は取り消せません。"
       )
     )
       return;
-    await deleteDoc(
-      doc(db, "artifacts", appId, "users", user.uid, "es_entries", id)
-    );
+
+    setEntries((prev) => prev.filter((e) => e.id !== id));
   };
 
   const handleEditById = (id) => {
@@ -676,87 +616,47 @@ export default function App() {
 
     const link = document.createElement("a");
     link.href = url;
-    link.download = `es-backup-${new Date().toISOString().slice(0, 19)}.json`;
+    link.download = `es-data-${new Date()
+      .toISOString()
+      .slice(0, 19)
+      .replace(/:/g, "-")}.json`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
   };
 
-  // --- JSONインポートでバックアップ復元 ---
   const handleImport = (event) => {
     const file = event.target.files[0];
     if (!file) return;
-    if (!user) return;
 
     const reader = new FileReader();
-    reader.onload = async (e) => {
+    reader.onload = (e) => {
       try {
         const importedData = JSON.parse(e.target.result);
         if (Array.isArray(importedData)) {
           if (
             confirm(
-              "現在のデータを上書きして、バックアップファイルを読み込みますか？"
+              "現在のデータを破棄して、ファイルを読み込みますか？\n(未保存のデータは失われます)"
             )
           ) {
-            const batch = writeBatch(db);
-            const collectionRef = collection(
-              db,
-              "artifacts",
-              appId,
-              "users",
-              user.uid,
-              "es_entries"
+            const normalizedData = importedData.map((item) =>
+              sanitizeEntry(item)
             );
-
-            importedData.forEach((item) => {
-              const docRef = item.id
-                ? doc(collectionRef, item.id)
-                : doc(collectionRef);
-
-              const { id, ...rawData } = item;
-
-              const sanitizedData = sanitizeEntry(rawData);
-
-              const dataToSave = {
-                ...sanitizedData,
-                updatedAt: serverTimestamp(),
-              };
-
-              if (!rawData.createdAt) {
-                dataToSave.createdAt = serverTimestamp();
-              } else {
-                dataToSave.createdAt = rawData.createdAt;
-              }
-
-              batch.set(docRef, dataToSave, { merge: true });
-            });
-
-            await batch.commit();
-            alert("データを復元・正規化してインポートしました。");
+            setEntries(normalizedData);
           }
         } else {
-          alert("無効なファイル形式です。");
+          alert(
+            "無効なファイル形式です。es-backup形式のJSONファイルを選択してください。"
+          );
         }
       } catch (error) {
         console.error(error);
-        alert("ファイルの読み込みに失敗しました。");
+        alert("ファイルの読み込みに失敗しました。JSON形式を確認してください。");
       }
     };
     reader.readAsText(file);
     event.target.value = "";
-  };
-
-  const resetForm = () => {
-    setView("list");
-    setEditingId(null);
-    setFormData({
-      company: "",
-      industry: "",
-      status: "未提出",
-      selectionType: "",
-      qas: [{ id: Date.now(), question: "", answer: "", tags: "" }],
-    });
   };
 
   const startEdit = (entry) => {
@@ -780,6 +680,7 @@ export default function App() {
         { id: Date.now(), question: "", answer: "", tags: "", charLimit: "" },
       ],
     }));
+
   const removeQA = (id) => {
     if (formData.qas.length > 1)
       setFormData((p) => ({ ...p, qas: p.qas.filter((q) => q.id !== id) }));
@@ -789,13 +690,6 @@ export default function App() {
       ...p,
       qas: p.qas.map((q) => (q.id === id ? { ...q, [f]: v } : q)),
     }));
-
-  if (loading)
-    return (
-      <div className="flex items-center justify-center h-screen bg-slate-50 text-slate-400">
-        <Loader2 className="animate-spin mr-2" /> Loading...
-      </div>
-    );
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-20">
@@ -809,7 +703,7 @@ export default function App() {
               <Briefcase size={20} />
             </div>
             <h1 className="text-lg font-bold text-slate-800 hidden sm:block tracking-tight">
-              ES Manager
+              ES Manager{" "}
             </h1>
           </div>
 
@@ -832,7 +726,7 @@ export default function App() {
                 <button
                   onClick={handleExport}
                   className="bg-white text-slate-600 border border-slate-200 p-2 rounded-lg hover:bg-slate-50 hover:text-indigo-600 transition-colors"
-                  title="バックアップを保存"
+                  title="データをエクスポート(JSON)"
                 >
                   <Download size={18} />
                 </button>
@@ -843,7 +737,7 @@ export default function App() {
                     accept=".json"
                     onChange={handleImport}
                     className="hidden"
-                    title="バックアップを復元"
+                    title="データをインポート(JSON)"
                   />
                 </label>
               </div>
@@ -908,7 +802,9 @@ export default function App() {
               <div className="grid gap-6">
                 {processedCompanyEntries.length === 0 && (
                   <div className="text-center text-slate-400 py-10">
-                    該当するエントリーシートはありません
+                    エントリーシートがありません。
+                    <br />
+                    右上のインポートボタンからJSONを読み込むか、新規作成してください。
                   </div>
                 )}
                 {processedCompanyEntries.map((entry) => (
@@ -988,7 +884,7 @@ export default function App() {
               <div className="space-y-8">
                 {Object.keys(entriesByStatus).length === 0 && (
                   <div className="text-center text-slate-400 py-10">
-                    該当するデータはありません
+                    データはありません
                   </div>
                 )}
                 {["未提出", "作成中", "提出済", "選考中", "採用", "不採用"].map(
