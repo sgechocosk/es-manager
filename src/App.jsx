@@ -310,6 +310,7 @@ const QAItemDisplay = ({
   selectionType,
   tags,
   showCompanyInfo = false,
+  onEdit,
 }) => (
   <div className="p-4 bg-white border border-slate-200 rounded-xl hover:shadow-md transition-all group">
     {showCompanyInfo && (
@@ -319,11 +320,23 @@ const QAItemDisplay = ({
             {companyName}
           </span>
           <StatusBadge status={status} />
+          {selectionType && (
+            <span className="text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded flex items-center gap-1">
+              {selectionType}
+            </span>
+          )}
         </div>
-        {selectionType && (
-          <span className="text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded flex items-center gap-1">
-            {selectionType}
-          </span>
+        {onEdit && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit(qa.entryId);
+            }}
+            className="p-1.5 text-slate-400 hover:text-indigo-600 rounded-md transition-colors"
+            title="編集"
+          >
+            <Edit2 size={16} />
+          </button>
         )}
       </div>
     )}
@@ -335,6 +348,11 @@ const QAItemDisplay = ({
         </span>
         <h3 className="font-bold text-sm text-slate-800 leading-relaxed">
           {qa.question}
+          {qa.charLimit && (
+            <span className="ml-2 text-xs font-normal text-slate-400">
+              ({qa.charLimit}文字)
+            </span>
+          )}
         </h3>
       </div>
       <CopyButton text={qa.answer} />
@@ -411,6 +429,11 @@ const ESEntryDisplay = ({ entry, onEdit, onDelete }) => {
                   <span className="text-indigo-600 font-black text-sm">Q.</span>
                   <h3 className="font-bold text-sm text-slate-700 leading-relaxed">
                     {qa.question}
+                    {qa.charLimit && (
+                      <span className="ml-2 text-xs font-normal text-slate-400">
+                        ({qa.charLimit}文字)
+                      </span>
+                    )}
                   </h3>
                 </div>
                 <CopyButton text={qa.answer} />
@@ -639,6 +662,13 @@ export default function App() {
     );
   };
 
+  const handleEditById = (id) => {
+    const entry = entries.find((e) => e.id === id);
+    if (entry) {
+      startEdit(entry);
+    }
+  };
+
   const handleExport = () => {
     const dataStr = JSON.stringify(entries, null, 2);
     const blob = new Blob([dataStr], { type: "application/json" });
@@ -653,6 +683,7 @@ export default function App() {
     URL.revokeObjectURL(url);
   };
 
+  // --- JSONインポートでバックアップ復元 ---
   const handleImport = (event) => {
     const file = event.target.files[0];
     if (!file) return;
@@ -682,8 +713,11 @@ export default function App() {
               const docRef = item.id
                 ? doc(collectionRef, item.id)
                 : doc(collectionRef);
+
               const { id, ...rawData } = item;
+
               const sanitizedData = sanitizeEntry(rawData);
+
               const dataToSave = {
                 ...sanitizedData,
                 updatedAt: serverTimestamp(),
@@ -765,7 +799,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-20">
-      {/* Header */}
       <header className="bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-0 z-20 px-4 py-3 shadow-sm">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div
@@ -906,6 +939,7 @@ export default function App() {
                     status={item.status}
                     selectionType={item.selectionType}
                     showCompanyInfo={true}
+                    onEdit={handleEditById}
                   />
                 ))}
               </div>
@@ -940,6 +974,7 @@ export default function App() {
                           status={item.status}
                           selectionType={item.selectionType}
                           showCompanyInfo={true}
+                          onEdit={handleEditById}
                         />
                       ))}
                     </div>
@@ -1122,7 +1157,6 @@ export default function App() {
                             <div className="text-xs font-bold text-slate-400">
                               Q{idx + 1}
                             </div>
-                            {/* 文字数制限の入力欄を追加 */}
                             <div className="flex items-center gap-1">
                               <span className="text-[10px] text-slate-400">
                                 文字数制限:
@@ -1157,7 +1191,6 @@ export default function App() {
                             }
                           />
                           <div className="text-right mt-1 flex justify-end gap-2 items-center">
-                            {/* 文字数制限が設定されている場合のみ、上限表示と警告色を適用 */}
                             {qa.charLimit && (
                               <span
                                 className={`text-[10px] font-mono px-2 py-0.5 rounded-full ${
