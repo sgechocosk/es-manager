@@ -6,7 +6,7 @@ import {
   Check,
   Trash2,
   Edit2,
-  Briefcase,
+  GraduationCap,
   Save,
   X,
   Bot,
@@ -15,6 +15,7 @@ import {
   Tags,
   Building2,
   Sparkles,
+  Briefcase,
   Calendar,
   Download,
   Upload,
@@ -700,7 +701,7 @@ export default function App() {
             onClick={() => setView("list")}
           >
             <div className="bg-indigo-600 text-white p-1.5 rounded-lg">
-              <Briefcase size={20} />
+              <GraduationCap size={20} />
             </div>
             <h1 className="text-lg font-bold text-slate-800 hidden sm:block tracking-tight">
               ES Manager{" "}
@@ -1053,12 +1054,12 @@ export default function App() {
                             <div className="text-xs font-bold text-slate-400">
                               Q{idx + 1}
                             </div>
-                            <div className="flex items-center gap-1">
+                            <div className="flex items-center gap-1 mr-4">
                               <span className="text-[10px] text-slate-400">
                                 文字数制限:
                               </span>
                               <input
-                                type="number"
+                                type="text"
                                 className="w-16 text-right text-xs bg-white border border-slate-200 rounded px-1 py-0.5 focus:border-indigo-500 outline-none placeholder-slate-300"
                                 placeholder="なし"
                                 value={qa.charLimit || ""}
