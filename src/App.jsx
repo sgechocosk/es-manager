@@ -394,28 +394,34 @@ export default function App() {
   };
 
   const processedCompanyEntries = useMemo(() => {
-    if (!searchQuery) return entries;
+    let result = entries;
 
-    return entries
-      .map((entry) => {
-        const isCompanyMatch =
-          isMatch(entry.company) ||
-          isMatch(entry.industry) ||
-          isMatch(entry.selectionType);
+    if (searchQuery) {
+      result = entries
+        .map((entry) => {
+          const isCompanyMatch =
+            isMatch(entry.company) ||
+            isMatch(entry.industry) ||
+            isMatch(entry.selectionType);
 
-        const filteredQAs = entry.qas.filter(
-          (qa) =>
-            isCompanyMatch ||
-            isMatch(qa.question) ||
-            isMatch(qa.answer) ||
-            isMatch(qa.tags)
-        );
+          const filteredQAs = entry.qas.filter(
+            (qa) =>
+              isCompanyMatch ||
+              isMatch(qa.question) ||
+              isMatch(qa.answer) ||
+              isMatch(qa.tags)
+          );
 
-        if (isCompanyMatch) return entry;
-        if (filteredQAs.length === 0) return null;
-        return { ...entry, qas: filteredQAs };
-      })
-      .filter(Boolean);
+          if (isCompanyMatch) return entry;
+          if (filteredQAs.length === 0) return null;
+          return { ...entry, qas: filteredQAs };
+        })
+        .filter(Boolean);
+    }
+
+    return [...result].sort((a, b) =>
+      (a.company || "").localeCompare(b.company || "", "ja")
+    );
   }, [entries, searchQuery]);
 
   const flattenedQAs = useMemo(() => {
