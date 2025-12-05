@@ -16,7 +16,7 @@ import {
   onSnapshot,
   serverTimestamp,
   query,
-  writeBatch, // 追加: 一括書き込み用
+  writeBatch,
 } from "firebase/firestore";
 import {
   Search,
@@ -342,6 +342,75 @@ const QAItemDisplay = ({
   </div>
 );
 
+const ESEntryDisplay = ({ entry, onEdit, onDelete }) => (
+  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-all duration-300">
+    <div className="px-5 py-3 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white flex justify-between items-center">
+      <div className="flex flex-wrap items-center gap-3">
+        <h2 className="text-lg font-bold text-slate-800">{entry.company}</h2>
+        <StatusBadge status={entry.status} />
+        <span className="text-xs text-slate-500 flex items-center gap-1">
+          <Briefcase size={12} /> {entry.industry}
+        </span>
+        {entry.selectionType && (
+          <span className="text-xs text-slate-500 flex items-center gap-1 px-2 py-0.5 bg-slate-100 rounded">
+            <Calendar size={12} /> {entry.selectionType}
+          </span>
+        )}
+      </div>
+      <div className="flex gap-1">
+        <button
+          onClick={() => onEdit(entry)}
+          className="p-1.5 text-slate-400 hover:text-indigo-600 rounded-md transition-colors"
+        >
+          <Edit2 size={16} />
+        </button>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete(entry.id);
+          }}
+          className="p-1.5 text-slate-400 hover:text-rose-600 rounded-md transition-colors"
+        >
+          <Trash2 size={16} />
+        </button>
+      </div>
+    </div>
+    <div className="divide-y divide-slate-50 bg-slate-50/30">
+      {entry.qas.map((qa, idx) => (
+        <div key={idx} className="p-5 hover:bg-white transition-colors">
+          <div className="flex justify-between items-start gap-4 mb-2">
+            <div className="flex gap-2 flex-1">
+              <span className="text-indigo-600 font-black text-sm">Q.</span>
+              <h3 className="font-bold text-sm text-slate-700 leading-relaxed">
+                {qa.question}
+              </h3>
+            </div>
+            <CopyButton text={qa.answer} />
+          </div>
+          <p className="text-sm text-slate-600 whitespace-pre-wrap leading-7 mb-3 pl-6">
+            {qa.answer}
+          </p>
+          <div className="pl-6 flex flex-wrap justify-between items-end gap-2">
+            <div className="flex flex-wrap gap-2">
+              {splitTags(qa.tags).map((tag, i) => (
+                <span
+                  key={i}
+                  className="inline-flex items-center px-2 py-1 rounded text-[10px] font-medium bg-indigo-50 text-indigo-600 border border-indigo-100"
+                >
+                  #{tag}
+                </span>
+              ))}
+            </div>
+            <div className="text-[10px] font-mono text-slate-400 bg-slate-50 px-2 py-0.5 rounded">
+              {qa.answer.length}文字
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
 export default function App() {
   const [user, setUser] = useState(null);
   const [entries, setEntries] = useState([]);
@@ -435,8 +504,6 @@ export default function App() {
     );
   }, [entries, searchQuery]);
 
-  
-
   const flattenedQAs = useMemo(() => {
     let allItems = [];
     entries.forEach((entry) => {
@@ -487,15 +554,15 @@ export default function App() {
       }, {});
   }, [flattenedQAs]);
 
-  const statusGroups = useMemo(() => {
+  const entriesByStatus = useMemo(() => {
     const groups = {};
-    flattenedQAs.forEach((item) => {
-      const status = item.status || "未設定";
+    processedCompanyEntries.forEach((entry) => {
+      const status = entry.status || "未設定";
       if (!groups[status]) groups[status] = [];
-      groups[status].push(item);
+      groups[status].push(entry);
     });
     return groups;
-  }, [flattenedQAs]);
+  }, [processedCompanyEntries]);
 
   // --- Handlers ---
   const handleSave = async () => {
@@ -581,9 +648,7 @@ export default function App() {
             importedData.forEach((item) => {
               if (item.id) {
                 const docRef = doc(collectionRef, item.id);
-                // idフィールドを除外してデータを作成
                 const { id, ...data } = item;
-                // インポート時に更新日時のみ更新（またはそのまま復元）
                 batch.set(docRef, { ...data, updatedAt: serverTimestamp() });
               }
             });
@@ -769,82 +834,12 @@ export default function App() {
                   </div>
                 )}
                 {processedCompanyEntries.map((entry) => (
-                  <div
+                  <ESEntryDisplay
                     key={entry.id}
-                    className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-all duration-300"
-                  >
-                    <div className="px-5 py-3 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white flex justify-between items-center">
-                      <div className="flex flex-wrap items-center gap-3">
-                        <h2 className="text-lg font-bold text-slate-800">
-                          {entry.company}
-                        </h2>
-                        <StatusBadge status={entry.status} />
-                        <span className="text-xs text-slate-500 flex items-center gap-1">
-                          <Briefcase size={12} /> {entry.industry}
-                        </span>
-                        {entry.selectionType && (
-                          <span className="text-xs text-slate-500 flex items-center gap-1 px-2 py-0.5 bg-slate-100 rounded">
-                            <Calendar size={12} /> {entry.selectionType}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex gap-1">
-                        <button
-                          onClick={() => startEdit(entry)}
-                          className="p-1.5 text-slate-400 hover:text-indigo-600 rounded-md transition-colors"
-                        >
-                          <Edit2 size={16} />
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDelete(entry.id);
-                          }}
-                          className="p-1.5 text-slate-400 hover:text-rose-600 rounded-md transition-colors"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </div>
-                    <div className="divide-y divide-slate-50 bg-slate-50/30">
-                      {entry.qas.map((qa, idx) => (
-                        <div
-                          key={idx}
-                          className="p-5 hover:bg-white transition-colors"
-                        >
-                          <div className="flex justify-between items-start gap-4 mb-2">
-                            <div className="flex gap-2 flex-1">
-                              <span className="text-indigo-600 font-black text-sm">
-                                Q.
-                              </span>
-                              <h3 className="font-bold text-sm text-slate-700 leading-relaxed">
-                                {qa.question}
-                              </h3>
-                            </div>
-                            <CopyButton text={qa.answer} />
-                          </div>
-                          <p className="text-sm text-slate-600 whitespace-pre-wrap leading-7 mb-3 pl-6">
-                            {qa.answer}
-                          </p>
-                          <div className="pl-6 flex flex-wrap justify-between items-end gap-2">
-                            <div className="flex flex-wrap gap-2">
-                              {splitTags(qa.tags).map((tag, i) => (
-                                <span
-                                  key={i}
-                                  className="inline-flex items-center px-2 py-1 rounded text-[10px] font-medium bg-indigo-50 text-indigo-600 border border-indigo-100"
-                                >
-                                  #{tag}
-                                </span>
-                              ))}
-                            </div>
-                            <div className="text-[10px] font-mono text-slate-400 bg-slate-50 px-2 py-0.5 rounded">
-                              {qa.answer.length}文字
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+                    entry={entry}
+                    onEdit={startEdit}
+                    onDelete={handleDelete}
+                  />
                 ))}
               </div>
             )}
@@ -908,40 +903,36 @@ export default function App() {
               </div>
             )}
 
-            {/* ▼ 追加箇所: ステータス別表示 (View 4) ▼ */}
+            {/* View 4: Status List (ES Grouped) */}
             {viewMode === "status" && (
               <div className="space-y-8">
-                {Object.keys(statusGroups).length === 0 && (
+                {Object.keys(entriesByStatus).length === 0 && (
                   <div className="text-center text-slate-400 py-10">
                     該当するデータはありません
                   </div>
                 )}
-                {/* 任意の順序で表示したい場合はここで配列を定義してmapします */}
                 {["未提出", "作成中", "提出済", "選考中", "採用", "不採用"].map(
                   (status) => {
-                    const items = statusGroups[status];
-                    if (!items || items.length === 0) return null;
+                    const entries = entriesByStatus[status];
+                    if (!entries || entries.length === 0) return null;
                     return (
                       <div
                         key={status}
-                        className="bg-slate-50/50 rounded-xl border border-slate-200 p-4"
+                        className="bg-slate-50/50 rounded-xlYB border border-slate-200 p-4"
                       >
                         <div className="mb-4 flex items-center gap-2">
                           <StatusBadge status={status} />
                           <span className="text-xs text-slate-400 font-bold">
-                            {items.length}件
+                            {entries.length}社
                           </span>
                         </div>
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                          {items.map((item, nV) => (
-                            <QAItemDisplay
-                              key={`${item.entryId}-${nV}`}
-                              qa={item}
-                              tags={item.tagsArray}
-                              companyName={item.companyName}
-                              status={item.status}
-                              selectionType={item.selectionType}
-                              showCompanyInfo={true}
+                        <div className="space-y-6">
+                          {entries.map((entry) => (
+                            <ESEntryDisplay
+                              key={entry.id}
+                              entry={entry}
+                              onEdit={startEdit}
+                              onDelete={handleDelete}
                             />
                           ))}
                         </div>
@@ -949,8 +940,7 @@ export default function App() {
                     );
                   }
                 )}
-                {/* 定義したステータス以外（"未設定"など）があればその他として表示 */}
-                {Object.keys(statusGroups)
+                {Object.keys(entriesByStatus)
                   .filter(
                     (s) =>
                       ![
@@ -965,21 +955,18 @@ export default function App() {
                   .map((status) => (
                     <div
                       key={status}
-                      className="bg-slate-50/50 rounded-xl border border-slate-200 p-4"
+                      className="bg-slate-50/50 rounded-xlYB border border-slate-200 p-4"
                     >
                       <h3 className="text-sm font-bold text-slate-600 mb-4 px-1">
                         {status}
                       </h3>
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                        {statusGroups[status].map((item, idx) => (
-                          <QAItemDisplay
-                            key={idx}
-                            qa={item}
-                            tags={item.tagsArray}
-                            companyName={item.companyName}
-                            status={item.status}
-                            selectionType={item.selectionType}
-                            showCompanyInfo={true}
+                      <div className="space-y-6">
+                        {entriesByStatus[status].map((entry) => (
+                          <ESEntryDisplay
+                            key={entry.id}
+                            entry={entry}
+                            onEdit={startEdit}
+                            onDelete={handleDelete}
                           />
                         ))}
                       </div>
