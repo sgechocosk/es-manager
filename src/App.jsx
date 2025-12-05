@@ -60,6 +60,26 @@ const splitTags = (tagString) => {
   return tagString.split(/[,\s、，]+/).filter((t) => t.length > 0);
 };
 
+const sanitizeEntry = (entry) => {
+  const sanitizedQas = Array.isArray(entry.qas)
+    ? entry.qas.map((qa) => ({
+        id: qa.id || Date.now() + Math.random(),
+        question: qa.question || "",
+        answer: qa.answer || "",
+        tags: qa.tags || "",
+        charLimit: qa.charLimit || "",
+      }))
+    : [];
+
+  return {
+    company: entry.company || "名称未設定",
+    industry: entry.industry || "",
+    status: entry.status || "未提出",
+    selectionType: entry.selectionType || "",
+    qas: sanitizedQas,
+  };
+};
+
 const callGeminiAPI = async (prompt) => {
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
@@ -99,7 +119,7 @@ const StatusBadge = ({ status }) => {
         colors[status] || colors["未提出"]
       }`}
     >
-      {status}
+      {status || "未提出"}
     </span>
   );
 };
@@ -342,74 +362,84 @@ const QAItemDisplay = ({
   </div>
 );
 
-const ESEntryDisplay = ({ entry, onEdit, onDelete }) => (
-  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-all duration-300">
-    <div className="px-5 py-3 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white flex justify-between items-center">
-      <div className="flex flex-wrap items-center gap-3">
-        <h2 className="text-lg font-bold text-slate-800">{entry.company}</h2>
-        <StatusBadge status={entry.status} />
-        <span className="text-xs text-slate-500 flex items-center gap-1">
-          <Briefcase size={12} /> {entry.industry}
-        </span>
-        {entry.selectionType && (
-          <span className="text-xs text-slate-500 flex items-center gap-1 px-2 py-0.5 bg-slate-100 rounded">
-            <Calendar size={12} /> {entry.selectionType}
+const ESEntryDisplay = ({ entry, onEdit, onDelete }) => {
+  const qas = entry.qas || [];
+
+  return (
+    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-all duration-300">
+      <div className="px-5 py-3 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white flex justify-between items-center">
+        <div className="flex flex-wrap items-center gap-3">
+          <h2 className="text-lg font-bold text-slate-800">{entry.company}</h2>
+          <StatusBadge status={entry.status} />
+          <span className="text-xs text-slate-500 flex items-center gap-1">
+            <Briefcase size={12} /> {entry.industry}
           </span>
+          {entry.selectionType && (
+            <span className="text-xs text-slate-500 flex items-center gap-1 px-2 py-0.5 bg-slate-100 rounded">
+              <Calendar size={12} /> {entry.selectionType}
+            </span>
+          )}
+        </div>
+        <div className="flex gap-1">
+          <button
+            onClick={() => onEdit(entry)}
+            className="p-1.5 text-slate-400 hover:text-indigo-600 rounded-md transition-colors"
+          >
+            <Edit2 size={16} />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(entry.id);
+            }}
+            className="p-1.5 text-slate-400 hover:text-rose-600 rounded-md transition-colors"
+          >
+            <Trash2 size={16} />
+          </button>
+        </div>
+      </div>
+      <div className="divide-y divide-slate-50 bg-slate-50/30">
+        {qas.length === 0 ? (
+          <div className="p-5 text-sm text-slate-400 text-center">
+            質問データがありません
+          </div>
+        ) : (
+          qas.map((qa, idx) => (
+            <div key={idx} className="p-5 hover:bg-white transition-colors">
+              <div className="flex justify-between items-start gap-4 mb-2">
+                <div className="flex gap-2 flex-1">
+                  <span className="text-indigo-600 font-black text-sm">Q.</span>
+                  <h3 className="font-bold text-sm text-slate-700 leading-relaxed">
+                    {qa.question}
+                  </h3>
+                </div>
+                <CopyButton text={qa.answer} />
+              </div>
+              <p className="text-sm text-slate-600 whitespace-pre-wrap leading-7 mb-3 pl-6">
+                {qa.answer}
+              </p>
+              <div className="pl-6 flex flex-wrap justify-between items-end gap-2">
+                <div className="flex flex-wrap gap-2">
+                  {splitTags(qa.tags).map((tag, i) => (
+                    <span
+                      key={i}
+                      className="inline-flex items-center px-2 py-1 rounded text-[10px] font-medium bg-indigo-50 text-indigo-600 border border-indigo-100"
+                    >
+                      #{tag}
+                    </span>
+                  ))}
+                </div>
+                <div className="text-[10px] font-mono text-slate-400 bg-slate-50 px-2 py-0.5 rounded">
+                  {(qa.answer || "").length}文字
+                </div>
+              </div>
+            </div>
+          ))
         )}
       </div>
-      <div className="flex gap-1">
-        <button
-          onClick={() => onEdit(entry)}
-          className="p-1.5 text-slate-400 hover:text-indigo-600 rounded-md transition-colors"
-        >
-          <Edit2 size={16} />
-        </button>
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete(entry.id);
-          }}
-          className="p-1.5 text-slate-400 hover:text-rose-600 rounded-md transition-colors"
-        >
-          <Trash2 size={16} />
-        </button>
-      </div>
     </div>
-    <div className="divide-y divide-slate-50 bg-slate-50/30">
-      {entry.qas.map((qa, idx) => (
-        <div key={idx} className="p-5 hover:bg-white transition-colors">
-          <div className="flex justify-between items-start gap-4 mb-2">
-            <div className="flex gap-2 flex-1">
-              <span className="text-indigo-600 font-black text-sm">Q.</span>
-              <h3 className="font-bold text-sm text-slate-700 leading-relaxed">
-                {qa.question}
-              </h3>
-            </div>
-            <CopyButton text={qa.answer} />
-          </div>
-          <p className="text-sm text-slate-600 whitespace-pre-wrap leading-7 mb-3 pl-6">
-            {qa.answer}
-          </p>
-          <div className="pl-6 flex flex-wrap justify-between items-end gap-2">
-            <div className="flex flex-wrap gap-2">
-              {splitTags(qa.tags).map((tag, i) => (
-                <span
-                  key={i}
-                  className="inline-flex items-center px-2 py-1 rounded text-[10px] font-medium bg-indigo-50 text-indigo-600 border border-indigo-100"
-                >
-                  #{tag}
-                </span>
-              ))}
-            </div>
-            <div className="text-[10px] font-mono text-slate-400 bg-slate-50 px-2 py-0.5 rounded">
-              {qa.answer.length}文字
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
-  </div>
-);
+  );
+};
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -484,7 +514,7 @@ export default function App() {
             isMatch(entry.industry) ||
             isMatch(entry.selectionType);
 
-          const filteredQAs = entry.qas.filter(
+          const filteredQAs = (entry.qas || []).filter(
             (qa) =>
               isCompanyMatch ||
               isMatch(qa.question) ||
@@ -507,27 +537,29 @@ export default function App() {
   const flattenedQAs = useMemo(() => {
     let allItems = [];
     entries.forEach((entry) => {
-      entry.qas.forEach((qa) => {
-        const tags = splitTags(qa.tags);
-        const match =
-          isMatch(entry.company) ||
-          isMatch(entry.industry) ||
-          isMatch(entry.selectionType) ||
-          isMatch(qa.question) ||
-          isMatch(qa.answer) ||
-          tags.some((t) => isMatch(t));
+      if (entry.qas) {
+        entry.qas.forEach((qa) => {
+          const tags = splitTags(qa.tags);
+          const match =
+            isMatch(entry.company) ||
+            isMatch(entry.industry) ||
+            isMatch(entry.selectionType) ||
+            isMatch(qa.question) ||
+            isMatch(qa.answer) ||
+            tags.some((t) => isMatch(t));
 
-        if (match) {
-          allItems.push({
-            ...qa,
-            tagsArray: tags,
-            companyName: entry.company,
-            status: entry.status,
-            selectionType: entry.selectionType,
-            entryId: entry.id,
-          });
-        }
-      });
+          if (match) {
+            allItems.push({
+              ...qa,
+              tagsArray: tags,
+              companyName: entry.company || "名称未設定",
+              status: entry.status || "未設定",
+              selectionType: entry.selectionType,
+              entryId: entry.id,
+            });
+          }
+        });
+      }
     });
     return allItems;
   }, [entries, searchQuery]);
@@ -576,7 +608,10 @@ export default function App() {
       user.uid,
       "es_entries"
     );
-    const payload = { ...formData, updatedAt: serverTimestamp() };
+    const payload = {
+      ...sanitizeEntry(formData),
+      updatedAt: serverTimestamp(),
+    };
     try {
       if (editingId) await updateDoc(doc(collectionRef, editingId), payload);
       else
@@ -618,7 +653,6 @@ export default function App() {
     URL.revokeObjectURL(url);
   };
 
-  // --- JSONインポート（バックアップ復元） ---
   const handleImport = (event) => {
     const file = event.target.files[0];
     if (!file) return;
@@ -634,7 +668,6 @@ export default function App() {
               "現在のデータを上書きして、バックアップファイルを読み込みますか？"
             )
           ) {
-            // Firebaseへの一括書き込み処理
             const batch = writeBatch(db);
             const collectionRef = collection(
               db,
@@ -646,15 +679,27 @@ export default function App() {
             );
 
             importedData.forEach((item) => {
-              if (item.id) {
-                const docRef = doc(collectionRef, item.id);
-                const { id, ...data } = item;
-                batch.set(docRef, { ...data, updatedAt: serverTimestamp() });
+              const docRef = item.id
+                ? doc(collectionRef, item.id)
+                : doc(collectionRef);
+              const { id, ...rawData } = item;
+              const sanitizedData = sanitizeEntry(rawData);
+              const dataToSave = {
+                ...sanitizedData,
+                updatedAt: serverTimestamp(),
+              };
+
+              if (!rawData.createdAt) {
+                dataToSave.createdAt = serverTimestamp();
+              } else {
+                dataToSave.createdAt = rawData.createdAt;
               }
+
+              batch.set(docRef, dataToSave, { merge: true });
             });
 
             await batch.commit();
-            alert("データを復元しました。");
+            alert("データを復元・正規化してインポートしました。");
           }
         } else {
           alert("無効なファイル形式です。");
@@ -684,7 +729,7 @@ export default function App() {
     setFormData({
       company: entry.company,
       industry: entry.industry,
-      status: entry.status,
+      status: entry.status || "未提出",
       selectionType: entry.selectionType || "",
       qas: entry.qas || [],
     });
