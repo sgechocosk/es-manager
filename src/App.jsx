@@ -136,7 +136,7 @@ const CopyButton = ({ text }) => {
   );
 };
 
-const AIAssistant = ({ question, answer, onApply }) => {
+const AIAssistant = ({ question, answer, onApply, charLimit }) => {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState("");
   const [mode, setMode] = useState(null);
@@ -149,6 +149,10 @@ const AIAssistant = ({ question, answer, onApply }) => {
     setResult("");
 
     let prompt = "";
+    const limitCondition = charLimit
+      ? `・文字数制限: ${charLimit}文字程度に収めること。`
+      : "";
+
     if (actionType === "refine") {
       prompt = `あなたはプロのキャリアアドバイザーです。以下の就職活動のエントリーシート(ES)の回答を推敲してください。
       
@@ -158,6 +162,9 @@ const AIAssistant = ({ question, answer, onApply }) => {
       【元の回答】
       ${answer}
 
+      【文字数制限】
+      ${charLimit ? charLimit + "文字以内" : "特になし"}
+
       【ユーザーからの推敲指示】
       ${
         instruction ||
@@ -166,20 +173,24 @@ const AIAssistant = ({ question, answer, onApply }) => {
       
       【条件】
       1. 誤字脱字を修正し、適切な敬語表現を使い、改行は使用しないこと。
-      2. 出力は推敲後のテキストのみを、マークダウンや挨拶文無しで表示してください。`;
+      2. 出力は推敲後のテキストのみを、マークダウンや挨拶文無しで表示してください。
+      3. ${limitCondition}`;
     } else if (actionType === "feedback") {
       prompt = `あなたは企業の採用担当者です。以下のエントリーシート(ES)の回答に対してフィードバックをしてください。
       
       【質問内容】
       ${question}
+      ${charLimit ? `(文字数制限: ${charLimit}文字)` : ""}
 
       【回答内容】
       ${answer}
+      (現在の文字数: ${answer.length}文字)
       
       【出力条件】
       1. 評価できる点と改善すべき点を具体的に挙げてください。
       2. 重要: 出力はプレーンテキストのみで行ってください。マークダウン（**太字**や#見出し等）は一切使用しないでください。
-      3. 箇条書き記号には「・」を使用してください。`;
+      3. 箇条書き記号には「・」を使用してください。
+      4. 文字数制限がある場合は、過不足についてもコメントしてください。`;
     }
 
     const aiText = await callGeminiAPI(prompt);
@@ -424,6 +435,8 @@ export default function App() {
     );
   }, [entries, searchQuery]);
 
+  
+
   const flattenedQAs = useMemo(() => {
     let allItems = [];
     entries.forEach((entry) => {
@@ -472,6 +485,16 @@ export default function App() {
         obj[key] = groups[key];
         return obj;
       }, {});
+  }, [flattenedQAs]);
+
+  const statusGroups = useMemo(() => {
+    const groups = {};
+    flattenedQAs.forEach((item) => {
+      const status = item.status || "未設定";
+      if (!groups[status]) groups[status] = [];
+      groups[status].push(item);
+    });
+    return groups;
   }, [flattenedQAs]);
 
   // --- Handlers ---
@@ -608,7 +631,10 @@ export default function App() {
   const addQA = () =>
     setFormData((p) => ({
       ...p,
-      qas: [...p.qas, { id: Date.now(), question: "", answer: "", tags: "" }],
+      qas: [
+        ...p.qas,
+        { id: Date.now(), question: "", answer: "", tags: "", charLimit: "" },
+      ],
     }));
   const removeQA = (id) => {
     if (formData.qas.length > 1)
@@ -709,6 +735,7 @@ export default function App() {
           <div className="max-w-7xl mx-auto mt-3 flex gap-1 overflow-x-auto pb-1">
             {[
               { id: "company", icon: Building2, label: "会社別" },
+              { id: "status", icon: Check, label: "ステータス別" },
               { id: "question", icon: LayoutList, label: "質問一覧" },
               { id: "tag", icon: Tags, label: "タグ別" },
             ].map((mode) => (
@@ -799,15 +826,20 @@ export default function App() {
                           <p className="text-sm text-slate-600 whitespace-pre-wrap leading-7 mb-3 pl-6">
                             {qa.answer}
                           </p>
-                          <div className="pl-6 flex flex-wrap gap-2">
-                            {splitTags(qa.tags).map((tag, i) => (
-                              <span
-                                key={i}
-                                className="inline-flex items-center px-2 py-1 rounded text-[10px] font-medium bg-indigo-50 text-indigo-600 border border-indigo-100"
-                              >
-                                #{tag}
-                              </span>
-                            ))}
+                          <div className="pl-6 flex flex-wrap justify-between items-end gap-2">
+                            <div className="flex flex-wrap gap-2">
+                              {splitTags(qa.tags).map((tag, i) => (
+                                <span
+                                  key={i}
+                                  className="inline-flex items-center px-2 py-1 rounded text-[10px] font-medium bg-indigo-50 text-indigo-600 border border-indigo-100"
+                                >
+                                  #{tag}
+                                </span>
+                              ))}
+                            </div>
+                            <div className="text-[10px] font-mono text-slate-400 bg-slate-50 px-2 py-0.5 rounded">
+                              {qa.answer.length}文字
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -873,6 +905,86 @@ export default function App() {
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {/* ▼ 追加箇所: ステータス別表示 (View 4) ▼ */}
+            {viewMode === "status" && (
+              <div className="space-y-8">
+                {Object.keys(statusGroups).length === 0 && (
+                  <div className="text-center text-slate-400 py-10">
+                    該当するデータはありません
+                  </div>
+                )}
+                {/* 任意の順序で表示したい場合はここで配列を定義してmapします */}
+                {["未提出", "作成中", "提出済", "選考中", "採用", "不採用"].map(
+                  (status) => {
+                    const items = statusGroups[status];
+                    if (!items || items.length === 0) return null;
+                    return (
+                      <div
+                        key={status}
+                        className="bg-slate-50/50 rounded-xl border border-slate-200 p-4"
+                      >
+                        <div className="mb-4 flex items-center gap-2">
+                          <StatusBadge status={status} />
+                          <span className="text-xs text-slate-400 font-bold">
+                            {items.length}件
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                          {items.map((item, nV) => (
+                            <QAItemDisplay
+                              key={`${item.entryId}-${nV}`}
+                              qa={item}
+                              tags={item.tagsArray}
+                              companyName={item.companyName}
+                              status={item.status}
+                              selectionType={item.selectionType}
+                              showCompanyInfo={true}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  }
+                )}
+                {/* 定義したステータス以外（"未設定"など）があればその他として表示 */}
+                {Object.keys(statusGroups)
+                  .filter(
+                    (s) =>
+                      ![
+                        "未提出",
+                        "作成中",
+                        "提出済",
+                        "選考中",
+                        "採用",
+                        "不採用",
+                      ].includes(s)
+                  )
+                  .map((status) => (
+                    <div
+                      key={status}
+                      className="bg-slate-50/50 rounded-xl border border-slate-200 p-4"
+                    >
+                      <h3 className="text-sm font-bold text-slate-600 mb-4 px-1">
+                        {status}
+                      </h3>
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        {statusGroups[status].map((item, idx) => (
+                          <QAItemDisplay
+                            key={idx}
+                            qa={item}
+                            tags={item.tagsArray}
+                            companyName={item.companyName}
+                            status={item.status}
+                            selectionType={item.selectionType}
+                            showCompanyInfo={true}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
               </div>
             )}
           </div>
@@ -974,8 +1086,25 @@ export default function App() {
                           <X size={16} />
                         </button>
                         <div className="mb-3">
-                          <div className="text-xs font-bold text-slate-400 mb-1">
-                            Q{idx + 1}
+                          <div className="flex justify-between items-center mb-1">
+                            <div className="text-xs font-bold text-slate-400">
+                              Q{idx + 1}
+                            </div>
+                            {/* 文字数制限の入力欄を追加 */}
+                            <div className="flex items-center gap-1">
+                              <span className="text-[10px] text-slate-400">
+                                文字数制限:
+                              </span>
+                              <input
+                                type="number"
+                                className="w-16 text-right text-xs bg-white border border-slate-200 rounded px-1 py-0.5 focus:border-indigo-500 outline-none placeholder-slate-300"
+                                placeholder="なし"
+                                value={qa.charLimit || ""}
+                                onChange={(e) =>
+                                  updateQA(qa.id, "charLimit", e.target.value)
+                                }
+                              />
+                            </div>
                           </div>
                           <input
                             className="w-full bg-transparent font-bold text-slate-800 placeholder-slate-300 outline-none border-b focus:border-indigo-500 pb-1"
@@ -995,7 +1124,19 @@ export default function App() {
                               updateQA(qa.id, "answer", e.target.value)
                             }
                           />
-                          <div className="text-right mt-1">
+                          <div className="text-right mt-1 flex justify-end gap-2 items-center">
+                            {/* 文字数制限が設定されている場合のみ、上限表示と警告色を適用 */}
+                            {qa.charLimit && (
+                              <span
+                                className={`text-[10px] font-mono px-2 py-0.5 rounded-full ${
+                                  qa.answer.length > qa.charLimit
+                                    ? "bg-rose-100 text-rose-600"
+                                    : "bg-slate-100 text-slate-500"
+                                }`}
+                              >
+                                上限: {qa.charLimit}
+                              </span>
+                            )}
                             <span className="text-[10px] font-mono text-slate-500 bg-slate-200 px-2 py-0.5 rounded-full">
                               {qa.answer.length}文字
                             </span>
@@ -1003,6 +1144,7 @@ export default function App() {
                           <AIAssistant
                             question={qa.question}
                             answer={qa.answer}
+                            charLimit={qa.charLimit}
                             onApply={(text) => updateQA(qa.id, "answer", text)}
                           />
                         </div>
