@@ -67,7 +67,7 @@ const sanitizeEntry = (entry) => {
     selectionType: entry.selectionType || "",
     deadline: entry.deadline || "",
     createdAt: entry.createdAt || now,
-    updatedAt: now,
+    updatedAt: entry.updatedAt || now,
     qas: sanitizedQas,
   };
 };
@@ -691,7 +691,11 @@ export default function App() {
     if (!formData.company) return;
 
     try {
-      const entryData = { ...formData, id: editingId };
+      const entryData = {
+        ...formData,
+        id: editingId,
+        updatedAt: getCurrentJSTTime(),
+      };
       const sanitized = sanitizeEntry(entryData);
 
       setEntries((prev) => {
@@ -791,6 +795,7 @@ export default function App() {
       status: entry.status || "未提出",
       selectionType: entry.selectionType || "",
       deadline: entry.deadline || "",
+      createdAt: entry.createdAt,
       qas: entry.qas
         ? entry.qas.map((q) => ({
             ...q,
