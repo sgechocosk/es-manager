@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Search,
   Plus,
@@ -20,6 +20,7 @@ import {
   Calendar,
   Download,
   Upload,
+  Key,
 } from "lucide-react";
 
 // --- Utilities ---
@@ -29,7 +30,6 @@ const splitTags = (tagInput) => {
   return tagInput.split(/[,\s、，]+/).filter((t) => t.length > 0);
 };
 
-// 日本時間をISO形式互換の文字列で取得する関数
 const getCurrentJSTTime = () => {
   const date = new Date();
   const jstDate = new Date(
@@ -73,7 +73,12 @@ const sanitizeEntry = (entry) => {
 };
 
 const callGeminiAPI = async (prompt) => {
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+  const apiKey = localStorage.getItem("GEMINI_API_KEY");
+
+  if (!apiKey) {
+    return "APIキーが設定されていません。右上の鍵アイコンからAPIキーを設定してください。";
+  }
+
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
 
   try {
@@ -148,7 +153,80 @@ const CopyButton = ({ text }) => {
   );
 };
 
+// API Key Setting Modal Component
+const APIKeyModal = ({ isOpen, onClose }) => {
+  const [key, setKey] = useState("");
+
+  useEffect(() => {
+    if (isOpen) {
+      setKey(localStorage.getItem("GEMINI_API_KEY") || "");
+    }
+  }, [isOpen]);
+
+  const handleSave = () => {
+    if (key.trim()) {
+      localStorage.setItem("GEMINI_API_KEY", key.trim());
+      alert("APIキーを保存しました。");
+    } else {
+      localStorage.removeItem("GEMINI_API_KEY");
+      alert("APIキーを削除しました。");
+    }
+    onClose();
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+        <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+          <h3 className="font-bold text-slate-700 flex items-center gap-2">
+            <Key size={18} className="text-indigo-600" /> APIキー設定
+          </h3>
+          <button
+            onClick={onClose}
+            className="text-slate-400 hover:text-slate-600"
+          >
+            <X size={20} />
+          </button>
+        </div>
+        <div className="p-6">
+          <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+            有効なGemini APIキーを入力してください。
+            <br />
+            キーはブラウザのローカルストレージにのみ保存され、外部サーバ等へは送信されません。
+          </p>
+          <input
+            type="password"
+            value={key}
+            onChange={(e) => setKey(e.target.value)}
+            placeholder="AIzaSy..."
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all font-mono text-sm mb-4"
+          />
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-bold text-slate-500 hover:bg-slate-100 rounded-lg transition-colors"
+            >
+              キャンセル
+            </button>
+            <button
+              onClick={handleSave}
+              className="px-4 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm transition-colors"
+            >
+              保存する
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const AIAssistant = ({ question, answer, onApply, charLimit }) => {
+  const hasApiKey = localStorage.getItem("GEMINI_API_KEY");
+  if (!hasApiKey) return null;
+
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState("");
   const [mode, setMode] = useState(null);
@@ -476,6 +554,7 @@ export default function App() {
   const [viewMode, setViewMode] = useState("company");
   const [editingId, setEditingId] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   const [formData, setFormData] = useState({
     company: "",
@@ -671,22 +750,30 @@ export default function App() {
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
-        const importedData = JSON.parse(e.target.result);
-        if (Array.isArray(importedData)) {
-          if (
-            confirm(
-              "現在のデータを破棄して、ファイルを読み込みますか？\n(未保存のデータは失われます)"
-            )
-          ) {
-            const normalizedData = importedData.map((item) =>
-              sanitizeEntry(item)
-            );
-            setEntries(normalizedData);
-          }
+        const importedJson = JSON.parse(e.target.result);
+
+        let entriesToLoad = [];
+
+        if (Array.isArray(importedJson)) {
+          entriesToLoad = importedJson;
+        } else if (importedJson && Array.isArray(importedJson.entries)) {
+          entriesToLoad = importedJson.entries;
         } else {
           alert(
             "無効なファイル形式です。es-data形式のJSONファイルを選択してください。"
           );
+          return;
+        }
+
+        if (
+          confirm(
+            "現在のデータを破棄して、ファイルを読み込みますか？\n(未保存のデータは失われます)"
+          )
+        ) {
+          const normalizedData = entriesToLoad.map((item) =>
+            sanitizeEntry(item)
+          );
+          setEntries(normalizedData);
         }
       } catch (error) {
         console.error(error);
@@ -784,6 +871,13 @@ export default function App() {
                     title="データをインポート(JSON)"
                   />
                 </label>
+                <button
+                  onClick={() => setIsSettingsOpen(true)}
+                  className="bg-white text-slate-600 border border-slate-200 p-2 rounded-lg hover:bg-slate-50 hover:text-indigo-600 transition-colors"
+                  title="APIキー設定"
+                >
+                  <Key size={18} />
+                </button>
               </div>
             </div>
           )}
@@ -1205,6 +1299,11 @@ export default function App() {
           </div>
         )}
       </main>
+
+      <APIKeyModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+      />
     </div>
   );
 }
