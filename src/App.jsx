@@ -6,7 +6,6 @@ import {
   Check,
   Trash2,
   Edit2,
-  GraduationCap,
   Save,
   X,
   Bot,
@@ -863,9 +862,11 @@ export default function App() {
             className="flex items-center gap-2 cursor-pointer self-start sm:self-auto"
             onClick={handleCancel}
           >
-            <div className="bg-indigo-600 text-white p-1.5 rounded-lg">
-              <GraduationCap size={20} />
-            </div>
+            <img
+              src="/favicon.png"
+              alt="ES Manager Icon"
+              className="w-8 h-8 rounded-lg shadow-sm"
+            />
             <h1 className="text-lg font-bold text-slate-800 hidden sm:block tracking-tight">
               ES Manager{" "}
             </h1>
