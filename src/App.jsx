@@ -22,22 +22,24 @@ import {
 } from "lucide-react";
 
 // --- Utilities ---
-const splitTags = (tagString) => {
-  if (!tagString) return [];
-  return tagString.split(/[,\s、，]+/).filter((t) => t.length > 0);
+const splitTags = (tagInput) => {
+  if (Array.isArray(tagInput)) return tagInput;
+  if (!tagInput || typeof tagInput !== "string") return [];
+  return tagInput.split(/[,\s、，]+/).filter((t) => t.length > 0);
 };
 
 const sanitizeEntry = (entry) => {
   const now = new Date().toISOString();
-  const sanitizedQas = Array.isArray(entry.qas)
-    ? entry.qas.map((qa) => ({
-        id: qa.id || Date.now() + Math.random(),
-        question: qa.question || "",
-        answer: qa.answer || "",
-        tags: qa.tags || "",
-        charLimit: qa.charLimit || "",
-      }))
-    : [];
+
+  const rawQas = Array.isArray(entry.qas) ? entry.qas : [];
+
+  const sanitizedQas = rawQas.map((qa) => ({
+    id: qa.id || Date.now() + Math.random(),
+    question: qa.question || "",
+    answer: qa.answer || "",
+    charLimit: qa.charLimit || "",
+    tags: splitTags(qa.tags),
+  }));
 
   return {
     id:
@@ -47,9 +49,10 @@ const sanitizeEntry = (entry) => {
     industry: entry.industry || "",
     status: entry.status || "未提出",
     selectionType: entry.selectionType || "",
-    qas: sanitizedQas,
+    deadline: entry.deadline || "",
     createdAt: entry.createdAt || now,
     updatedAt: now,
+    qas: sanitizedQas,
   };
 };
 
@@ -337,14 +340,15 @@ const QAItemDisplay = ({
 
     <div className="pl-7 flex flex-wrap justify-between items-end gap-2">
       <div className="flex flex-wrap gap-2">
-        {tags.map((tag, i) => (
-          <span
-            key={i}
-            className="inline-flex items-center px-2 py-1 rounded text-[10px] font-medium bg-indigo-50 text-indigo-600 border border-indigo-100"
-          >
-            #{tag}
-          </span>
-        ))}
+        {Array.isArray(tags) &&
+          tags.map((tag, i) => (
+            <span
+              key={i}
+              className="inline-flex items-center px-2 py-1 rounded text-[10px] font-medium bg-indigo-50 text-indigo-600 border border-indigo-100"
+            >
+              #{tag}
+            </span>
+          ))}
       </div>
       <div className="text-[10px] font-mono text-slate-400 bg-slate-50 px-2 py-0.5 rounded">
         {qa.answer.length}文字
@@ -368,6 +372,11 @@ const ESEntryDisplay = ({ entry, onEdit, onDelete }) => {
           {entry.selectionType && (
             <span className="text-xs text-slate-500 flex items-center gap-1 px-2 py-0.5 bg-slate-100 rounded">
               <Calendar size={12} /> {entry.selectionType}
+            </span>
+          )}
+          {entry.deadline && (
+            <span className="text-xs text-red-500 bg-red-50 flex items-center gap-1 px-2 py-0.5 rounded font-medium">
+              <Calendar size={12} /> 期限: {entry.deadline.replace("T", " ")}
             </span>
           )}
         </div>
@@ -416,14 +425,15 @@ const ESEntryDisplay = ({ entry, onEdit, onDelete }) => {
               </p>
               <div className="pl-6 flex flex-wrap justify-between items-end gap-2">
                 <div className="flex flex-wrap gap-2">
-                  {splitTags(qa.tags).map((tag, i) => (
-                    <span
-                      key={i}
-                      className="inline-flex items-center px-2 py-1 rounded text-[10px] font-medium bg-indigo-50 text-indigo-600 border border-indigo-100"
-                    >
-                      #{tag}
-                    </span>
-                  ))}
+                  {Array.isArray(qa.tags) &&
+                    qa.tags.map((tag, i) => (
+                      <span
+                        key={i}
+                        className="inline-flex items-center px-2 py-1 rounded text-[10px] font-medium bg-indigo-50 text-indigo-600 border border-indigo-100"
+                      >
+                        #{tag}
+                      </span>
+                    ))}
                 </div>
                 <div className="text-[10px] font-mono text-slate-400 bg-slate-50 px-2 py-0.5 rounded">
                   {(qa.answer || "").length}文字
@@ -449,6 +459,7 @@ export default function App() {
     industry: "",
     status: "未提出",
     selectionType: "",
+    deadline: "",
     qas: [{ id: Date.now(), question: "", answer: "", tags: "" }],
   });
 
@@ -477,7 +488,9 @@ export default function App() {
               isCompanyMatch ||
               isMatch(qa.question) ||
               isMatch(qa.answer) ||
-              isMatch(qa.tags)
+              (Array.isArray(qa.tags)
+                ? qa.tags.some((t) => isMatch(t))
+                : isMatch(qa.tags))
           );
 
           if (isCompanyMatch) return entry;
@@ -567,6 +580,7 @@ export default function App() {
       industry: "",
       status: "未提出",
       selectionType: "",
+      deadline: "",
       qas: [{ id: Date.now(), question: "", answer: "", tags: "" }],
     });
   };
@@ -666,7 +680,13 @@ export default function App() {
       industry: entry.industry,
       status: entry.status || "未提出",
       selectionType: entry.selectionType || "",
-      qas: entry.qas || [],
+      deadline: entry.deadline || "",
+      qas: entry.qas
+        ? entry.qas.map((q) => ({
+            ...q,
+            tags: Array.isArray(q.tags) ? q.tags.join(", ") : q.tags || "",
+          }))
+        : [],
     });
     setEditingId(entry.id);
     setView("form");
@@ -1029,6 +1049,19 @@ export default function App() {
                         })
                       }
                       placeholder="例: 本選考、インターン"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-slate-500">
+                      提出期限
+                    </label>
+                    <input
+                      type="datetime-local"
+                      className="w-full px-3 py-2 border rounded-lg mt-1 outline-none focus:border-indigo-500"
+                      value={formData.deadline}
+                      onChange={(e) =>
+                        setFormData({ ...formData, deadline: e.target.value })
+                      }
                     />
                   </div>
                 </div>
