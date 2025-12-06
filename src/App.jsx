@@ -565,6 +565,36 @@ export default function App() {
     qas: [{ id: Date.now(), question: "", answer: "", tags: "" }],
   });
 
+  // --- Alert for Unsaved Changes ---
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (entries.length > 0 || view === "form") {
+        e.preventDefault();
+        const message =
+          "データは保存されていません。リロードすると失われます。";
+        e.returnValue = message;
+        return message;
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [view, entries]);
+
+  const handleCancel = () => {
+    if (view === "form") {
+      const isConfirmed = window.confirm(
+        "編集中のデータは保存されていません。\n一覧画面に戻るとデータは失われますが、よろしいですか?"
+      );
+
+      if (isConfirmed) {
+        resetForm();
+      }
+    } else {
+      resetForm();
+    }
+  };
+
   // --- Data Processing for Views ---
   const isMatch = (text) => {
     if (!searchQuery) return true;
@@ -715,7 +745,7 @@ export default function App() {
   const handleDelete = (id) => {
     if (
       !confirm(
-        "この企業のエントリーシートを削除しますか？\nこの操作は取り消せません。"
+        "この企業のエントリーシートを削除しますか?\nこの操作は取り消せません。"
       )
     )
       return;
@@ -771,7 +801,7 @@ export default function App() {
 
         if (
           confirm(
-            "現在のデータを破棄して、ファイルを読み込みますか？\n(未保存のデータは失われます)"
+            "現在のデータを破棄して、ファイルを読み込みますか?\n(未保存のデータは失われます)"
           )
         ) {
           const normalizedData = entriesToLoad.map((item) =>
@@ -833,7 +863,7 @@ export default function App() {
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div
             className="flex items-center gap-2 cursor-pointer self-start sm:self-auto"
-            onClick={() => setView("list")}
+            onClick={handleCancel}
           >
             <div className="bg-indigo-600 text-white p-1.5 rounded-lg">
               <GraduationCap size={20} />
@@ -901,7 +931,7 @@ export default function App() {
               </button>
             ) : (
               <button
-                onClick={() => setView("list")}
+                onClick={handleCancel}
                 className="bg-slate-100 hover:bg-slate-200 text-slate-600 p-2 rounded-full"
               >
                 <X size={20} />
@@ -1286,7 +1316,7 @@ export default function App() {
 
                 <div className="flex justify-end gap-3 pt-4 border-t">
                   <button
-                    onClick={resetForm}
+                    onClick={handleCancel}
                     className="px-5 py-2 rounded-lg text-slate-500 hover:bg-slate-100 font-bold text-sm"
                   >
                     キャンセル
