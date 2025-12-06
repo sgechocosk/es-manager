@@ -153,7 +153,6 @@ const CopyButton = ({ text }) => {
   );
 };
 
-// API Key Setting Modal Component
 const APIKeyModal = ({ isOpen, onClose }) => {
   const [key, setKey] = useState("");
 
@@ -549,6 +548,7 @@ const ESEntryDisplay = ({ entry, onEdit, onDelete }) => {
 };
 
 export default function App() {
+  // --- State ---
   const [entries, setEntries] = useState([]);
   const [view, setView] = useState("list");
   const [viewMode, setViewMode] = useState("company");
@@ -565,7 +565,7 @@ export default function App() {
     qas: [{ id: Date.now(), question: "", answer: "", tags: "" }],
   });
 
-  // --- Alert for Unsaved Changes ---
+  // --- Effects ---
   useEffect(() => {
     const handleBeforeUnload = (e) => {
       if (entries.length > 0 || view === "form") {
@@ -581,21 +581,7 @@ export default function App() {
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [view, entries]);
 
-  const handleCancel = () => {
-    if (view === "form") {
-      const isConfirmed = window.confirm(
-        "編集中のデータは保存されていません。\n一覧画面に戻るとデータは失われますが、よろしいですか?"
-      );
-
-      if (isConfirmed) {
-        resetForm();
-      }
-    } else {
-      resetForm();
-    }
-  };
-
-  // --- Data Processing for Views ---
+  // --- Data Processing ---
   const isMatch = (text) => {
     if (!searchQuery) return true;
     const lowerQ = searchQuery.toLowerCase();
@@ -633,7 +619,6 @@ export default function App() {
     }
 
     return [...result].sort((a, b) => {
-      // Sort by update time descending
       if (a.updatedAt && b.updatedAt) {
         return new Date(b.updatedAt) - new Date(a.updatedAt);
       }
@@ -715,6 +700,20 @@ export default function App() {
       deadline: "",
       qas: [{ id: Date.now(), question: "", answer: "", tags: "" }],
     });
+  };
+
+  const handleCancel = () => {
+    if (view === "form") {
+      const isConfirmed = window.confirm(
+        "編集中のデータは保存されていません。\n一覧画面に戻るとデータは失われますが、よろしいですか?"
+      );
+
+      if (isConfirmed) {
+        resetForm();
+      }
+    } else {
+      resetForm();
+    }
   };
 
   const handleSave = () => {
@@ -837,7 +836,6 @@ export default function App() {
     setView("form");
   };
 
-  // Form Operations
   const addQA = () =>
     setFormData((p) => ({
       ...p,
@@ -940,7 +938,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* View Mode Switcher (List View Only) */}
         {view === "list" && (
           <div className="max-w-7xl mx-auto mt-3 flex gap-1 overflow-x-auto pb-1">
             {[
@@ -970,7 +967,7 @@ export default function App() {
       <main className="max-w-5xl mx-auto p-4 sm:p-6">
         {view === "list" ? (
           <div className="space-y-8">
-            {/* View 1: Company List */}
+            {/* View: Company List */}
             {viewMode === "company" && (
               <div className="grid gap-6">
                 {processedCompanyEntries.length === 0 && (
@@ -991,7 +988,7 @@ export default function App() {
               </div>
             )}
 
-            {/* View 2: Question List (Flat) */}
+            {/* View: Question List (Flat) */}
             {viewMode === "question" && (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {flattenedQAs.length === 0 && (
@@ -1014,7 +1011,7 @@ export default function App() {
               </div>
             )}
 
-            {/* View 3: Tag Group */}
+            {/* View: Tag Group */}
             {viewMode === "tag" && (
               <div className="space-y-8">
                 {Object.keys(tagGroups).length === 0 && (
@@ -1052,7 +1049,7 @@ export default function App() {
               </div>
             )}
 
-            {/* View 4: Status List (ES Grouped) */}
+            {/* View: Status List (ES Grouped) */}
             {viewMode === "status" && (
               <div className="space-y-8">
                 {Object.keys(entriesByStatus).length === 0 && (
@@ -1134,7 +1131,7 @@ export default function App() {
                 </h2>
               </div>
               <div className="p-6 space-y-6">
-                {/* Basic Info Fields */}
+                {/* Basic Info */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="text-xs font-bold text-slate-500">
