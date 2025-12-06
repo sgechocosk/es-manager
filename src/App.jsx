@@ -16,6 +16,7 @@ import {
   Building2,
   Sparkles,
   Briefcase,
+  Ticket,
   Calendar,
   Download,
   Upload,
@@ -28,8 +29,23 @@ const splitTags = (tagInput) => {
   return tagInput.split(/[,\s、，]+/).filter((t) => t.length > 0);
 };
 
+// 日本時間をISO形式互換の文字列で取得する関数
+const getCurrentJSTTime = () => {
+  const date = new Date();
+  const jstDate = new Date(
+    date.toLocaleString("en-US", { timeZone: "Asia/Tokyo" })
+  );
+  const y = jstDate.getFullYear();
+  const m = String(jstDate.getMonth() + 1).padStart(2, "0");
+  const d = String(jstDate.getDate()).padStart(2, "0");
+  const H = String(jstDate.getHours()).padStart(2, "0");
+  const M = String(jstDate.getMinutes()).padStart(2, "0");
+  const S = String(jstDate.getSeconds()).padStart(2, "0");
+  return `${y}-${m}-${d}T${H}:${M}:${S}+09:00`;
+};
+
 const sanitizeEntry = (entry) => {
-  const now = new Date().toISOString();
+  const now = getCurrentJSTTime();
 
   const rawQas = Array.isArray(entry.qas) ? entry.qas : [];
 
@@ -359,6 +375,7 @@ const QAItemDisplay = ({
 
 const ESEntryDisplay = ({ entry, onEdit, onDelete }) => {
   const qas = entry.qas || [];
+  const isExpired = entry.deadline && new Date(entry.deadline) < new Date();
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-all duration-300">
@@ -371,11 +388,17 @@ const ESEntryDisplay = ({ entry, onEdit, onDelete }) => {
           </span>
           {entry.selectionType && (
             <span className="text-xs text-slate-500 flex items-center gap-1 px-2 py-0.5 bg-slate-100 rounded">
-              <Calendar size={12} /> {entry.selectionType}
+              <Ticket size={12} /> {entry.selectionType}
             </span>
           )}
           {entry.deadline && (
-            <span className="text-xs text-red-500 bg-red-50 flex items-center gap-1 px-2 py-0.5 rounded font-medium">
+            <span
+              className={`text-xs flex items-center gap-1 px-2 py-0.5 rounded font-medium ${
+                isExpired
+                  ? "bg-slate-100 text-slate-400"
+                  : "bg-red-50 text-red-500"
+              }`}
+            >
               <Calendar size={12} /> 期限: {entry.deadline.replace("T", " ")}
             </span>
           )}
@@ -629,12 +652,12 @@ export default function App() {
     const blob = new Blob([dataStr], { type: "application/json" });
     const url = URL.createObjectURL(blob);
 
+    const jstNowStr = getCurrentJSTTime();
+    const fileNameTime = jstNowStr.split("+")[0].replace(/[:T]/g, "-");
+
     const link = document.createElement("a");
     link.href = url;
-    link.download = `es-data-${new Date()
-      .toISOString()
-      .slice(0, 19)
-      .replace(/:/g, "-")}.json`;
+    link.download = `es-data-${fileNameTime}.json`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -662,7 +685,7 @@ export default function App() {
           }
         } else {
           alert(
-            "無効なファイル形式です。es-backup形式のJSONファイルを選択してください。"
+            "無効なファイル形式です。es-data形式のJSONファイルを選択してください。"
           );
         }
       } catch (error) {
