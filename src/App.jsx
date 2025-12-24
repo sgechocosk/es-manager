@@ -20,6 +20,8 @@ import {
   Download,
   Upload,
   Key,
+  Link as LinkIcon,
+  ExternalLink,
 } from "lucide-react";
 
 // --- Utilities ---
@@ -215,6 +217,90 @@ const APIKeyModal = ({ isOpen, onClose }) => {
               保存する
             </button>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const CompanyUrlModal = ({ isOpen, onClose, entries, urls, onSave }) => {
+  const [localUrls, setLocalUrls] = useState(urls);
+
+  const companyNames = useMemo(() => {
+    const names = new Set(entries.map((e) => e.company).filter(Boolean));
+    return Array.from(names).sort();
+  }, [entries]);
+
+  useEffect(() => {
+    if (isOpen) setLocalUrls(urls);
+  }, [isOpen, urls]);
+
+  const handleChange = (company, url) => {
+    setLocalUrls((prev) => ({ ...prev, [company]: url }));
+  };
+
+  const handleSave = () => {
+    onSave(localUrls);
+    onClose();
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm animate-in fade-in">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col animate-in zoom-in-95">
+        <div className="px-6 py-4 border-b flex justify-between items-center bg-slate-50 rounded-t-xl">
+          <h3 className="font-bold text-slate-700 flex items-center gap-2">
+            <LinkIcon size={18} className="text-indigo-600" /> 企業URL設定
+          </h3>
+          <button onClick={onClose}>
+            <X size={20} className="text-slate-400 hover:text-slate-600" />
+          </button>
+        </div>
+
+        <div className="p-6 overflow-y-auto flex-1">
+          <p className="text-xs text-slate-500 mb-4">
+            企業ごとの採用マイページURLを設定できます。設定したURLは同じ企業名のすべてのエントリーに適用されます。
+          </p>
+          <div className="space-y-3">
+            {companyNames.length === 0 && (
+              <p className="text-sm text-slate-400">
+                登録された企業がありません。
+              </p>
+            )}
+            {companyNames.map((company) => (
+              <div key={company} className="flex items-center gap-3">
+                <div
+                  className="w-1/3 text-sm font-bold text-slate-700 truncate"
+                  title={company}
+                >
+                  {company}
+                </div>
+                <input
+                  type="url"
+                  placeholder="https://..."
+                  className="flex-1 px-3 py-2 border rounded-lg text-sm focus:border-indigo-500 outline-none"
+                  value={localUrls[company] || ""}
+                  onChange={(e) => handleChange(company, e.target.value)}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="p-4 border-t bg-slate-50 rounded-b-xl flex justify-end gap-2">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm font-bold text-slate-500 hover:bg-slate-100 rounded-lg"
+          >
+            キャンセル
+          </button>
+          <button
+            onClick={handleSave}
+            className="px-4 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg"
+          >
+            保存する
+          </button>
         </div>
       </div>
     </div>
@@ -449,7 +535,7 @@ const QAItemDisplay = ({
   </div>
 );
 
-const ESEntryDisplay = ({ entry, onEdit, onDelete }) => {
+const ESEntryDisplay = ({ entry, onEdit, onDelete, companyUrl }) => {
   const qas = entry.qas || [];
   const isExpired = entry.deadline && new Date(entry.deadline) < new Date();
 
@@ -458,6 +544,18 @@ const ESEntryDisplay = ({ entry, onEdit, onDelete }) => {
       <div className="px-5 py-3 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white flex justify-between items-center">
         <div className="flex flex-wrap items-center gap-3">
           <h2 className="text-lg font-bold text-slate-800">{entry.company}</h2>
+          {companyUrl && (
+            <a
+              href={companyUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="p-1.5 text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-md transition-colors"
+              title="マイページへ移動"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <ExternalLink size={16} />
+            </a>
+          )}
           <StatusBadge status={entry.status} />
           <span className="text-xs text-slate-500 flex items-center gap-1">
             <Briefcase size={12} /> {entry.industry}
@@ -554,10 +652,13 @@ export default function App() {
   const [editingId, setEditingId] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isUrlSettingsOpen, setIsUrlSettingsOpen] = useState(false);
+  const [companyUrls, setCompanyUrls] = useState({});
 
   const [formData, setFormData] = useState({
     company: "",
     industry: "",
+    myPageUrl: "",
     status: "未提出",
     selectionType: "",
     deadline: "",
@@ -579,6 +680,10 @@ export default function App() {
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [view, entries]);
+
+  const handleSaveUrls = (newUrls) => {
+    setCompanyUrls(newUrls);
+  };
 
   // --- Data Processing ---
   const isMatch = (text) => {
@@ -694,6 +799,7 @@ export default function App() {
     setFormData({
       company: "",
       industry: "",
+      myPageUrl: "",
       status: "未提出",
       selectionType: "",
       deadline: "",
@@ -719,6 +825,14 @@ export default function App() {
     if (!formData.company) return;
 
     try {
+      if (formData.myPageUrl) {
+        const newUrls = {
+          ...companyUrls,
+          [formData.company]: formData.myPageUrl,
+        };
+        setCompanyUrls(newUrls);
+      }
+
       const entryData = {
         ...formData,
         id: editingId,
@@ -742,9 +856,7 @@ export default function App() {
 
   const handleDelete = (id) => {
     if (
-      !confirm(
-        "この企業のエントリーシートを削除しますか?\nこの操作は取り消せません。"
-      )
+      !confirm("この企業のエントリーシートを削除しますか?\n(URL設定は残ります)")
     )
       return;
 
@@ -759,7 +871,12 @@ export default function App() {
   };
 
   const handleExport = () => {
-    const dataStr = JSON.stringify(entries, null, 2);
+    const exportData = {
+      entries: entries,
+      companyUrls: companyUrls,
+      exportedAt: getCurrentJSTTime(),
+    };
+    const dataStr = JSON.stringify(exportData, null, 2);
     const blob = new Blob([dataStr], { type: "application/json" });
     const url = URL.createObjectURL(blob);
 
@@ -785,11 +902,15 @@ export default function App() {
         const importedJson = JSON.parse(e.target.result);
 
         let entriesToLoad = [];
+        let urlsToLoad = {};
 
         if (Array.isArray(importedJson)) {
           entriesToLoad = importedJson;
         } else if (importedJson && Array.isArray(importedJson.entries)) {
           entriesToLoad = importedJson.entries;
+          if (importedJson.companyUrls) {
+            urlsToLoad = importedJson.companyUrls;
+          }
         } else {
           alert(
             "無効なファイル形式です。es-data形式のJSONファイルを選択してください。"
@@ -802,10 +923,21 @@ export default function App() {
             "現在のデータを破棄して、ファイルを読み込みますか?\n(未保存のデータは失われます)"
           )
         ) {
-          const normalizedData = entriesToLoad.map((item) =>
-            sanitizeEntry(item)
-          );
+          let migratedUrls = { ...urlsToLoad };
+
+          const normalizedData = entriesToLoad.map((item) => {
+            if (item.myPageUrl && item.company) {
+              migratedUrls[item.company] = item.myPageUrl;
+            }
+            return sanitizeEntry(item);
+          });
+
           setEntries(normalizedData);
+
+          setCompanyUrls((prev) => {
+            const newUrls = { ...prev, ...migratedUrls };
+            return newUrls;
+          });
         }
       } catch (error) {
         console.error(error);
@@ -823,6 +955,7 @@ export default function App() {
       status: entry.status || "未提出",
       selectionType: entry.selectionType || "",
       deadline: entry.deadline || "",
+      myPageUrl: companyUrls[entry.company] || "",
       createdAt: entry.createdAt,
       qas: entry.qas
         ? entry.qas.map((q) => ({
@@ -854,6 +987,7 @@ export default function App() {
       qas: p.qas.map((q) => (q.id === id ? { ...q, [f]: v } : q)),
     }));
 
+  // --- Render ---
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-20">
       <header className="bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-0 z-20 px-4 py-3 shadow-sm">
@@ -911,6 +1045,13 @@ export default function App() {
                   title="APIキー設定"
                 >
                   <Key size={18} />
+                </button>
+                <button
+                  onClick={() => setIsUrlSettingsOpen(true)}
+                  className="bg-white text-slate-600 border border-slate-200 p-2 rounded-lg hover:bg-slate-50 hover:text-indigo-600 transition-colors"
+                  title="企業URL設定"
+                >
+                  <LinkIcon size={18} />
                 </button>
               </div>
             </div>
@@ -984,6 +1125,7 @@ export default function App() {
                     entry={entry}
                     onEdit={startEdit}
                     onDelete={handleDelete}
+                    companyUrl={companyUrls[entry.company]}
                   />
                 ))}
               </div>
@@ -1080,6 +1222,7 @@ export default function App() {
                               entry={entry}
                               onEdit={startEdit}
                               onDelete={handleDelete}
+                              companyUrl={companyUrls[entry.company]}
                             />
                           ))}
                         </div>
@@ -1114,6 +1257,7 @@ export default function App() {
                             entry={entry}
                             onEdit={startEdit}
                             onDelete={handleDelete}
+                            companyUrl={companyUrls[entry.company]}
                           />
                         ))}
                       </div>
@@ -1141,11 +1285,47 @@ export default function App() {
                     <input
                       className="w-full px-3 py-2 border rounded-lg mt-1 outline-none focus:border-indigo-500"
                       value={formData.company}
-                      onChange={(e) =>
-                        setFormData({ ...formData, company: e.target.value })
-                      }
+                      onChange={(e) => {
+                        const newCompany = e.target.value;
+                        setFormData({
+                          ...formData,
+                          company: newCompany,
+                          myPageUrl:
+                            companyUrls[newCompany] || formData.myPageUrl || "",
+                        });
+                      }}
                       placeholder="例: 株式会社Tech"
                     />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-slate-500">
+                      マイページURL
+                    </label>
+                    <div className="relative mt-1">
+                      <input
+                        type="url"
+                        className="w-full pl-3 pr-8 py-2 border rounded-lg outline-none focus:border-indigo-500"
+                        value={formData.myPageUrl}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            myPageUrl: e.target.value,
+                          })
+                        }
+                        placeholder="https://..."
+                      />
+                      {formData.myPageUrl && (
+                        <a
+                          href={formData.myPageUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-indigo-600"
+                          title="リンクを確認"
+                        >
+                          <ExternalLink size={16} />
+                        </a>
+                      )}
+                    </div>
                   </div>
                   <div>
                     <label className="text-xs font-bold text-slate-500">
@@ -1336,6 +1516,14 @@ export default function App() {
       <APIKeyModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
+      />
+
+      <CompanyUrlModal
+        isOpen={isUrlSettingsOpen}
+        onClose={() => setIsUrlSettingsOpen(false)}
+        entries={entries}
+        urls={companyUrls}
+        onSave={handleSaveUrls}
       />
     </div>
   );
