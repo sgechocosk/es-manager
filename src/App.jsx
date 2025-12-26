@@ -142,6 +142,7 @@ const CopyButton = ({ text }) => {
   return (
     <button
       onClick={handleCopy}
+      title="クリップボードにコピー"
       className={`flex items-center gap-1.5 px-2 py-1 text-xs font-medium rounded-md transition-all duration-200 border ${
         copied
           ? "bg-emerald-50 text-emerald-600 border-emerald-200"
@@ -185,6 +186,7 @@ const APIKeyModal = ({ isOpen, onClose }) => {
           </h3>
           <button
             onClick={onClose}
+            title="閉じる"
             className="text-slate-400 hover:text-slate-600"
           >
             <X size={20} />
@@ -253,7 +255,7 @@ const CompanyUrlModal = ({ isOpen, onClose, entries, urls, onSave }) => {
           <h3 className="font-bold text-slate-700 flex items-center gap-2">
             <LinkIcon size={18} className="text-indigo-600" /> 企業URL設定
           </h3>
-          <button onClick={onClose}>
+          <button onClick={onClose} title="閉じる">
             <X size={20} className="text-slate-400 hover:text-slate-600" />
           </button>
         </div>
@@ -270,19 +272,30 @@ const CompanyUrlModal = ({ isOpen, onClose, entries, urls, onSave }) => {
             )}
             {companyNames.map((company) => (
               <div key={company} className="flex items-center gap-3">
-                <div
-                  className="w-1/3 text-sm font-bold text-slate-700 truncate"
-                  title={company}
-                >
+                <div className="w-1/3 text-sm font-bold text-slate-700 truncate">
                   {company}
                 </div>
-                <input
-                  type="url"
-                  placeholder="https://..."
-                  className="flex-1 px-3 py-2 border rounded-lg text-sm focus:border-indigo-500 outline-none"
-                  value={localUrls[company] || ""}
-                  onChange={(e) => handleChange(company, e.target.value)}
-                />
+                <div className="flex-1 flex items-center gap-2">
+                  <input
+                    type="url"
+                    placeholder="https://..."
+                    className="flex-1 px-3 py-2 border rounded-lg text-sm focus:border-indigo-500 outline-none"
+                    value={localUrls[company] || ""}
+                    onChange={(e) => handleChange(company, e.target.value)}
+                  />
+
+                  {localUrls[company] && (
+                    <a
+                      href={localUrls[company]}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-2 text-slate-400 hover:text-indigo-600 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors flex-shrink-0"
+                      title="マイページを開く"
+                    >
+                      <ExternalLink size={18} />
+                    </a>
+                  )}
+                </div>
               </div>
             ))}
           </div>
@@ -424,6 +437,7 @@ const AIAssistant = ({ question, answer, onApply, charLimit }) => {
             </div>
             <button
               onClick={close}
+              title="閉じる"
               className="text-slate-400 hover:text-slate-600"
             >
               <X size={16} />
@@ -550,7 +564,7 @@ const ESEntryDisplay = ({ entry, onEdit, onDelete, companyUrl }) => {
               target="_blank"
               rel="noopener noreferrer"
               className="p-1.5 text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-md transition-colors"
-              title="マイページへ移動"
+              title="マイページを開く"
               onClick={(e) => e.stopPropagation()}
             >
               <ExternalLink size={16} />
@@ -580,6 +594,7 @@ const ESEntryDisplay = ({ entry, onEdit, onDelete, companyUrl }) => {
         <div className="flex gap-1">
           <button
             onClick={() => onEdit(entry)}
+            title="編集"
             className="p-1.5 text-slate-400 hover:text-indigo-600 rounded-md transition-colors"
           >
             <Edit2 size={16} />
@@ -589,6 +604,7 @@ const ESEntryDisplay = ({ entry, onEdit, onDelete, companyUrl }) => {
               e.stopPropagation();
               onDelete(entry.id);
             }}
+            title="削除"
             className="p-1.5 text-slate-400 hover:text-rose-600 rounded-md transition-colors"
           >
             <Trash2 size={16} />
@@ -1040,18 +1056,18 @@ export default function App() {
                   />
                 </label>
                 <button
-                  onClick={() => setIsSettingsOpen(true)}
-                  className="bg-white text-slate-600 border border-slate-200 p-2 rounded-lg hover:bg-slate-50 hover:text-indigo-600 transition-colors"
-                  title="APIキー設定"
-                >
-                  <Key size={18} />
-                </button>
-                <button
                   onClick={() => setIsUrlSettingsOpen(true)}
                   className="bg-white text-slate-600 border border-slate-200 p-2 rounded-lg hover:bg-slate-50 hover:text-indigo-600 transition-colors"
                   title="企業URL設定"
                 >
                   <LinkIcon size={18} />
+                </button>
+                <button
+                  onClick={() => setIsSettingsOpen(true)}
+                  className="bg-white text-slate-600 border border-slate-200 p-2 rounded-lg hover:bg-slate-50 hover:text-indigo-600 transition-colors"
+                  title="APIキー設定"
+                >
+                  <Key size={18} />
                 </button>
               </div>
             </div>
@@ -1064,6 +1080,7 @@ export default function App() {
                   resetForm();
                   setView("form");
                 }}
+                title="新規作成"
                 className="bg-indigo-600 hover:bg-indigo-700 text-white p-2 rounded-lg sm:px-4 sm:py-2 flex items-center gap-1.5 shadow-md transition-all active:scale-95"
               >
                 <Plus size={18} />
@@ -1072,6 +1089,7 @@ export default function App() {
             ) : (
               <button
                 onClick={handleCancel}
+                title="一覧に戻る"
                 className="bg-slate-100 hover:bg-slate-200 text-slate-600 p-2 rounded-full"
               >
                 <X size={20} />
@@ -1320,7 +1338,7 @@ export default function App() {
                           target="_blank"
                           rel="noopener noreferrer"
                           className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-indigo-600"
-                          title="リンクを確認"
+                          title="マイページを開く"
                         >
                           <ExternalLink size={16} />
                         </a>
@@ -1408,6 +1426,7 @@ export default function App() {
                       >
                         <button
                           onClick={() => removeQA(qa.id)}
+                          title="質問を削除"
                           className="absolute top-3 right-3 text-slate-300 hover:text-rose-500"
                         >
                           <X size={16} />
