@@ -109,7 +109,6 @@ const StatusBadge = ({ status }) => {
     提出済: "bg-emerald-100 text-emerald-600",
     採用: "bg-amber-100 text-amber-700",
     不採用: "bg-rose-50 text-rose-400",
-    選考中: "bg-violet-100 text-violet-600",
   };
   return (
     <span
@@ -791,7 +790,11 @@ export default function App() {
       }
     });
     return Object.keys(groups)
-      .sort()
+      .sort((a, b) => {
+        if (a === "タグなし") return 1;
+        if (b === "タグなし") return -1;
+        return a.localeCompare(b, "ja");
+      })
       .reduce((obj, key) => {
         obj[key] = groups[key];
         return obj;
@@ -1218,7 +1221,7 @@ export default function App() {
                     データはありません
                   </div>
                 )}
-                {["未提出", "作成中", "提出済", "選考中", "採用", "不採用"].map(
+                {["未提出", "作成中", "提出済", "採用", "不採用"].map(
                   (status) => {
                     const entries = entriesByStatus[status];
                     if (!entries || entries.length === 0) return null;
@@ -1255,7 +1258,6 @@ export default function App() {
                         "未提出",
                         "作成中",
                         "提出済",
-                        "選考中",
                         "採用",
                         "不採用",
                       ].includes(s)
@@ -1374,7 +1376,6 @@ export default function App() {
                         "提出済",
                         "採用",
                         "不採用",
-                        "選考中",
                       ].map((s) => (
                         <option key={s} value={s}>
                           {s}
