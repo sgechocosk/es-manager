@@ -67,6 +67,7 @@ const sanitizeEntry = (entry) => {
     status: entry.status || "未提出",
     selectionType: entry.selectionType || "",
     deadline: entry.deadline || "",
+    note: entry.note || "",
     createdAt: entry.createdAt || now,
     updatedAt: entry.updatedAt || now,
     qas: sanitizedQas,
@@ -610,6 +611,14 @@ const ESEntryDisplay = ({ entry, onEdit, onDelete, companyUrl }) => {
           </button>
         </div>
       </div>
+      
+      {entry.note && (
+        <div className="px-5 py-3 bg-amber-50/40 border-b border-slate-100 text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
+          <span className="font-bold text-amber-600/80 mr-2 text-xs">NOTE</span>
+          {entry.note}
+        </div>
+      )}
+
       <div className="divide-y divide-slate-50 bg-slate-50/30">
         {qas.length === 0 ? (
           <div className="p-5 text-sm text-slate-400 text-center">
@@ -822,6 +831,7 @@ export default function App() {
       status: "未提出",
       selectionType: "",
       deadline: "",
+      note: "",
       qas: [{ id: Date.now(), question: "", answer: "", tags: "" }],
     });
   };
@@ -974,6 +984,7 @@ export default function App() {
       status: entry.status || "未提出",
       selectionType: entry.selectionType || "",
       deadline: entry.deadline || "",
+      note: entry.note || "",
       myPageUrl: companyUrls[entry.company] || "",
       createdAt: entry.createdAt,
       qas: entry.qas
@@ -1370,17 +1381,13 @@ export default function App() {
                         setFormData({ ...formData, status: e.target.value })
                       }
                     >
-                      {[
-                        "未提出",
-                        "作成中",
-                        "提出済",
-                        "採用",
-                        "不採用",
-                      ].map((s) => (
-                        <option key={s} value={s}>
-                          {s}
-                        </option>
-                      ))}
+                      {["未提出", "作成中", "提出済", "採用", "不採用"].map(
+                        (s) => (
+                          <option key={s} value={s}>
+                            {s}
+                          </option>
+                        )
+                      )}
                     </select>
                   </div>
                   <div>
@@ -1411,6 +1418,20 @@ export default function App() {
                       onChange={(e) =>
                         setFormData({ ...formData, deadline: e.target.value })
                       }
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="text-xs font-bold text-slate-500">
+                      備考
+                    </label>
+                    <input
+                      type="text"
+                      className="w-full px-3 py-2 border rounded-lg mt-1 outline-none focus:border-indigo-500"
+                      value={formData.note || ""}
+                      onChange={(e) =>
+                        setFormData({ ...formData, note: e.target.value })
+                      }
+                      placeholder="メモや関連事項"
                     />
                   </div>
                 </div>
