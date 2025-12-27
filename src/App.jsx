@@ -1021,23 +1021,26 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-20">
       <header className="bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-0 z-20 px-4 py-3 shadow-sm">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div
-            className="flex items-center gap-2 cursor-pointer self-start sm:self-auto"
-            onClick={handleCancel}
-          >
-            <img
-              src="/favicon.png"
-              alt="ES Manager Icon"
-              className="w-8 h-8 rounded-lg shadow-sm"
-            />
-            <h1 className="text-lg font-bold text-slate-800 hidden sm:block tracking-tight">
-              ES Manager{" "}
-            </h1>
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
+          <div className="w-full sm:w-auto flex justify-between items-center">
+            <div
+              className="flex items-center gap-2 cursor-pointer"
+              onClick={handleCancel}
+            >
+              <img
+                src="/favicon.png"
+                alt="ES Manager Icon"
+                className="w-8 h-8 rounded-lg shadow-sm"
+              />
+              <h1 className="text-lg font-bold text-slate-800 tracking-tight">
+                ES Manager{" "}
+              </h1>
+            </div>
+
           </div>
 
           {view === "list" && (
-            <div className="flex-1 w-full sm:w-auto flex gap-2">
+            <div className="flex-1 w-full sm:w-auto flex gap-2 items-center">
               <div className="relative flex-1 max-w-lg group">
                 <Search
                   className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500"
@@ -1051,11 +1054,11 @@ export default function App() {
                   className="w-full pl-9 pr-4 py-2 bg-slate-100 border border-transparent focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 rounded-xl text-sm transition-all outline-none"
                 />
               </div>
-              <div className="flex gap-1">
+              <div className="flex gap-1 shrink-0">
                 <button
                   onClick={handleExport}
                   className="bg-white text-slate-600 border border-slate-200 p-2 rounded-lg hover:bg-slate-50 hover:text-indigo-600 transition-colors"
-                  title="データをエクスポート(JSON)"
+                  title="エクスポート"
                 >
                   <Download size={18} />
                 </button>
@@ -1066,7 +1069,7 @@ export default function App() {
                     accept=".json"
                     onChange={handleImport}
                     className="hidden"
-                    title="データをインポート(JSON)"
+                    title="インポート"
                   />
                 </label>
                 <button
@@ -1083,24 +1086,24 @@ export default function App() {
                 >
                   <Key size={18} />
                 </button>
+
+                <button
+                  onClick={() => {
+                    resetForm();
+                    setView("form");
+                  }}
+                  title="新規作成"
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white p-2 rounded-lg sm:px-4 flex items-center gap-1.5 shadow-md transition-all active:scale-95 ml-1"
+                >
+                  <Plus size={18} />
+                  <span className="hidden md:inline font-medium">新規作成</span>
+                </button>
               </div>
             </div>
           )}
 
-          <div className="self-end sm:self-auto">
-            {view === "list" ? (
-              <button
-                onClick={() => {
-                  resetForm();
-                  setView("form");
-                }}
-                title="新規作成"
-                className="bg-indigo-600 hover:bg-indigo-700 text-white p-2 rounded-lg sm:px-4 sm:py-2 flex items-center gap-1.5 shadow-md transition-all active:scale-95"
-              >
-                <Plus size={18} />
-                <span className="hidden sm:inline font-medium">新規作成</span>
-              </button>
-            ) : (
+          {view !== "list" && (
+            <div className="self-end sm:self-auto">
               <button
                 onClick={handleCancel}
                 title="一覧に戻る"
@@ -1108,8 +1111,8 @@ export default function App() {
               >
                 <X size={20} />
               </button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         {view === "list" && (
