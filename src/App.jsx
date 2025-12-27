@@ -1,29 +1,29 @@
 import React, { useState, useEffect, useMemo } from "react";
 import {
-  Search,
-  Plus,
-  Copy,
   Check,
-  Trash2,
-  Edit2,
-  Save,
+  Copy,
+  Key,
   X,
+  Link as LinkIcon,
+  ExternalLink,
+  Sparkles,
   Bot,
   Loader2,
-  LayoutList,
-  Tags,
-  Building2,
-  Sparkles,
+  Edit2,
   Briefcase,
   Ticket,
   Calendar,
+  Trash2,
+  Search,
   Download,
   Upload,
-  Key,
-  Link as LinkIcon,
-  ExternalLink,
+  Plus,
+  Building2,
+  LayoutList,
+  Tags,
   ArrowUp,
   ArrowDown,
+  Save,
 } from "lucide-react";
 
 // --- Utilities ---
@@ -49,9 +49,7 @@ const getCurrentJSTTime = () => {
 
 const sanitizeEntry = (entry) => {
   const now = getCurrentJSTTime();
-
   const rawQas = Array.isArray(entry.qas) ? entry.qas : [];
-
   const sanitizedQas = rawQas.map((qa) => ({
     id: qa.id || Date.now() + Math.random(),
     question: qa.question || "",
@@ -78,7 +76,6 @@ const sanitizeEntry = (entry) => {
 
 const callGeminiAPI = async (prompt) => {
   const apiKey = localStorage.getItem("GEMINI_API_KEY");
-
   if (!apiKey) {
     return "APIキーが設定されていません。右上の鍵アイコンからAPIキーを設定してください。";
   }
@@ -104,20 +101,20 @@ const callGeminiAPI = async (prompt) => {
   }
 };
 
+const STATUS_COLORS = {
+  未提出: "bg-gray-100 text-gray-600",
+  作成中: "bg-blue-100 text-blue-600",
+  提出済: "bg-emerald-100 text-emerald-600",
+  採用: "bg-amber-100 text-amber-700",
+  不採用: "bg-rose-50 text-rose-400",
+};
+
 // --- Components ---
 const StatusBadge = ({ status }) => {
-  const colors = {
-    未提出: "bg-gray-100 text-gray-600",
-    作成中: "bg-blue-100 text-blue-600",
-    提出済: "bg-emerald-100 text-emerald-600",
-    採用: "bg-amber-100 text-amber-700",
-    不採用: "bg-rose-50 text-rose-400",
-  };
+  const colorClass = STATUS_COLORS[status] || STATUS_COLORS["未提出"];
   return (
     <span
-      className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wide border border-transparent whitespace-nowrap ${
-        colors[status] || colors["未提出"]
-      }`}
+      className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wide border border-transparent whitespace-nowrap ${colorClass}`}
     >
       {status || "未提出"}
     </span>
@@ -126,21 +123,18 @@ const StatusBadge = ({ status }) => {
 
 const CopyButton = ({ text }) => {
   const [copied, setCopied] = useState(false);
+
   const handleCopy = async (e) => {
     e.stopPropagation();
     try {
-      const textArea = document.createElement("textarea");
-      textArea.value = text;
-      document.body.appendChild(textArea);
-      textArea.select();
-      document.execCommand("copy");
-      document.body.removeChild(textArea);
+      await navigator.clipboard.writeText(text);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (error) {
-      console.error(error);
+      console.error("Copy failed", error);
     }
   };
+
   return (
     <button
       onClick={handleCopy}
@@ -285,7 +279,6 @@ const CompanyUrlModal = ({ isOpen, onClose, entries, urls, onSave }) => {
                     value={localUrls[company] || ""}
                     onChange={(e) => handleChange(company, e.target.value)}
                   />
-
                   {localUrls[company] && (
                     <a
                       href={localUrls[company]}
@@ -324,12 +317,12 @@ const CompanyUrlModal = ({ isOpen, onClose, entries, urls, onSave }) => {
 
 const AIAssistant = ({ question, answer, onApply, charLimit }) => {
   const hasApiKey = localStorage.getItem("GEMINI_API_KEY");
-  if (!hasApiKey) return null;
-
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState("");
   const [mode, setMode] = useState(null);
   const [instruction, setInstruction] = useState("");
+
+  if (!hasApiKey) return null;
 
   const handleAction = async (actionType) => {
     if (!answer) return;
@@ -702,16 +695,11 @@ export default function App() {
         return message;
       }
     };
-
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [view, entries]);
 
-  const handleSaveUrls = (newUrls) => {
-    setCompanyUrls(newUrls);
-  };
-
-  // --- Data Processing ---
+  // --- Helpers & Memos ---
   const isMatch = (text) => {
     if (!searchQuery) return true;
     const lowerQ = searchQuery.toLowerCase();
@@ -822,7 +810,9 @@ export default function App() {
     return groups;
   }, [processedCompanyEntries]);
 
-  // --- Handlers ---
+  // --- Handlers: Data & Form ---
+  const handleSaveUrls = (newUrls) => setCompanyUrls(newUrls);
+
   const resetForm = () => {
     setView("list");
     setEditingId(null);
@@ -843,10 +833,7 @@ export default function App() {
       const isConfirmed = window.confirm(
         "編集中のデータは保存されていません。\n一覧画面に戻るとデータは失われますが、よろしいですか?"
       );
-
-      if (isConfirmed) {
-        resetForm();
-      }
+      if (isConfirmed) resetForm();
     } else {
       resetForm();
     }
@@ -857,11 +844,10 @@ export default function App() {
 
     try {
       if (formData.myPageUrl) {
-        const newUrls = {
-          ...companyUrls,
+        setCompanyUrls((prev) => ({
+          ...prev,
           [formData.company]: formData.myPageUrl,
-        };
-        setCompanyUrls(newUrls);
+        }));
       }
 
       const entryData = {
@@ -890,17 +876,36 @@ export default function App() {
       !confirm("この企業のエントリーシートを削除しますか?\n(URL設定は残ります)")
     )
       return;
-
     setEntries((prev) => prev.filter((e) => e.id !== id));
+  };
+
+  const startEdit = (entry) => {
+    setFormData({
+      company: entry.company,
+      industry: entry.industry,
+      status: entry.status || "未提出",
+      selectionType: entry.selectionType || "",
+      deadline: entry.deadline || "",
+      note: entry.note || "",
+      myPageUrl: companyUrls[entry.company] || "",
+      createdAt: entry.createdAt,
+      qas: entry.qas
+        ? entry.qas.map((q) => ({
+            ...q,
+            tags: Array.isArray(q.tags) ? q.tags.join(", ") : q.tags || "",
+          }))
+        : [],
+    });
+    setEditingId(entry.id);
+    setView("form");
   };
 
   const handleEditById = (id) => {
     const entry = entries.find((e) => e.id === id);
-    if (entry) {
-      startEdit(entry);
-    }
+    if (entry) startEdit(entry);
   };
 
+  // --- Handlers: File IO ---
   const handleExport = () => {
     const exportData = {
       entries: entries,
@@ -931,7 +936,6 @@ export default function App() {
     reader.onload = (e) => {
       try {
         const importedJson = JSON.parse(e.target.result);
-
         let entriesToLoad = [];
         let urlsToLoad = {};
 
@@ -939,9 +943,7 @@ export default function App() {
           entriesToLoad = importedJson;
         } else if (importedJson && Array.isArray(importedJson.entries)) {
           entriesToLoad = importedJson.entries;
-          if (importedJson.companyUrls) {
-            urlsToLoad = importedJson.companyUrls;
-          }
+          if (importedJson.companyUrls) urlsToLoad = importedJson.companyUrls;
         } else {
           alert(
             "無効なファイル形式です。es-data形式のJSONファイルを選択してください。"
@@ -955,7 +957,6 @@ export default function App() {
           )
         ) {
           let migratedUrls = { ...urlsToLoad };
-
           const normalizedData = entriesToLoad.map((item) => {
             if (item.myPageUrl && item.company) {
               migratedUrls[item.company] = item.myPageUrl;
@@ -964,11 +965,7 @@ export default function App() {
           });
 
           setEntries(normalizedData);
-
-          setCompanyUrls((prev) => {
-            const newUrls = { ...prev, ...migratedUrls };
-            return newUrls;
-          });
+          setCompanyUrls((prev) => ({ ...prev, ...migratedUrls }));
         }
       } catch (error) {
         console.error(error);
@@ -979,27 +976,7 @@ export default function App() {
     event.target.value = "";
   };
 
-  const startEdit = (entry) => {
-    setFormData({
-      company: entry.company,
-      industry: entry.industry,
-      status: entry.status || "未提出",
-      selectionType: entry.selectionType || "",
-      deadline: entry.deadline || "",
-      note: entry.note || "",
-      myPageUrl: companyUrls[entry.company] || "",
-      createdAt: entry.createdAt,
-      qas: entry.qas
-        ? entry.qas.map((q) => ({
-            ...q,
-            tags: Array.isArray(q.tags) ? q.tags.join(", ") : q.tags || "",
-          }))
-        : [],
-    });
-    setEditingId(entry.id);
-    setView("form");
-  };
-
+  // --- Handlers: QA Array ---
   const addQA = () =>
     setFormData((p) => ({
       ...p,
@@ -1048,7 +1025,7 @@ export default function App() {
                 className="w-8 h-8 rounded-lg shadow-sm"
               />
               <h1 className="text-lg font-bold text-slate-800 tracking-tight">
-                ES Manager{" "}
+                ES Manager
               </h1>
             </div>
           </div>
@@ -1072,7 +1049,7 @@ export default function App() {
                 <button
                   onClick={handleExport}
                   className="bg-white text-slate-600 border border-slate-200 p-2 rounded-lg hover:bg-slate-50 hover:text-indigo-600 transition-colors"
-                  title="エクスポート"
+                  title="ダウンロード"
                 >
                   <Download size={18} />
                 </button>
@@ -1083,7 +1060,7 @@ export default function App() {
                     accept=".json"
                     onChange={handleImport}
                     className="hidden"
-                    title="インポート"
+                    title="アップロード"
                   />
                 </label>
                 <button
@@ -1154,7 +1131,6 @@ export default function App() {
         )}
       </header>
 
-      {/* Main Content */}
       <main className="max-w-5xl mx-auto p-4 sm:p-6">
         {view === "list" ? (
           <div className="space-y-8">
@@ -1165,7 +1141,7 @@ export default function App() {
                   <div className="text-center text-slate-400 py-10">
                     エントリーシートがありません。
                     <br />
-                    右上のインポートボタンからJSONを読み込むか、新規作成してください。
+                    右上のアップロードボタンからJSONを読み込むか、新規作成してください。
                   </div>
                 )}
                 {processedCompanyEntries.map((entry) => (
@@ -1241,7 +1217,7 @@ export default function App() {
               </div>
             )}
 
-            {/* View: Status List (ES Grouped) */}
+            {/* View: Status List */}
             {viewMode === "status" && (
               <div className="space-y-8">
                 {Object.keys(entriesByStatus).length === 0 && (
@@ -1324,7 +1300,6 @@ export default function App() {
                 </h2>
               </div>
               <div className="p-6 space-y-6">
-                {/* Basic Info */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="text-xs font-bold text-slate-500">
