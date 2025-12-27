@@ -611,7 +611,7 @@ const ESEntryDisplay = ({ entry, onEdit, onDelete, companyUrl }) => {
           </button>
         </div>
       </div>
-      
+
       {entry.note && (
         <div className="px-5 py-3 bg-amber-50/40 border-b border-slate-100 text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
           <span className="font-bold text-amber-600/80 mr-2 text-xs">NOTE</span>
@@ -1360,7 +1360,7 @@ export default function App() {
                   </div>
                   <div>
                     <label className="text-xs font-bold text-slate-500">
-                      業界
+                      業界・職種
                     </label>
                     <input
                       className="w-full px-3 py-2 border rounded-lg mt-1 outline-none focus:border-indigo-500"
@@ -1368,6 +1368,7 @@ export default function App() {
                       onChange={(e) =>
                         setFormData({ ...formData, industry: e.target.value })
                       }
+                      placeholder="例: IT、エンジニア"
                     />
                   </div>
                   <div>
@@ -1475,7 +1476,7 @@ export default function App() {
                           </div>
                           <input
                             className="w-full bg-transparent font-bold text-slate-800 placeholder-slate-300 outline-none border-b focus:border-indigo-500 pb-1"
-                            placeholder="質問内容 (例: 自己PR、ガクチカ)"
+                            placeholder="質問内容"
                             value={qa.question}
                             onChange={(e) =>
                               updateQA(qa.id, "question", e.target.value)
@@ -1516,7 +1517,7 @@ export default function App() {
                         </div>
                         <input
                           className="w-full text-xs px-3 py-2 bg-white border rounded-md outline-none"
-                          placeholder="タグ (カンマ区切り: 自己PR、ガクチカ)"
+                          placeholder="タグ (例: 自己PR、ガクチカ)"
                           value={qa.tags}
                           onChange={(e) =>
                             updateQA(qa.id, "tags", e.target.value)
