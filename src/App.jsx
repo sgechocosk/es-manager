@@ -1070,7 +1070,7 @@ export default function App() {
 
           {view === "list" && (
             <div className="flex-1 w-full sm:w-auto flex gap-2 items-center">
-              <div className="relative flex-1 max-w-lg group">
+              <div className="relative w-full max-w-lg group">
                 <Search
                   className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500"
                   size={16}
@@ -1091,14 +1091,16 @@ export default function App() {
                 >
                   <Download size={18} />
                 </button>
-                <label className="bg-white text-slate-600 border border-slate-200 p-2 rounded-lg hover:bg-slate-50 hover:text-indigo-600 transition-colors cursor-pointer">
+                <label
+                  className="bg-white text-slate-600 border border-slate-200 p-2 rounded-lg hover:bg-slate-50 hover:text-indigo-600 transition-colors cursor-pointer"
+                  title="アップロード"
+                >
                   <Upload size={18} />
                   <input
                     type="file"
                     accept=".json"
                     onChange={handleImport}
                     className="hidden"
-                    title="アップロード"
                   />
                 </label>
                 <button
@@ -1115,19 +1117,19 @@ export default function App() {
                 >
                   <Key size={18} />
                 </button>
-
-                <button
-                  onClick={() => {
-                    resetForm();
-                    setView("form");
-                  }}
-                  title="新規作成"
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white p-2 rounded-lg sm:px-4 flex items-center gap-1.5 shadow-md transition-all active:scale-95 ml-1"
-                >
-                  <Plus size={18} />
-                  <span className="hidden md:inline font-medium">新規作成</span>
-                </button>
               </div>
+
+              <button
+                onClick={() => {
+                  resetForm();
+                  setView("form");
+                }}
+                title="新規作成"
+                className="bg-indigo-600 hover:bg-indigo-700 text-white p-2 rounded-lg sm:px-4 flex items-center gap-1.5 shadow-md transition-all active:scale-95 ml-auto shrink-0"
+              >
+                <Plus size={18} />
+                <span className="hidden md:inline font-medium">新規作成</span>
+              </button>
             </div>
           )}
 
@@ -1149,7 +1151,7 @@ export default function App() {
             {[
               { id: "company", icon: Building2, label: "会社別" },
               { id: "status", icon: Check, label: "ステータス別" },
-              { id: "question", icon: LayoutList, label: "質問一覧" },
+              { id: "question", icon: LayoutList, label: "質問別" },
               { id: "tag", icon: Tags, label: "タグ別" },
             ].map((mode) => (
               <button
