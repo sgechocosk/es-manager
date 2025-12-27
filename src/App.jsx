@@ -109,6 +109,38 @@ const STATUS_COLORS = {
   不採用: "bg-rose-50 text-rose-400",
 };
 
+const HighlightText = ({ text, highlight }) => {
+  if (!highlight || !text) return <>{text}</>;
+  const terms = highlight
+    .toLowerCase()
+    .split(/[\s\u3000]+/)
+    .filter((t) => t.length > 0);
+  if (terms.length === 0) return <>{text}</>;
+
+  const pattern = new RegExp(
+    `(${terms.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})`,
+    "gi"
+  );
+  const parts = text.toString().split(pattern);
+
+  return (
+    <>
+      {parts.map((part, i) =>
+        terms.some((t) => t === part.toLowerCase()) ? (
+          <span
+            key={i}
+            className="bg-yellow-200 text-slate-900 px-0.5 rounded-sm box-decoration-clone"
+          >
+            {part}
+          </span>
+        ) : (
+          part
+        )
+      )}
+    </>
+  );
+};
+
 // --- Components ---
 const StatusBadge = ({ status }) => {
   const colorClass = STATUS_COLORS[status] || STATUS_COLORS["未提出"];
@@ -474,18 +506,19 @@ const QAItemDisplay = ({
   tags,
   showCompanyInfo = false,
   onEdit,
+  highlight,
 }) => (
   <div className="p-4 bg-white border border-slate-200 rounded-xl hover:shadow-md transition-all group">
     {showCompanyInfo && (
       <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-50">
         <div className="flex items-center gap-2">
           <span className="font-bold text-slate-700 text-sm">
-            {companyName}
+            <HighlightText text={companyName} highlight={highlight} />
           </span>
           <StatusBadge status={status} />
           {selectionType && (
             <span className="text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded flex items-center gap-1">
-              {selectionType}
+              <HighlightText text={selectionType} highlight={highlight} />
             </span>
           )}
         </div>
@@ -510,7 +543,7 @@ const QAItemDisplay = ({
           Q.
         </span>
         <h3 className="font-bold text-sm text-slate-800 leading-relaxed">
-          {qa.question}
+          <HighlightText text={qa.question} highlight={highlight} />
           {qa.charLimit && (
             <span className="ml-2 text-xs font-normal text-slate-400">
               ({qa.charLimit}文字)
@@ -522,7 +555,7 @@ const QAItemDisplay = ({
     </div>
 
     <p className="text-sm text-slate-600 whitespace-pre-wrap leading-7 mb-3 pl-7">
-      {qa.answer}
+      <HighlightText text={qa.answer} highlight={highlight} />
     </p>
 
     <div className="pl-7 flex flex-wrap justify-between items-end gap-2">
@@ -533,7 +566,7 @@ const QAItemDisplay = ({
               key={i}
               className="inline-flex items-center px-2 py-1 rounded text-[10px] font-medium bg-indigo-50 text-indigo-600 border border-indigo-100"
             >
-              #{tag}
+              #<HighlightText text={tag} highlight={highlight} />
             </span>
           ))}
       </div>
@@ -544,7 +577,7 @@ const QAItemDisplay = ({
   </div>
 );
 
-const ESEntryDisplay = ({ entry, onEdit, onDelete, companyUrl }) => {
+const ESEntryDisplay = ({ entry, onEdit, onDelete, companyUrl, highlight }) => {
   const qas = entry.qas || [];
   const isExpired = entry.deadline && new Date(entry.deadline) < new Date();
 
@@ -552,7 +585,9 @@ const ESEntryDisplay = ({ entry, onEdit, onDelete, companyUrl }) => {
     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-all duration-300">
       <div className="px-5 py-3 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white flex justify-between items-center">
         <div className="flex flex-wrap items-center gap-3">
-          <h2 className="text-lg font-bold text-slate-800">{entry.company}</h2>
+          <h2 className="text-lg font-bold text-slate-800">
+            <HighlightText text={entry.company} highlight={highlight} />
+          </h2>
           {companyUrl && (
             <a
               href={companyUrl}
@@ -567,11 +602,13 @@ const ESEntryDisplay = ({ entry, onEdit, onDelete, companyUrl }) => {
           )}
           <StatusBadge status={entry.status} />
           <span className="text-xs text-slate-500 flex items-center gap-1">
-            <Briefcase size={12} /> {entry.industry}
+            <Briefcase size={12} />
+            <HighlightText text={entry.industry} highlight={highlight} />
           </span>
           {entry.selectionType && (
             <span className="text-xs text-slate-500 flex items-center gap-1 px-2 py-0.5 bg-slate-100 rounded">
-              <Ticket size={12} /> {entry.selectionType}
+              <Ticket size={12} />
+              <HighlightText text={entry.selectionType} highlight={highlight} />
             </span>
           )}
           {entry.deadline && (
@@ -610,7 +647,7 @@ const ESEntryDisplay = ({ entry, onEdit, onDelete, companyUrl }) => {
       {entry.note && (
         <div className="px-5 py-3 bg-amber-50/40 border-b border-slate-100 text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
           <span className="font-bold text-amber-600/80 mr-2 text-xs">NOTE</span>
-          {entry.note}
+          <HighlightText text={entry.note} highlight={highlight} />
         </div>
       )}
 
@@ -626,7 +663,7 @@ const ESEntryDisplay = ({ entry, onEdit, onDelete, companyUrl }) => {
                 <div className="flex gap-2 flex-1">
                   <span className="text-indigo-600 font-black text-sm">Q.</span>
                   <h3 className="font-bold text-sm text-slate-700 leading-relaxed">
-                    {qa.question}
+                    <HighlightText text={qa.question} highlight={highlight} />
                     {qa.charLimit && (
                       <span className="ml-2 text-xs font-normal text-slate-400">
                         ({qa.charLimit}文字)
@@ -637,7 +674,7 @@ const ESEntryDisplay = ({ entry, onEdit, onDelete, companyUrl }) => {
                 <CopyButton text={qa.answer} />
               </div>
               <p className="text-sm text-slate-600 whitespace-pre-wrap leading-7 mb-3 pl-6">
-                {qa.answer}
+                <HighlightText text={qa.answer} highlight={highlight} />
               </p>
               <div className="pl-6 flex flex-wrap justify-between items-end gap-2">
                 <div className="flex flex-wrap gap-2">
@@ -647,7 +684,7 @@ const ESEntryDisplay = ({ entry, onEdit, onDelete, companyUrl }) => {
                         key={i}
                         className="inline-flex items-center px-2 py-1 rounded text-[10px] font-medium bg-indigo-50 text-indigo-600 border border-indigo-100"
                       >
-                        #{tag}
+                        #<HighlightText text={tag} highlight={highlight} />
                       </span>
                     ))}
                 </div>
@@ -880,23 +917,24 @@ export default function App() {
   };
 
   const startEdit = (entry) => {
+    const fullEntry = entries.find((e) => e.id === entry.id) || entry;
     setFormData({
-      company: entry.company,
-      industry: entry.industry,
-      status: entry.status || "未提出",
-      selectionType: entry.selectionType || "",
-      deadline: entry.deadline || "",
-      note: entry.note || "",
-      myPageUrl: companyUrls[entry.company] || "",
-      createdAt: entry.createdAt,
-      qas: entry.qas
-        ? entry.qas.map((q) => ({
+      company: fullEntry.company,
+      industry: fullEntry.industry,
+      status: fullEntry.status || "未提出",
+      selectionType: fullEntry.selectionType || "",
+      deadline: fullEntry.deadline || "",
+      note: fullEntry.note || "",
+      myPageUrl: companyUrls[fullEntry.company] || "",
+      createdAt: fullEntry.createdAt,
+      qas: fullEntry.qas
+        ? fullEntry.qas.map((q) => ({
             ...q,
             tags: Array.isArray(q.tags) ? q.tags.join(", ") : q.tags || "",
           }))
         : [],
     });
-    setEditingId(entry.id);
+    setEditingId(fullEntry.id);
     setView("form");
   };
 
@@ -1151,6 +1189,7 @@ export default function App() {
                     onEdit={startEdit}
                     onDelete={handleDelete}
                     companyUrl={companyUrls[entry.company]}
+                    highlight={searchQuery}
                   />
                 ))}
               </div>
@@ -1174,6 +1213,7 @@ export default function App() {
                     selectionType={item.selectionType}
                     showCompanyInfo={true}
                     onEdit={handleEditById}
+                    highlight={searchQuery}
                   />
                 ))}
               </div>
@@ -1209,6 +1249,7 @@ export default function App() {
                           selectionType={item.selectionType}
                           showCompanyInfo={true}
                           onEdit={handleEditById}
+                          highlight={searchQuery}
                         />
                       ))}
                     </div>
@@ -1248,6 +1289,7 @@ export default function App() {
                               onEdit={startEdit}
                               onDelete={handleDelete}
                               companyUrl={companyUrls[entry.company]}
+                              highlight={searchQuery}
                             />
                           ))}
                         </div>
