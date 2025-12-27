@@ -22,6 +22,8 @@ import {
   Key,
   Link as LinkIcon,
   ExternalLink,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 
 // --- Utilities ---
@@ -1007,10 +1009,23 @@ export default function App() {
       ],
     }));
 
+  const moveQA = (index, direction) => {
+    setFormData((p) => {
+      const newQas = [...p.qas];
+      if (direction === "up" && index > 0) {
+        [newQas[index - 1], newQas[index]] = [newQas[index], newQas[index - 1]];
+      } else if (direction === "down" && index < newQas.length - 1) {
+        [newQas[index + 1], newQas[index]] = [newQas[index], newQas[index + 1]];
+      }
+      return { ...p, qas: newQas };
+    });
+  };
+
   const removeQA = (id) => {
     if (formData.qas.length > 1)
       setFormData((p) => ({ ...p, qas: p.qas.filter((q) => q.id !== id) }));
   };
+
   const updateQA = (id, f, v) =>
     setFormData((p) => ({
       ...p,
@@ -1036,7 +1051,6 @@ export default function App() {
                 ES Manager{" "}
               </h1>
             </div>
-
           </div>
 
           {view === "list" && (
@@ -1166,7 +1180,7 @@ export default function App() {
               </div>
             )}
 
-            {/* View: Question List (Flat) */}
+            {/* View: Question List */}
             {viewMode === "question" && (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {flattenedQAs.length === 0 && (
@@ -1448,23 +1462,17 @@ export default function App() {
                     {formData.qas.map((qa, idx) => (
                       <div
                         key={qa.id}
-                        className="bg-slate-50 p-5 rounded-xl border relative group"
+                        className="bg-slate-50 p-5 rounded-xl border transition-all duration-200"
                       >
-                        <button
-                          onClick={() => removeQA(qa.id)}
-                          title="質問を削除"
-                          className="absolute top-3 right-3 text-slate-300 hover:text-rose-500"
-                        >
-                          <X size={16} />
-                        </button>
-                        <div className="mb-3">
-                          <div className="flex justify-between items-center mb-1">
-                            <div className="text-xs font-bold text-slate-400">
-                              Q{idx + 1}
-                            </div>
-                            <div className="flex items-center gap-1 mr-4">
-                              <span className="text-[10px] text-slate-400">
-                                文字数制限:
+                        <div className="flex justify-between items-center mb-3">
+                          <div className="text-xs font-bold text-slate-400">
+                            Q{idx + 1}
+                          </div>
+
+                          <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-1">
+                              <span className="text-[10px] text-slate-400 hidden sm:inline">
+                                文字数:
                               </span>
                               <input
                                 type="text"
@@ -1476,7 +1484,36 @@ export default function App() {
                                 }
                               />
                             </div>
+
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => moveQA(idx, "up")}
+                                disabled={idx === 0}
+                                className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                                title="質問を上に移動"
+                              >
+                                <ArrowUp size={16} />
+                              </button>
+                              <button
+                                onClick={() => moveQA(idx, "down")}
+                                disabled={idx === formData.qas.length - 1}
+                                className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                                title="質問を下に移動"
+                              >
+                                <ArrowDown size={16} />
+                              </button>
+                              <button
+                                onClick={() => removeQA(qa.id)}
+                                title="質問を削除"
+                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors"
+                              >
+                                <X size={16} />
+                              </button>
+                            </div>
                           </div>
+                        </div>
+
+                        <div className="mb-3">
                           <input
                             className="w-full bg-transparent font-bold text-slate-800 placeholder-slate-300 outline-none border-b focus:border-indigo-500 pb-1"
                             placeholder="質問内容"
@@ -1486,6 +1523,7 @@ export default function App() {
                             }
                           />
                         </div>
+
                         <div className="mb-3">
                           <textarea
                             className="w-full p-3 text-sm border rounded-lg bg-white focus:border-indigo-500 outline-none min-h-[120px]"
@@ -1496,6 +1534,9 @@ export default function App() {
                             }
                           />
                           <div className="text-right mt-1 flex justify-end gap-2 items-center">
+                            <span className="text-[10px] font-mono text-slate-500 bg-slate-200 px-2 py-0.5 rounded-full">
+                              {qa.answer.length}文字
+                            </span>
                             {qa.charLimit && (
                               <span
                                 className={`text-[10px] font-mono px-2 py-0.5 rounded-full ${
@@ -1507,9 +1548,6 @@ export default function App() {
                                 上限: {qa.charLimit}
                               </span>
                             )}
-                            <span className="text-[10px] font-mono text-slate-500 bg-slate-200 px-2 py-0.5 rounded-full">
-                              {qa.answer.length}文字
-                            </span>
                           </div>
                           <AIAssistant
                             question={qa.question}
