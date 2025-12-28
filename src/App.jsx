@@ -347,7 +347,15 @@ const CompanyUrlModal = ({ isOpen, onClose, entries, urls, onSave }) => {
   );
 };
 
-const AIAssistant = ({ question, answer, onApply, charLimit }) => {
+const AIAssistant = ({
+  question,
+  answer,
+  onApply,
+  charLimit,
+  company,
+  industry,
+  selectionType,
+}) => {
   const hasApiKey = localStorage.getItem("GEMINI_API_KEY");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState("");
@@ -363,48 +371,74 @@ const AIAssistant = ({ question, answer, onApply, charLimit }) => {
     setResult("");
 
     let prompt = "";
+
+    const contextInfo = `
+      【応募先情報】
+      ・企業名: ${company || "未定"}
+      ・業界: ${industry || "未定"}
+      ・選考種別: ${selectionType || "未定"}
+    `;
+
     const limitCondition = charLimit
-      ? `・文字数制限: ${charLimit}文字程度に収めること。`
+      ? `・文字数制限: ${charLimit}文字に正確に収めること。`
       : "";
 
     if (actionType === "refine") {
-      prompt = `あなたはプロのキャリアアドバイザーです。以下の就職活動のエントリーシート(ES)の回答を推敲してください。
-      
+      prompt = `あなたは${
+        industry || "その"
+      }業界に精通したプロのキャリアアドバイザーです。
+      応募先企業(${
+        company || "指定なし"
+      })の高評価を獲得できるよう、以下のES回答を推敲してください。
+
+      ${contextInfo}
+
       【質問内容】
       ${question}
 
       【元の回答】
       ${answer}
 
-      【文字数制限】
-      ${charLimit ? charLimit + "文字以内" : "特になし"}
-
-      【ユーザーからの推敲指示】
+      【ユーザー指示】
       ${
         instruction ||
-        "特になし。論理構成を整理し、より魅力的な文章にしてください。"
+        "論理構成(結論→理由→具体例→結び)を整理し、STAR法を意識して具体的かつ熱意が伝わる文章にしてください。"
       }
-      
-      【条件】
-      1. 誤字脱字を修正し、適切な敬語表現を使い、改行は使用しないこと。
-      2. 出力は推敲後のテキストのみを、マークダウンや挨拶文無しで表示してください。
-      3. ${limitCondition}`;
+
+      【制約条件】
+      1. ${
+        charLimit
+          ? charLimit + "文字以内で作成すること。"
+          : "元の文字数を大きく超えないこと。"
+      }
+      2. 冗長な表現を削ぎ落とし、インパクトのある言葉を選ぶこと。
+      3. 挨拶文やMarkdownは不要。推敲後のテキストのみを出力すること。
+      4. 改行は使用せず、一続きの文章にすること。`;
     } else if (actionType === "feedback") {
-      prompt = `あなたは企業の採用担当者です。以下のエントリーシート(ES)の回答に対してフィードバックをしてください。
-      
+      prompt = `あなたは${
+        company || "企業"
+      }の採用担当者です。以下のES回答を厳しく評価し、改善点を指摘してください。
+
+      ${contextInfo}
+
       【質問内容】
       ${question}
-      ${charLimit ? `(文字数制限: ${charLimit}文字)` : ""}
+      ${charLimit ? `(制限: ${charLimit}文字)` : ""}
 
       【回答内容】
       ${answer}
-      (現在の文字数: ${answer.length}文字)
-      
-      【出力条件】
-      1. 評価できる点と改善すべき点を具体的に挙げてください。
-      2. 重要: 出力はプレーンテキストのみで行ってください。マークダウン(**太字**や#見出し等)は一切使用しないでください。
-      3. 箇条書き記号には「・」を使用してください。
-      4. 文字数制限がある場合は、過不足についてもコメントしてください。`;
+
+      【出力フォーマット】
+      以下の形式でマークダウン形式の記号などを使わずにプレーンテキストで出力してください。
+
+      【評価できる点】
+      ・(具体的に)
+
+      【改善すべき点】
+      ・(論理性、具体性、再現性などの観点から)
+
+      【具体的な修正案】
+      ・(どう書き直すべきかのアドバイス)`;
     }
 
     const aiText = await callGeminiAPI(prompt);
@@ -451,7 +485,7 @@ const AIAssistant = ({ question, answer, onApply, charLimit }) => {
       {loading && (
         <div className="mt-3 p-4 bg-slate-50 rounded-xl border border-slate-200 flex items-center gap-3 text-sm text-slate-500 animate-pulse">
           <Loader2 size={18} className="animate-spin text-indigo-500" />
-          <span>AIが思考中... (質問内容: {question.substring(0, 30)}...)</span>
+          <span>AIが思考中...</span>
         </div>
       )}
 
@@ -473,24 +507,29 @@ const AIAssistant = ({ question, answer, onApply, charLimit }) => {
           <div className="p-4 text-sm text-slate-700 leading-relaxed whitespace-pre-wrap bg-white font-sans">
             {result}
           </div>
-          <div className="p-3 bg-slate-50 border-t border-indigo-50 flex justify-end gap-2">
-            <button
-              onClick={close}
-              className="px-3 py-1.5 text-xs font-bold text-slate-500 hover:bg-slate-200 rounded-md transition-colors"
-            >
-              閉じる
-            </button>
-            {mode === "refine" && (
+          <div className="p-3 bg-slate-50 border-t border-indigo-50 flex justify-between items-center">
+            <div className="text-xs font-mono text-slate-500 pl-1">
+              {mode === "refine" && `${result.length}文字`}
+            </div>
+            <div className="flex gap-2">
               <button
-                onClick={() => {
-                  onApply(result);
-                  close();
-                }}
-                className="px-3 py-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-md shadow-sm flex items-center gap-1.5 transition-colors"
+                onClick={close}
+                className="px-3 py-1.5 text-xs font-bold text-slate-500 hover:bg-slate-200 rounded-md transition-colors"
               >
-                <Check size={14} /> 反映する
+                閉じる
               </button>
-            )}
+              {mode === "refine" && (
+                <button
+                  onClick={() => {
+                    onApply(result);
+                    close();
+                  }}
+                  className="px-3 py-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-md shadow-sm flex items-center gap-1.5 transition-colors"
+                >
+                  <Check size={14} /> 反映する
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -1572,6 +1611,9 @@ export default function App() {
                             question={qa.question}
                             answer={qa.answer}
                             charLimit={qa.charLimit}
+                            company={formData.company}
+                            industry={formData.industry}
+                            selectionType={formData.selectionType}
                             onApply={(text) => updateQA(qa.id, "answer", text)}
                           />
                         </div>
