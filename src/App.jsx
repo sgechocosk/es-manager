@@ -257,9 +257,11 @@ const CompanyUrlModal = ({ isOpen, onClose, entries, urls, onSave }) => {
   const [localUrls, setLocalUrls] = useState(urls);
 
   const companyNames = useMemo(() => {
-    const names = new Set(entries.map((e) => e.company).filter(Boolean));
+    const entryCompanies = entries.map((e) => e.company).filter(Boolean);
+    const urlCompanies = Object.keys(localUrls);
+    const names = new Set([...entryCompanies, ...urlCompanies]);
     return Array.from(names).sort();
-  }, [entries]);
+  }, [entries, localUrls]);
 
   useEffect(() => {
     if (isOpen) setLocalUrls(urls);
