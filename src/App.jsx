@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   Check,
   Copy,
@@ -741,6 +741,18 @@ const ESEntryDisplay = ({ entry, onEdit, onDelete, companyUrl, highlight }) => {
   );
 };
 
+// --- Default Data ---
+const DEFAULT_FORM_DATA = {
+  company: "",
+  industry: "",
+  myPageUrl: "",
+  status: "未提出",
+  selectionType: "",
+  deadline: "",
+  note: "",
+  qas: [{ id: 0, question: "", answer: "", tags: "", charLimit: "" }],
+};
+
 export default function App() {
   // --- State ---
   const [entries, setEntries] = useState([]);
@@ -752,20 +764,32 @@ export default function App() {
   const [isUrlSettingsOpen, setIsUrlSettingsOpen] = useState(false);
   const [companyUrls, setCompanyUrls] = useState({});
 
-  const [formData, setFormData] = useState({
-    company: "",
-    industry: "",
-    myPageUrl: "",
-    status: "未提出",
-    selectionType: "",
-    deadline: "",
-    qas: [{ id: Date.now(), question: "", answer: "", tags: "" }],
-  });
+  const [formData, setFormData] = useState({ ...DEFAULT_FORM_DATA });
+  const [initialFormState, setInitialFormState] = useState(null);
 
   // --- Effects ---
   useEffect(() => {
     const handleBeforeUnload = (e) => {
-      if (entries.length > 0 || view === "form") {
+      const hasEntries = entries.length > 0;
+
+      let isFormDirty = false;
+      if (view === "form" && initialFormState) {
+        const currentJson = JSON.stringify({
+          ...formData,
+          qas: formData.qas.map(({ id, ...rest }) => rest),
+        });
+        const initialJson = JSON.stringify({
+          ...initialFormState,
+          qas: initialFormState.qas.map(({ id, ...rest }) => rest),
+        });
+        isFormDirty = currentJson !== initialJson;
+      }
+
+      if (!hasEntries && !isFormDirty) {
+        return;
+      }
+
+      if (hasEntries || isFormDirty) {
         e.preventDefault();
         const message =
           "データは保存されていません。リロードすると失われます。";
@@ -775,7 +799,7 @@ export default function App() {
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [view, entries]);
+  }, [view, entries, formData, initialFormState]);
 
   // --- Helpers & Memos ---
   const isMatch = (text) => {
@@ -894,24 +918,38 @@ export default function App() {
   const resetForm = () => {
     setView("list");
     setEditingId(null);
-    setFormData({
-      company: "",
-      industry: "",
-      myPageUrl: "",
-      status: "未提出",
-      selectionType: "",
-      deadline: "",
-      note: "",
-      qas: [{ id: Date.now(), question: "", answer: "", tags: "" }],
-    });
+    const newState = {
+      ...DEFAULT_FORM_DATA,
+      qas: [
+        { id: Date.now(), question: "", answer: "", tags: "", charLimit: "" },
+      ],
+    };
+    setFormData(newState);
+    setInitialFormState(null);
   };
 
   const handleCancel = () => {
     if (view === "form") {
-      const isConfirmed = window.confirm(
-        "編集中のデータは保存されていません。\n一覧画面に戻るとデータは失われますが、よろしいですか?"
-      );
-      if (isConfirmed) resetForm();
+      let isDirty = false;
+      if (initialFormState) {
+        const currentJson = JSON.stringify({
+          ...formData,
+          qas: formData.qas.map(({ id, ...rest }) => rest),
+        });
+        const initialJson = JSON.stringify({
+          ...initialFormState,
+          qas: initialFormState.qas.map(({ id, ...rest }) => rest),
+        });
+        isDirty = currentJson !== initialJson;
+      }
+
+      if (isDirty) {
+        const isConfirmed = window.confirm(
+          "編集中のデータは保存されていません。\n一覧画面に戻るとデータは失われますが、よろしいですか?"
+        );
+        if (!isConfirmed) return;
+      }
+      resetForm();
     } else {
       resetForm();
     }
@@ -959,7 +997,7 @@ export default function App() {
 
   const startEdit = (entry) => {
     const fullEntry = entries.find((e) => e.id === entry.id) || entry;
-    setFormData({
+    const editState = {
       company: fullEntry.company,
       industry: fullEntry.industry,
       status: fullEntry.status || "未提出",
@@ -974,7 +1012,10 @@ export default function App() {
             tags: Array.isArray(q.tags) ? q.tags.join(", ") : q.tags || "",
           }))
         : [],
-    });
+    };
+
+    setFormData(editState);
+    setInitialFormState(JSON.parse(JSON.stringify(editState))); // Deep copy for comparison
     setEditingId(fullEntry.id);
     setView("form");
   };
@@ -982,6 +1023,19 @@ export default function App() {
   const handleEditById = (id) => {
     const entry = entries.find((e) => e.id === id);
     if (entry) startEdit(entry);
+  };
+
+  const startNewEntry = () => {
+    resetForm();
+    const newState = {
+      ...DEFAULT_FORM_DATA,
+      qas: [
+        { id: Date.now(), question: "", answer: "", tags: "", charLimit: "" },
+      ],
+    };
+    setFormData(newState);
+    setInitialFormState(JSON.parse(JSON.stringify(newState)));
+    setView("form");
   };
 
   // --- Handlers: File IO ---
@@ -1161,10 +1215,7 @@ export default function App() {
               </div>
 
               <button
-                onClick={() => {
-                  resetForm();
-                  setView("form");
-                }}
+                onClick={startNewEntry}
                 title="新規作成"
                 className="bg-indigo-600 hover:bg-indigo-700 text-white p-2 rounded-lg sm:px-4 flex items-center gap-1.5 shadow-md transition-all active:scale-95 ml-auto shrink-0"
               >
