@@ -8,6 +8,7 @@ import {
   ExternalLink,
   Sparkles,
   Bot,
+  BookOpen,
   Loader2,
   Edit2,
   Briefcase,
@@ -349,6 +350,204 @@ const CompanyUrlModal = ({ isOpen, onClose, entries, urls, onSave }) => {
   );
 };
 
+const ReferenceSelectorModal = ({
+  isOpen,
+  onClose,
+  entries,
+  onSelect,
+  currentQuestion,
+}) => {
+  const [search, setSearch] = useState("");
+  const [selectedIds, setSelectedIds] = useState(new Set());
+
+  const allQAs = useMemo(() => {
+    let items = [];
+    entries.forEach((entry) => {
+      if (entry.qas) {
+        entry.qas.forEach((qa) => {
+          items.push({
+            uniqueId: `${entry.id}_${qa.id}`,
+            question: qa.question,
+            answer: qa.answer,
+            company: entry.company,
+            industry: entry.industry || "",
+            selectionType: entry.selectionType || "",
+            tags: Array.isArray(qa.tags) ? qa.tags.join(" ") : qa.tags || "",
+          });
+        });
+      }
+    });
+    return items;
+  }, [entries]);
+
+  const filteredQAs = useMemo(() => {
+    if (!search) return allQAs;
+    const terms = search
+      .toLowerCase()
+      .split(/[\s\u3000]+/)
+      .filter((t) => t.length > 0);
+
+    return allQAs.filter((item) => {
+      const text = [
+        item.company,
+        item.question,
+        item.answer,
+        item.industry,
+        item.selectionType,
+        item.tags,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      return terms.every((term) => text.includes(term));
+    });
+  }, [allQAs, search]);
+
+  const toggleSelection = (id) => {
+    const next = new Set(selectedIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelectedIds(next);
+  };
+
+  const handleConfirm = () => {
+    const selectedItems = allQAs.filter((item) =>
+      selectedIds.has(item.uniqueId)
+    );
+    onSelect(selectedItems);
+    setSearch("");
+    setSelectedIds(new Set());
+    onClose();
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm animate-in fade-in">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-5xl h-[90vh] flex flex-col animate-in zoom-in-95">
+        <div className="px-5 py-3 border-b flex justify-between items-center bg-slate-50 rounded-t-xl shrink-0">
+          <h3 className="font-bold text-slate-700 flex items-center gap-2 text-sm">
+            <BookOpen size={18} className="text-indigo-600" /> 過去の回答を選択
+          </h3>
+          <button onClick={onClose} title="閉じる">
+            <X size={20} className="text-slate-400 hover:text-slate-600" />
+          </button>
+        </div>
+
+        <div className="bg-white border-b shrink-0">
+          {currentQuestion && (
+            <div className="px-5 py-3 bg-indigo-50/50 border-b border-indigo-50 flex items-center gap-3">
+              <span className="text-xs font-bold text-indigo-600 whitespace-nowrap">
+                現在の質問:
+              </span>
+              <p className="text-xs font-bold text-slate-700 line-clamp-1">
+                {currentQuestion}
+              </p>
+            </div>
+          )}
+
+          <div className="px-5 py-2">
+            <div className="relative">
+              <Search
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                size={14}
+              />
+              <input
+                type="text"
+                placeholder="企業、質問、タグ、回答を検索..."
+                className="w-full pl-9 pr-4 py-1.5 border rounded-lg text-xs outline-none focus:border-indigo-500 bg-slate-50 focus:bg-white transition-colors"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4 bg-slate-100/50">
+          {filteredQAs.length === 0 && (
+            <p className="text-center text-slate-400 py-20 text-sm">
+              該当する回答がありません
+            </p>
+          )}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {filteredQAs.map((item) => {
+              const isSelected = selectedIds.has(item.uniqueId);
+              return (
+                <div
+                  key={item.uniqueId}
+                  onClick={() => toggleSelection(item.uniqueId)}
+                  className={`p-3 rounded-xl border cursor-pointer transition-all h-48 flex flex-col shadow-sm hover:shadow-md ${
+                    isSelected
+                      ? "bg-indigo-50 border-indigo-300 ring-1 ring-indigo-300"
+                      : "bg-white border-slate-200 hover:border-indigo-300"
+                  }`}
+                >
+                  <div className="flex items-start gap-3 h-full overflow-hidden">
+                    <div
+                      className={`mt-1 w-4 h-4 rounded border flex items-center justify-center transition-colors flex-shrink-0 ${
+                        isSelected
+                          ? "bg-indigo-600 border-indigo-600"
+                          : "bg-white border-slate-300"
+                      }`}
+                    >
+                      {isSelected && <Check size={10} className="text-white" />}
+                    </div>
+
+                    <div className="flex-1 min-w-0 flex flex-col h-full">
+                      <div className="flex flex-wrap items-center gap-2 mb-2 shrink-0">
+                        <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded truncate max-w-[120px]">
+                          {item.company}
+                        </span>
+                        {item.selectionType && (
+                          <span className="text-[10px] text-slate-400 border border-slate-100 px-1.5 py-0.5 rounded">
+                            {item.selectionType}
+                          </span>
+                        )}
+                      </div>
+
+                      <p className="text-xs font-bold text-slate-800 mb-2 shrink-0 line-clamp-2 border-b border-slate-50 pb-2">
+                        Q. {item.question}
+                      </p>
+
+                      <div className="flex-1 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-slate-200">
+                        <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap">
+                          {item.answer}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="p-3 border-t bg-white rounded-b-xl flex justify-between items-center shrink-0">
+          <span className="text-xs font-bold text-slate-500 ml-2">
+            {selectedIds.size}件選択中
+          </span>
+          <div className="flex gap-2">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-xs font-bold text-slate-500 hover:bg-slate-100 rounded-lg"
+            >
+              キャンセル
+            </button>
+            <button
+              onClick={handleConfirm}
+              disabled={selectedIds.size === 0}
+              className="px-5 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              選択して適用
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const AIAssistant = ({
   question,
   answer,
@@ -357,17 +556,22 @@ const AIAssistant = ({
   company,
   industry,
   selectionType,
+  allEntries,
 }) => {
   const hasApiKey = localStorage.getItem("GEMINI_API_KEY");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState("");
   const [mode, setMode] = useState(null);
   const [instruction, setInstruction] = useState("");
+  const [isRefModalOpen, setIsRefModalOpen] = useState(false);
+  const [selectedRefs, setSelectedRefs] = useState([]);
 
   if (!hasApiKey) return null;
 
-  const handleAction = async (actionType) => {
-    if (!answer) return;
+  const handleAction = async (actionType, directRefs = null) => {
+    if ((actionType === "refine" || actionType === "feedback") && !answer)
+      return;
+
     setLoading(true);
     setMode(actionType);
     setResult("");
@@ -381,10 +585,6 @@ const AIAssistant = ({
       ・選考種別: ${selectionType || "未定"}
     `;
 
-    const limitCondition = charLimit
-      ? `・文字数制限: ${charLimit}文字に正確に収めること。`
-      : "";
-
     if (actionType === "refine") {
       prompt = `あなたは${
         industry || "その"
@@ -392,55 +592,71 @@ const AIAssistant = ({
       応募先企業(${
         company || "指定なし"
       })の高評価を獲得できるよう、以下のES回答を推敲してください。
-
       ${contextInfo}
-
-      【質問内容】
-      ${question}
-
-      【元の回答】
-      ${answer}
-
-      【ユーザー指示】
-      ${
+      【質問内容】${question}
+      【元の回答】${answer}
+      【ユーザー指示】${
         instruction ||
         "論理構成(結論→理由→具体例→結び)を整理し、STAR法を意識して具体的かつ熱意が伝わる文章にしてください。"
       }
-
       【制約条件】
       1. ${
         charLimit
           ? charLimit + "文字以内で作成すること。"
           : "元の文字数を大きく超えないこと。"
       }
-      2. 冗長な表現を削ぎ落とし、インパクトのある言葉を選ぶこと。
-      3. 挨拶文やMarkdownは不要。推敲後のテキストのみを出力すること。
-      4. 改行は使用せず、一続きの文章にすること。`;
+      2. 挨拶文不要。推敲後のテキストのみ出力。
+      3. 改行は使用せず、一続きの文章にすること。`;
     } else if (actionType === "feedback") {
       prompt = `あなたは${
         company || "企業"
       }の採用担当者です。以下のES回答を厳しく評価し、改善点を指摘してください。
+      ${contextInfo}
+      【質問内容】${question}
+      ${charLimit ? `(制限: ${charLimit}文字)` : ""}
+      【回答内容】${answer}
+      【出力フォーマット】
+      プレーンテキストで出力してください。
+      【評価できる点】
+      【改善すべき点】
+      【具体的な修正案】`;
+    } else if (actionType === "generate") {
+      const refsToUse = directRefs || selectedRefs;
+      const refsText = refsToUse
+        .map(
+          (r, i) =>
+            `[参考${i + 1}] (企業: ${r.company})\nQ: ${r.question}\nA: ${
+              r.answer
+            }`
+        )
+        .join("\n\n");
+
+      prompt = `あなたはプロのキャリアアドバイザーです。
+      以下の「参考にする過去の回答」の内容や要素（強み、エピソードなど）をうまく活用・再構成して、
+      今回の「新しい質問」に対する回答を新規に作成してください。
 
       ${contextInfo}
 
-      【質問内容】
+      【今回の質問】
       ${question}
-      ${charLimit ? `(制限: ${charLimit}文字)` : ""}
 
-      【回答内容】
-      ${answer}
+      【参考にする過去の回答】
+      ${refsText}
 
-      【出力フォーマット】
-      以下の形式でマークダウン形式の記号などを使わずにプレーンテキストで出力してください。
+      【ユーザーの指示】
+      ${
+        instruction ||
+        "過去の回答のエピソードを活かして、今回の質問に整合するように回答を作成してください。"
+      }
 
-      【評価できる点】
-      ・(具体的に)
-
-      【改善すべき点】
-      ・(論理性、具体性、再現性などの観点から)
-
-      【具体的な修正案】
-      ・(どう書き直すべきかのアドバイス)`;
+      【制約条件】
+      1. ${
+        charLimit
+          ? `必ず${charLimit}文字以内に収めること。`
+          : "適切な長さで作成すること。"
+      }
+      2. 挨拶文不要。回答のテキストのみを出力すること。
+      3. 改行は使用せず、一続きの文章にすること。`;
     }
 
     const aiText = await callGeminiAPI(prompt);
@@ -448,21 +664,33 @@ const AIAssistant = ({
     setLoading(false);
   };
 
+  const handleSelectReferences = (refs) => {
+    setSelectedRefs(refs);
+    setMode("generate");
+    handleAction("generate", refs);
+  };
+
   const close = () => {
     setResult("");
     setMode(null);
     setInstruction("");
+    setSelectedRefs([]);
   };
+
+  const isError =
+    result.startsWith("エラー") ||
+    result.startsWith("APIキー") ||
+    result.startsWith("AIからの");
 
   return (
     <div className="mt-2">
       {!mode && (
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-2 flex-wrap items-center">
           <div className="flex-1 min-w-[200px]">
             <input
               type="text"
-              placeholder="例: リーダーシップを強調して、もっと簡潔に..."
-              className="w-full text-xs px-3 py-1.5 border border-slate-200 rounded-l-lg focus:border-indigo-400 outline-none"
+              placeholder="AIへの指示 (例: 具体的に、簡潔に...)"
+              className="w-full text-xs px-3 py-1.5 border border-slate-200 rounded-lg focus:border-indigo-400 outline-none"
               value={instruction}
               onChange={(e) => setInstruction(e.target.value)}
             />
@@ -470,16 +698,22 @@ const AIAssistant = ({
           <button
             onClick={() => handleAction("refine")}
             disabled={!answer}
-            className="flex items-center gap-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded-r-lg shadow-sm transition-colors disabled:opacity-50"
+            className="flex items-center gap-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded-lg shadow-sm transition-colors disabled:opacity-50"
           >
-            <Sparkles size={12} /> AI推敲
+            <Sparkles size={12} /> 推敲
           </button>
           <button
             onClick={() => handleAction("feedback")}
             disabled={!answer}
             className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 px-3 py-1.5 rounded-lg border border-emerald-200 transition-colors disabled:opacity-50 ml-auto sm:ml-0"
           >
-            <Bot size={14} /> フィードバック
+            <Bot size={14} /> FB
+          </button>
+          <button
+            onClick={() => setIsRefModalOpen(true)}
+            className="flex items-center gap-1.5 text-xs font-bold text-indigo-700 bg-indigo-100 hover:bg-indigo-200 px-3 py-1.5 rounded-lg border border-indigo-200 transition-colors"
+          >
+            <BookOpen size={12} /> 統合
           </button>
         </div>
       )}
@@ -495,8 +729,8 @@ const AIAssistant = ({
         <div className="mt-3 bg-white rounded-xl border-2 border-indigo-100 shadow-sm overflow-hidden animate-in slide-in-from-top-2">
           <div className="bg-indigo-50/50 px-4 py-2 border-b border-indigo-100 flex justify-between items-center">
             <div className="flex items-center gap-2 text-sm font-bold text-indigo-800">
-              {mode === "refine" ? <Sparkles size={16} /> : <Bot size={16} />}
-              {mode === "refine" ? "AI推敲案" : "AIフィードバック"}
+              {mode === "feedback" ? <Bot size={16} /> : <Sparkles size={16} />}
+              {mode === "feedback" ? "AIフィードバック" : "AI生成結果"}
             </div>
             <button
               onClick={close}
@@ -511,7 +745,7 @@ const AIAssistant = ({
           </div>
           <div className="p-3 bg-slate-50 border-t border-indigo-50 flex justify-between items-center">
             <div className="text-xs font-mono text-slate-500 pl-1">
-              {mode === "refine" && `${result.length}文字`}
+              {mode !== "feedback" && !isError && `${result.length}文字`}
             </div>
             <div className="flex gap-2">
               <button
@@ -520,7 +754,7 @@ const AIAssistant = ({
               >
                 閉じる
               </button>
-              {mode === "refine" && (
+              {mode !== "feedback" && !isError && (
                 <button
                   onClick={() => {
                     onApply(result);
@@ -535,6 +769,14 @@ const AIAssistant = ({
           </div>
         </div>
       )}
+
+      <ReferenceSelectorModal
+        isOpen={isRefModalOpen}
+        onClose={() => setIsRefModalOpen(false)}
+        entries={allEntries}
+        onSelect={handleSelectReferences}
+        currentQuestion={question}
+      />
     </div>
   );
 };
@@ -807,33 +1049,31 @@ export default function App() {
     const lowerQ = searchQuery.toLowerCase();
     const terms = lowerQ.split(/[\s\u3000]+/).filter((t) => t.length > 0);
     if (!text) return false;
-    return terms.every((term) => text.toLowerCase().includes(term));
+    return terms.some((term) => text.toLowerCase().includes(term));
   };
 
   const processedCompanyEntries = useMemo(() => {
     let result = entries;
 
     if (searchQuery) {
+      const lowerQ = searchQuery.toLowerCase();
+      const terms = lowerQ.split(/[\s\u3000]+/).filter((t) => t.length > 0);
+
       result = entries
         .map((entry) => {
-          const isCompanyMatch =
-            isMatch(entry.company) ||
-            isMatch(entry.industry) ||
-            isMatch(entry.selectionType);
+          const entryBaseText =
+            `${entry.company} ${entry.industry} ${entry.selectionType}`.toLowerCase();
 
-          const filteredQAs = (entry.qas || []).filter(
-            (qa) =>
-              isCompanyMatch ||
-              isMatch(qa.question) ||
-              isMatch(qa.answer) ||
-              (Array.isArray(qa.tags)
-                ? qa.tags.some((t) => isMatch(t))
-                : isMatch(qa.tags))
-          );
+          const filteredQAs = (entry.qas || []).filter((qa) => {
+            const qaTags = Array.isArray(qa.tags) ? qa.tags.join(" ") : qa.tags;
+            const combinedText =
+              `${entryBaseText} ${qa.question} ${qa.answer} ${qaTags}`.toLowerCase();
 
-          if (isCompanyMatch) return entry;
-          if (filteredQAs.length === 0) return null;
-          return { ...entry, qas: filteredQAs };
+            return terms.every((term) => combinedText.includes(term));
+          });
+
+          if (filteredQAs.length > 0) return { ...entry, qas: filteredQAs };
+          return null;
         })
         .filter(Boolean);
     }
@@ -848,17 +1088,26 @@ export default function App() {
 
   const flattenedQAs = useMemo(() => {
     let allItems = [];
+    const lowerQ = searchQuery.toLowerCase();
+    const terms = lowerQ.split(/[\s\u3000]+/).filter((t) => t.length > 0);
+
     entries.forEach((entry) => {
       if (entry.qas) {
         entry.qas.forEach((qa) => {
           const tags = splitTags(qa.tags);
-          const match =
-            isMatch(entry.company) ||
-            isMatch(entry.industry) ||
-            isMatch(entry.selectionType) ||
-            isMatch(qa.question) ||
-            isMatch(qa.answer) ||
-            tags.some((t) => isMatch(t));
+
+          const fullContext = [
+            entry.company,
+            entry.industry,
+            entry.selectionType,
+            qa.question,
+            qa.answer,
+            tags.join(" "),
+          ]
+            .join(" ")
+            .toLowerCase();
+
+          const match = terms.every((term) => fullContext.includes(term));
 
           if (match) {
             allItems.push({
@@ -1015,7 +1264,7 @@ export default function App() {
     };
 
     setFormData(editState);
-    setInitialFormState(JSON.parse(JSON.stringify(editState))); // Deep copy for comparison
+    setInitialFormState(JSON.parse(JSON.stringify(editState)));
     setEditingId(fullEntry.id);
     setView("form");
   };
@@ -1668,6 +1917,7 @@ export default function App() {
                             industry={formData.industry}
                             selectionType={formData.selectionType}
                             onApply={(text) => updateQA(qa.id, "answer", text)}
+                            allEntries={entries}
                           />
                         </div>
                         <input
