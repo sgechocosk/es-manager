@@ -18,6 +18,7 @@ import {
   Search,
   Download,
   Upload,
+  Settings,
   Plus,
   Building2,
   LayoutList,
@@ -25,7 +26,12 @@ import {
   ArrowUp,
   ArrowDown,
   Save,
+  AlertTriangle,
 } from "lucide-react";
+
+// --- Constants ---
+const STORAGE_KEY_SETTINGS = "ES_MANAGER_SETTINGS";
+const STORAGE_KEY_DATA = "ES_MANAGER_DATA";
 
 // --- Utilities ---
 const splitTags = (tagInput) => {
@@ -78,7 +84,7 @@ const sanitizeEntry = (entry) => {
 const callGeminiAPI = async (prompt) => {
   const apiKey = localStorage.getItem("GEMINI_API_KEY");
   if (!apiKey) {
-    return "APIキーが設定されていません。右上の鍵アイコンからAPIキーを設定してください。";
+    return "APIキーが設定されていません。右上の設定ボタンからAPIキーを設定してください。";
   }
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
@@ -184,23 +190,33 @@ const CopyButton = ({ text }) => {
   );
 };
 
-const APIKeyModal = ({ isOpen, onClose }) => {
-  const [key, setKey] = useState("");
+const SettingsModal = ({
+  isOpen,
+  onClose,
+  initialAutoSave,
+  onSettingsSave,
+}) => {
+  const [apiKey, setApiKey] = useState("");
+  const [autoSave, setAutoSave] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
-      setKey(localStorage.getItem("GEMINI_API_KEY") || "");
+      setApiKey(localStorage.getItem("GEMINI_API_KEY") || "");
+      setAutoSave(initialAutoSave);
     }
-  }, [isOpen]);
+  }, [isOpen, initialAutoSave]);
 
   const handleSave = () => {
-    if (key.trim()) {
-      localStorage.setItem("GEMINI_API_KEY", key.trim());
-      alert("APIキーを保存しました。");
+    if (apiKey.trim()) {
+      localStorage.setItem("GEMINI_API_KEY", apiKey.trim());
     } else {
       localStorage.removeItem("GEMINI_API_KEY");
-      alert("APIキーを削除しました。");
     }
+
+    onSettingsSave({ autoSave });
+
+    localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify({ autoSave }));
+
     onClose();
   };
 
@@ -211,7 +227,7 @@ const APIKeyModal = ({ isOpen, onClose }) => {
       <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
         <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
           <h3 className="font-bold text-slate-700 flex items-center gap-2">
-            <Key size={18} className="text-indigo-600" /> APIキー設定
+            <Settings size={18} className="text-indigo-600" /> 設定
           </h3>
           <button
             onClick={onClose}
@@ -221,20 +237,69 @@ const APIKeyModal = ({ isOpen, onClose }) => {
             <X size={20} />
           </button>
         </div>
-        <div className="p-6">
-          <p className="text-xs text-slate-500 mb-4 leading-relaxed">
-            有効なGemini APIキーを入力してください。
-            <br />
-            キーはブラウザのローカルストレージにのみ保存され、外部サーバ等へは送信されません。
-          </p>
-          <input
-            type="password"
-            value={key}
-            onChange={(e) => setKey(e.target.value)}
-            placeholder="AIzaSy..."
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all font-mono text-sm mb-4"
-          />
-          <div className="flex justify-end gap-2">
+        <div className="p-6 space-y-6">
+          {/* API Key Section */}
+          <div>
+            <h4 className="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+              <Key size={16} /> APIキー設定
+            </h4>
+            <p className="text-xs text-slate-500 mb-2 leading-relaxed">
+              Gemini
+              APIキーを入力してください。キーはブラウザにのみ保存されます。
+            </p>
+            <input
+              type="password"
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              placeholder="AIzaSy..."
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all font-mono text-sm"
+            />
+          </div>
+
+          <hr className="border-slate-100" />
+
+          {/* Auto Save Section */}
+          <div>
+            <h4 className="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+              <Save size={16} /> データの自動保存
+            </h4>
+            <label className="flex items-start gap-3 p-3 border rounded-lg hover:bg-slate-50 cursor-pointer transition-colors">
+              <input
+                type="checkbox"
+                checked={autoSave}
+                onChange={(e) => setAutoSave(e.target.checked)}
+                className="mt-1 w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500 border-gray-300"
+              />
+              <div className="flex-1">
+                <span className="block text-sm font-bold text-slate-700">
+                  ブラウザにデータを保存する
+                </span>
+                <span className="block text-xs text-slate-500 mt-1 leading-relaxed">
+                  有効にすると、入力したデータがブラウザ(localStorage)に自動的に保存され、次回起動時に復元されます。
+                </span>
+                {!autoSave && (
+                  <span className="block text-xs text-amber-600 mt-1.5 flex items-center gap-1 font-medium">
+                    <AlertTriangle size={12} />
+                    OFFの場合、ブラウザを閉じるとデータは消えます。
+                  </span>
+                )}
+                {autoSave && (
+                  <span className="block text-xs text-indigo-600 mt-1.5 flex items-center gap-1 font-medium">
+                    <Check size={12} />
+                    次回起動時にデータが復元されます。
+                  </span>
+                )}
+              </div>
+            </label>
+            {!autoSave && initialAutoSave && (
+              <p className="text-xs text-rose-500 mt-2 font-bold">
+                ※
+                設定を保存すると、現在ブラウザに記憶されているデータは削除されます。
+              </p>
+            )}
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
             <button
               onClick={onClose}
               className="px-4 py-2 text-sm font-bold text-slate-500 hover:bg-slate-100 rounded-lg transition-colors"
@@ -245,7 +310,7 @@ const APIKeyModal = ({ isOpen, onClose }) => {
               onClick={handleSave}
               className="px-4 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm transition-colors"
             >
-              保存する
+              設定を保存
             </button>
           </div>
         </div>
@@ -1009,11 +1074,64 @@ export default function App() {
   const [formData, setFormData] = useState({ ...DEFAULT_FORM_DATA });
   const [initialFormState, setInitialFormState] = useState(null);
 
-  // --- Effects ---
+  const [appSettings, setAppSettings] = useState({ autoSave: false });
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  // --- Effects: Initialization & Auto Save ---
+  useEffect(() => {
+    const savedSettingsJson = localStorage.getItem(STORAGE_KEY_SETTINGS);
+    let initialSettings = { autoSave: false };
+
+    if (savedSettingsJson) {
+      try {
+        initialSettings = JSON.parse(savedSettingsJson);
+      } catch (e) {
+        console.error("Failed to parse settings", e);
+      }
+    }
+
+    setAppSettings(initialSettings);
+
+    if (initialSettings.autoSave) {
+      const savedDataJson = localStorage.getItem(STORAGE_KEY_DATA);
+      if (savedDataJson) {
+        try {
+          const parsed = JSON.parse(savedDataJson);
+          if (parsed && Array.isArray(parsed.entries)) {
+            setEntries(parsed.entries);
+          }
+          if (parsed && parsed.companyUrls) {
+            setCompanyUrls(parsed.companyUrls);
+          }
+        } catch (e) {
+          console.error("Failed to parse auto-saved data", e);
+        }
+      }
+    }
+    setIsInitialized(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isInitialized) return;
+
+    if (appSettings.autoSave) {
+      const dataToSave = {
+        entries: entries,
+        companyUrls: companyUrls,
+        updatedAt: getCurrentJSTTime(),
+      };
+      localStorage.setItem(STORAGE_KEY_DATA, JSON.stringify(dataToSave));
+    } else {
+      localStorage.removeItem(STORAGE_KEY_DATA);
+    }
+  }, [entries, companyUrls, appSettings.autoSave, isInitialized]);
+
+  // --- Effects: BeforeUnload ---
   useEffect(() => {
     const handleBeforeUnload = (e) => {
-      const hasEntries = entries.length > 0;
+      if (appSettings.autoSave) return;
 
+      const hasEntries = entries.length > 0;
       let isFormDirty = false;
       if (view === "form" && initialFormState) {
         const currentJson = JSON.stringify({
@@ -1041,7 +1159,7 @@ export default function App() {
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [view, entries, formData, initialFormState]);
+  }, [view, entries, formData, initialFormState, appSettings.autoSave]);
 
   // --- Helpers & Memos ---
   const isMatch = (text) => {
@@ -1163,6 +1281,10 @@ export default function App() {
 
   // --- Handlers: Data & Form ---
   const handleSaveUrls = (newUrls) => setCompanyUrls(newUrls);
+
+  const handleSettingsSave = (newSettings) => {
+    setAppSettings(newSettings);
+  };
 
   const resetForm = () => {
     setView("list");
@@ -1457,9 +1579,9 @@ export default function App() {
                 <button
                   onClick={() => setIsSettingsOpen(true)}
                   className="bg-white text-slate-600 border border-slate-200 p-2 rounded-lg hover:bg-slate-50 hover:text-indigo-600 transition-colors"
-                  title="APIキー設定"
+                  title="設定"
                 >
-                  <Key size={18} />
+                  <Settings size={18} />
                 </button>
               </div>
 
@@ -1960,9 +2082,11 @@ export default function App() {
         )}
       </main>
 
-      <APIKeyModal
+      <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
+        initialAutoSave={appSettings.autoSave}
+        onSettingsSave={handleSettingsSave}
       />
 
       <CompanyUrlModal
