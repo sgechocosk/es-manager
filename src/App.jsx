@@ -62,6 +62,7 @@ const sanitizeEntry = (entry) => {
     question: qa.question || "",
     answer: qa.answer || "",
     charLimit: qa.charLimit || "",
+    note: qa.note || "",
     tags: splitTags(qa.tags),
   }));
 
@@ -622,6 +623,7 @@ const AIAssistant = ({
   industry,
   selectionType,
   allEntries,
+  note,
 }) => {
   const hasApiKey = localStorage.getItem("GEMINI_API_KEY");
   const [loading, setLoading] = useState(false);
@@ -659,6 +661,7 @@ const AIAssistant = ({
       })の高評価を獲得できるよう、以下のES回答を推敲してください。
       ${contextInfo}
       【質問内容】${question}
+      【補足事項/前提条件】${note || "なし"}
       【元の回答】${answer}
       【ユーザー指示】${
         instruction ||
@@ -678,6 +681,7 @@ const AIAssistant = ({
       }の採用担当者です。以下のES回答を厳しく評価し、改善点を指摘してください。
       ${contextInfo}
       【質問内容】${question}
+      【補足事項/前提条件】${note || "なし"}
       ${charLimit ? `(制限: ${charLimit}文字)` : ""}
       【回答内容】${answer}
       【出力フォーマット】
@@ -704,6 +708,7 @@ const AIAssistant = ({
 
       【今回の質問】
       ${question}
+      【補足事項/前提条件】${note || "なし"}
 
       【参考にする過去の回答】
       ${refsText}
@@ -902,6 +907,12 @@ const QAItemDisplay = ({
       <CopyButton text={qa.answer} />
     </div>
 
+    {qa.note && (
+      <div className="mb-2 pl-7 pb-2 border-b border-slate-100 text-xs text-slate-500 whitespace-pre-wrap">
+        <HighlightText text={qa.note} highlight={highlight} />
+      </div>
+    )}
+
     <p className="text-sm text-slate-600 whitespace-pre-wrap leading-7 mb-3 pl-7">
       <HighlightText text={qa.answer} highlight={highlight} />
     </p>
@@ -1021,6 +1032,13 @@ const ESEntryDisplay = ({ entry, onEdit, onDelete, companyUrl, highlight }) => {
                 </div>
                 <CopyButton text={qa.answer} />
               </div>
+
+              {qa.note && (
+                <div className="mb-2 pl-6 pb-2 border-b border-slate-100 text-xs text-slate-500 whitespace-pre-wrap">
+                  <HighlightText text={qa.note} highlight={highlight} />
+                </div>
+              )}
+
               <p className="text-sm text-slate-600 whitespace-pre-wrap leading-7 mb-3 pl-6">
                 <HighlightText text={qa.answer} highlight={highlight} />
               </p>
@@ -1057,7 +1075,7 @@ const DEFAULT_FORM_DATA = {
   selectionType: "",
   deadline: "",
   note: "",
-  qas: [{ id: 0, question: "", answer: "", tags: "", charLimit: "" }],
+  qas: [{ id: 0, question: "", answer: "", tags: "", charLimit: "", note: "" }],
 };
 
 export default function App() {
@@ -1185,7 +1203,7 @@ export default function App() {
           const filteredQAs = (entry.qas || []).filter((qa) => {
             const qaTags = Array.isArray(qa.tags) ? qa.tags.join(" ") : qa.tags;
             const combinedText =
-              `${entryBaseText} ${qa.question} ${qa.answer} ${qaTags}`.toLowerCase();
+              `${entryBaseText} ${qa.question} ${qa.answer} ${qa.note} ${qaTags}`.toLowerCase();
 
             return terms.every((term) => combinedText.includes(term));
           });
@@ -1220,6 +1238,7 @@ export default function App() {
             entry.selectionType,
             qa.question,
             qa.answer,
+            qa.note,
             tags.join(" "),
           ]
             .join(" ")
@@ -1292,7 +1311,14 @@ export default function App() {
     const newState = {
       ...DEFAULT_FORM_DATA,
       qas: [
-        { id: Date.now(), question: "", answer: "", tags: "", charLimit: "" },
+        {
+          id: Date.now(),
+          question: "",
+          answer: "",
+          tags: "",
+          charLimit: "",
+          note: "",
+        },
       ],
     };
     setFormData(newState);
@@ -1381,6 +1407,7 @@ export default function App() {
         ? fullEntry.qas.map((q) => ({
             ...q,
             tags: Array.isArray(q.tags) ? q.tags.join(", ") : q.tags || "",
+            note: q.note || "",
           }))
         : [],
     };
@@ -1401,7 +1428,14 @@ export default function App() {
     const newState = {
       ...DEFAULT_FORM_DATA,
       qas: [
-        { id: Date.now(), question: "", answer: "", tags: "", charLimit: "" },
+        {
+          id: Date.now(),
+          question: "",
+          answer: "",
+          tags: "",
+          charLimit: "",
+          note: "",
+        },
       ],
     };
     setFormData(newState);
@@ -1486,7 +1520,14 @@ export default function App() {
       ...p,
       qas: [
         ...p.qas,
-        { id: Date.now(), question: "", answer: "", tags: "", charLimit: "" },
+        {
+          id: Date.now(),
+          question: "",
+          answer: "",
+          tags: "",
+          charLimit: "",
+          note: "",
+        },
       ],
     }));
 
@@ -1806,8 +1847,8 @@ export default function App() {
                   {editingId ? "編集" : "新規登録"}
                 </h2>
               </div>
-              <div className="p-6 space-y-6">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="p-6 space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
                   <div>
                     <label className="text-xs font-bold text-slate-500">
                       企業名 <span className="text-red-500">*</span>
@@ -2007,6 +2048,17 @@ export default function App() {
                         </div>
 
                         <div className="mb-3">
+                          <input
+                            className="w-full text-xs px-3 py-2 bg-slate-50/50 border rounded-md outline-none placeholder-slate-400 focus:bg-white focus:border-indigo-500 transition-colors"
+                            placeholder="補足事項や前提条件"
+                            value={qa.note || ""}
+                            onChange={(e) =>
+                              updateQA(qa.id, "note", e.target.value)
+                            }
+                          />
+                        </div>
+
+                        <div className="mb-3">
                           <textarea
                             className="w-full p-3 text-sm border rounded-lg bg-white focus:border-indigo-500 outline-none min-h-[120px]"
                             placeholder="回答..."
@@ -2038,6 +2090,7 @@ export default function App() {
                             company={formData.company}
                             industry={formData.industry}
                             selectionType={formData.selectionType}
+                            note={qa.note}
                             onApply={(text) => updateQA(qa.id, "answer", text)}
                             allEntries={entries}
                           />
