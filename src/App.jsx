@@ -753,7 +753,7 @@ const AIAssistant = ({
     result.startsWith("AIからの");
 
   return (
-    <div className="mt-2">
+    <div className="mt-2 animate-in fade-in slide-in-from-top-1 duration-200">
       {!mode && (
         <div className="flex gap-2 flex-wrap items-center">
           <div className="flex-1 min-w-[200px]">
@@ -1095,6 +1095,8 @@ export default function App() {
   const [appSettings, setAppSettings] = useState({ autoSave: false });
   const [isInitialized, setIsInitialized] = useState(false);
 
+  const [activeQAId, setActiveQAId] = useState(null);
+
   // --- Effects: Initialization & Auto Save ---
   useEffect(() => {
     const savedSettingsJson = localStorage.getItem(STORAGE_KEY_SETTINGS);
@@ -1323,6 +1325,7 @@ export default function App() {
     };
     setFormData(newState);
     setInitialFormState(null);
+    setActiveQAId(null);
   };
 
   const handleCancel = () => {
@@ -1415,6 +1418,9 @@ export default function App() {
     setFormData(editState);
     setInitialFormState(JSON.parse(JSON.stringify(editState)));
     setEditingId(fullEntry.id);
+    if (editState.qas.length > 0) {
+      setActiveQAId(editState.qas[0].id);
+    }
     setView("form");
   };
 
@@ -1425,11 +1431,12 @@ export default function App() {
 
   const startNewEntry = () => {
     resetForm();
+    const newId = Date.now();
     const newState = {
       ...DEFAULT_FORM_DATA,
       qas: [
         {
-          id: Date.now(),
+          id: newId,
           question: "",
           answer: "",
           tags: "",
@@ -1440,6 +1447,7 @@ export default function App() {
     };
     setFormData(newState);
     setInitialFormState(JSON.parse(JSON.stringify(newState)));
+    setActiveQAId(newId);
     setView("form");
   };
 
@@ -1515,13 +1523,14 @@ export default function App() {
   };
 
   // --- Handlers: QA Array ---
-  const addQA = () =>
+  const addQA = () => {
+    const newId = Date.now();
     setFormData((p) => ({
       ...p,
       qas: [
         ...p.qas,
         {
-          id: Date.now(),
+          id: newId,
           question: "",
           answer: "",
           tags: "",
@@ -1530,6 +1539,8 @@ export default function App() {
         },
       ],
     }));
+    setActiveQAId(newId);
+  };
 
   const moveQA = (index, direction) => {
     setFormData((p) => {
@@ -1556,7 +1567,10 @@ export default function App() {
 
   // --- Render ---
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-20">
+    <div
+      className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-20"
+      onClick={() => setActiveQAId(null)}
+    >
       <header className="bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-0 z-20 px-4 py-3 shadow-sm">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
           <div className="w-full sm:w-auto flex justify-between items-center">
@@ -1847,7 +1861,10 @@ export default function App() {
                   {editingId ? "編集" : "新規登録"}
                 </h2>
               </div>
-              <div className="p-6 space-y-4">
+              <div
+                className="p-6 space-y-4"
+                onClick={() => setActiveQAId(null)}
+              >
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
                   <div>
                     <label className="text-xs font-bold text-slate-500">
@@ -1982,132 +1999,204 @@ export default function App() {
                     Q&A
                   </label>
                   <div className="space-y-6">
-                    {formData.qas.map((qa, idx) => (
-                      <div
-                        key={qa.id}
-                        className="bg-slate-50 p-5 rounded-xl border transition-all duration-200"
-                      >
-                        <div className="flex justify-between items-center mb-3">
-                          <div className="text-xs font-bold text-slate-400">
-                            Q{idx + 1}
+                    {formData.qas.map((qa, idx) => {
+                      const isActive = activeQAId === qa.id;
+
+                      return (
+                        <div
+                          key={qa.id}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveQAId(qa.id);
+                          }}
+                          className={`rounded-xl border transition-all duration-300 ease-in-out p-4 ${
+                            isActive
+                              ? "bg-slate-50 shadow-sm border-indigo-200 ring-1 ring-indigo-200"
+                              : "bg-white border-slate-200 hover:border-indigo-300 cursor-pointer opacity-90 hover:opacity-100"
+                          }`}
+                        >
+                          <div className="flex justify-between items-center mb-1">
+                            <div className="text-xs font-bold text-slate-400">
+                              Q{idx + 1}
+                            </div>
+
+                            {isActive && (
+                              <div className="flex items-center gap-3 animate-in fade-in slide-in-from-top-1 duration-200">
+                                <div className="flex items-center gap-1">
+                                  <span className="text-[10px] text-slate-400 hidden sm:inline">
+                                    文字数:
+                                  </span>
+                                  <input
+                                    type="text"
+                                    className="w-16 text-right text-xs bg-white border border-slate-200 rounded px-1 py-0.5 focus:border-indigo-500 outline-none placeholder-slate-300"
+                                    placeholder="なし"
+                                    value={qa.charLimit || ""}
+                                    onChange={(e) =>
+                                      updateQA(
+                                        qa.id,
+                                        "charLimit",
+                                        e.target.value
+                                      )
+                                    }
+                                  />
+                                </div>
+
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      moveQA(idx, "up");
+                                    }}
+                                    disabled={idx === 0}
+                                    className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                                    title="質問を上に移動"
+                                  >
+                                    <ArrowUp size={16} />
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      moveQA(idx, "down");
+                                    }}
+                                    disabled={idx === formData.qas.length - 1}
+                                    className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                                    title="質問を下に移動"
+                                  >
+                                    <ArrowDown size={16} />
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      removeQA(qa.id);
+                                    }}
+                                    title="質問を削除"
+                                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors"
+                                  >
+                                    <X size={16} />
+                                  </button>
+                                </div>
+                              </div>
+                            )}
                           </div>
 
-                          <div className="flex items-center gap-3">
-                            <div className="flex items-center gap-1">
-                              <span className="text-[10px] text-slate-400 hidden sm:inline">
-                                文字数:
-                              </span>
+                          <div className="mb-3">
+                            <input
+                              className={`w-full bg-transparent font-bold text-slate-800 placeholder-slate-300 outline-none border-b focus:border-indigo-500 pb-1 ${
+                                !isActive ? "text-sm" : ""
+                              }`}
+                              placeholder="質問内容"
+                              value={qa.question}
+                              onFocus={() => setActiveQAId(qa.id)}
+                              onChange={(e) =>
+                                updateQA(qa.id, "question", e.target.value)
+                              }
+                            />
+                          </div>
+
+                          {isActive && (
+                            <div className="mb-3 animate-in fade-in slide-in-from-top-1 duration-200">
                               <input
-                                type="text"
-                                className="w-16 text-right text-xs bg-white border border-slate-200 rounded px-1 py-0.5 focus:border-indigo-500 outline-none placeholder-slate-300"
-                                placeholder="なし"
-                                value={qa.charLimit || ""}
+                                className="w-full text-xs px-3 py-2 bg-slate-50/50 border rounded-md outline-none placeholder-slate-400 focus:bg-white focus:border-indigo-500 transition-colors"
+                                placeholder="補足事項や前提条件"
+                                value={qa.note || ""}
+                                onFocus={() => setActiveQAId(qa.id)}
                                 onChange={(e) =>
-                                  updateQA(qa.id, "charLimit", e.target.value)
+                                  updateQA(qa.id, "note", e.target.value)
                                 }
                               />
                             </div>
+                          )}
 
-                            <div className="flex items-center gap-1">
-                              <button
-                                onClick={() => moveQA(idx, "up")}
-                                disabled={idx === 0}
-                                className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
-                                title="質問を上に移動"
-                              >
-                                <ArrowUp size={16} />
-                              </button>
-                              <button
-                                onClick={() => moveQA(idx, "down")}
-                                disabled={idx === formData.qas.length - 1}
-                                className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
-                                title="質問を下に移動"
-                              >
-                                <ArrowDown size={16} />
-                              </button>
-                              <button
-                                onClick={() => removeQA(qa.id)}
-                                title="質問を削除"
-                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors"
-                              >
-                                <X size={16} />
-                              </button>
-                            </div>
+                          <div className="mb-1">
+                            <textarea
+                              className={`w-full p-3 text-sm border rounded-lg bg-white focus:border-indigo-500 outline-none transition-all duration-300 ${
+                                isActive ? "min-h-[120px]" : "min-h-[80px]"
+                              }`}
+                              placeholder="回答..."
+                              value={qa.answer}
+                              onFocus={() => setActiveQAId(qa.id)}
+                              onChange={(e) =>
+                                updateQA(qa.id, "answer", e.target.value)
+                              }
+                            />
+                            {isActive ? (
+                              <div className="animate-in fade-in slide-in-from-top-1 duration-200">
+                                <div className="text-right mt-1 flex justify-end gap-2 items-center">
+                                  <span className="text-[10px] font-mono text-slate-500 bg-slate-200 px-2 py-0.5 rounded-full">
+                                    {qa.answer.length}文字
+                                  </span>
+                                  {qa.charLimit && (
+                                    <span
+                                      className={`text-[10px] font-mono px-2 py-0.5 rounded-full ${
+                                        qa.answer.length > qa.charLimit
+                                          ? "bg-rose-100 text-rose-600"
+                                          : "bg-slate-100 text-slate-500"
+                                      }`}
+                                    >
+                                      上限: {qa.charLimit}
+                                    </span>
+                                  )}
+                                </div>
+                                <AIAssistant
+                                  question={qa.question}
+                                  answer={qa.answer}
+                                  charLimit={qa.charLimit}
+                                  company={formData.company}
+                                  industry={formData.industry}
+                                  selectionType={formData.selectionType}
+                                  note={qa.note}
+                                  onApply={(text) =>
+                                    updateQA(qa.id, "answer", text)
+                                  }
+                                  allEntries={entries}
+                                />
+                              </div>
+                            ) : null}
                           </div>
-                        </div>
 
-                        <div className="mb-3">
-                          <input
-                            className="w-full bg-transparent font-bold text-slate-800 placeholder-slate-300 outline-none border-b focus:border-indigo-500 pb-1"
-                            placeholder="質問内容"
-                            value={qa.question}
-                            onChange={(e) =>
-                              updateQA(qa.id, "question", e.target.value)
-                            }
-                          />
-                        </div>
-
-                        <div className="mb-3">
-                          <input
-                            className="w-full text-xs px-3 py-2 bg-slate-50/50 border rounded-md outline-none placeholder-slate-400 focus:bg-white focus:border-indigo-500 transition-colors"
-                            placeholder="補足事項や前提条件"
-                            value={qa.note || ""}
-                            onChange={(e) =>
-                              updateQA(qa.id, "note", e.target.value)
-                            }
-                          />
-                        </div>
-
-                        <div className="mb-3">
-                          <textarea
-                            className="w-full p-3 text-sm border rounded-lg bg-white focus:border-indigo-500 outline-none min-h-[120px]"
-                            placeholder="回答..."
-                            value={qa.answer}
-                            onChange={(e) =>
-                              updateQA(qa.id, "answer", e.target.value)
-                            }
-                          />
-                          <div className="text-right mt-1 flex justify-end gap-2 items-center">
-                            <span className="text-[10px] font-mono text-slate-500 bg-slate-200 px-2 py-0.5 rounded-full">
-                              {qa.answer.length}文字
-                            </span>
-                            {qa.charLimit && (
-                              <span
-                                className={`text-[10px] font-mono px-2 py-0.5 rounded-full ${
-                                  qa.answer.length > qa.charLimit
-                                    ? "bg-rose-100 text-rose-600"
-                                    : "bg-slate-100 text-slate-500"
+                          {isActive ? (
+                            <input
+                              className="w-full text-xs px-3 py-2 bg-white border rounded-md outline-none focus:border-indigo-500 animate-in fade-in slide-in-from-top-1 duration-200"
+                              placeholder="タグ (例: 自己PR、ガクチカ)"
+                              value={qa.tags}
+                              onFocus={() => setActiveQAId(qa.id)}
+                              onChange={(e) =>
+                                updateQA(qa.id, "tags", e.target.value)
+                              }
+                            />
+                          ) : (
+                            <div className="flex justify-between items-center gap-2 mt-1 animate-in fade-in duration-300">
+                              <input
+                                className="flex-1 text-xs px-2 py-1 bg-white border border-slate-200 rounded outline-none focus:border-indigo-500 transition-all placeholder-slate-300"
+                                placeholder="タグ"
+                                value={qa.tags}
+                                onClick={(e) => e.stopPropagation()}
+                                onChange={(e) =>
+                                  updateQA(qa.id, "tags", e.target.value)
+                                }
+                              />
+                              <div
+                                className={`text-right text-[10px] font-mono shrink-0 ${
+                                  qa.charLimit &&
+                                  qa.answer.length > Number(qa.charLimit)
+                                    ? "text-rose-500 font-bold"
+                                    : "text-slate-400"
                                 }`}
                               >
-                                上限: {qa.charLimit}
-                              </span>
-                            )}
-                          </div>
-                          <AIAssistant
-                            question={qa.question}
-                            answer={qa.answer}
-                            charLimit={qa.charLimit}
-                            company={formData.company}
-                            industry={formData.industry}
-                            selectionType={formData.selectionType}
-                            note={qa.note}
-                            onApply={(text) => updateQA(qa.id, "answer", text)}
-                            allEntries={entries}
-                          />
+                                {qa.answer.length}文字
+                                {qa.charLimit && ` / 上限: ${qa.charLimit}`}
+                              </div>
+                            </div>
+                          )}
                         </div>
-                        <input
-                          className="w-full text-xs px-3 py-2 bg-white border rounded-md outline-none"
-                          placeholder="タグ (例: 自己PR、ガクチカ)"
-                          value={qa.tags}
-                          onChange={(e) =>
-                            updateQA(qa.id, "tags", e.target.value)
-                          }
-                        />
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                   <button
-                    onClick={addQA}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      addQA();
+                    }}
                     className="mt-4 w-full py-3 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 hover:border-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 flex items-center justify-center gap-2 text-sm font-bold"
                   >
                     <Plus size={16} /> 質問を追加
