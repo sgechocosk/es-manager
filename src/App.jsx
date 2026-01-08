@@ -324,10 +324,37 @@ const CompanyUrlModal = ({ isOpen, onClose, entries, urls, onSave }) => {
   const [localUrls, setLocalUrls] = useState(urls);
 
   const companyNames = useMemo(() => {
-    const entryCompanies = entries.map((e) => e.company).filter(Boolean);
+    const usedCompaniesSet = new Set(
+      entries.map((e) => e.company).filter(Boolean)
+    );
+
+    const entryCompanies = Array.from(usedCompaniesSet);
     const urlCompanies = Object.keys(localUrls);
-    const names = new Set([...entryCompanies, ...urlCompanies]);
-    return Array.from(names).sort();
+    const names = Array.from(new Set([...entryCompanies, ...urlCompanies]));
+
+    return names.sort((a, b) => {
+      const isUsedA = usedCompaniesSet.has(a);
+      const hasUrlA = !!localUrls[a];
+
+      const isUsedB = usedCompaniesSet.has(b);
+      const hasUrlB = !!localUrls[b];
+
+      const getRank = (isUsed, hasUrl) => {
+        if (isUsed && hasUrl) return 1;
+        if (isUsed && !hasUrl) return 2;
+        if (!isUsed && hasUrl) return 3;
+        return 4;
+      };
+
+      const rankA = getRank(isUsedA, hasUrlA);
+      const rankB = getRank(isUsedB, hasUrlB);
+
+      if (rankA !== rankB) {
+        return rankA - rankB;
+      }
+
+      return a.localeCompare(b, "ja");
+    });
   }, [entries, localUrls]);
 
   useEffect(() => {
@@ -336,6 +363,14 @@ const CompanyUrlModal = ({ isOpen, onClose, entries, urls, onSave }) => {
 
   const handleChange = (company, url) => {
     setLocalUrls((prev) => ({ ...prev, [company]: url }));
+  };
+
+  const handleDeleteLine = (company) => {
+    setLocalUrls((prev) => {
+      const next = { ...prev };
+      delete next[company];
+      return next;
+    });
   };
 
   const handleSave = () => {
@@ -367,33 +402,55 @@ const CompanyUrlModal = ({ isOpen, onClose, entries, urls, onSave }) => {
                 登録された企業がありません。
               </p>
             )}
-            {companyNames.map((company) => (
-              <div key={company} className="flex items-center gap-3">
-                <div className="w-1/3 text-sm font-bold text-slate-700 truncate">
-                  {company}
+            {companyNames.map((company) => {
+              const isUsed = entries.some((e) => e.company === company);
+
+              return (
+                <div key={company} className="flex items-center gap-3 group">
+                  <div
+                    className="w-1/3 text-sm font-bold text-slate-700 truncate"
+                    title={company}
+                  >
+                    {company}
+                  </div>
+                  <div className="flex-1 flex items-center gap-2">
+                    <input
+                      type="url"
+                      placeholder={isUsed ? "https://..." : "未使用の企業"}
+                      className={`flex-1 px-3 py-2 border rounded-lg text-sm outline-none transition-colors ${
+                        !isUsed && !localUrls[company]
+                          ? "bg-slate-50 text-slate-400 border-slate-200"
+                          : "focus:border-indigo-500"
+                      }`}
+                      value={localUrls[company] || ""}
+                      onChange={(e) => handleChange(company, e.target.value)}
+                    />
+
+                    {localUrls[company] && (
+                      <a
+                        href={localUrls[company]}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-2 text-slate-400 hover:text-indigo-600 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors flex-shrink-0"
+                        title="マイページを開く"
+                      >
+                        <ExternalLink size={18} />
+                      </a>
+                    )}
+
+                    {!isUsed && (
+                      <button
+                        onClick={() => handleDeleteLine(company)}
+                        className="p-2 text-slate-300 hover:text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200 rounded-lg transition-all flex-shrink-0"
+                        title="リストから削除"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <div className="flex-1 flex items-center gap-2">
-                  <input
-                    type="url"
-                    placeholder="https://..."
-                    className="flex-1 px-3 py-2 border rounded-lg text-sm focus:border-indigo-500 outline-none"
-                    value={localUrls[company] || ""}
-                    onChange={(e) => handleChange(company, e.target.value)}
-                  />
-                  {localUrls[company] && (
-                    <a
-                      href={localUrls[company]}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="p-2 text-slate-400 hover:text-indigo-600 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors flex-shrink-0"
-                      title="マイページを開く"
-                    >
-                      <ExternalLink size={18} />
-                    </a>
-                  )}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
@@ -1556,7 +1613,9 @@ export default function App() {
 
   const removeQA = (id) => {
     if (formData.qas.length > 1) {
-      if (window.confirm("この質問を削除しますか? (この操作は取り消せません。)")) {
+      if (
+        window.confirm("この質問を削除しますか? (この操作は取り消せません。)")
+      ) {
         setFormData((p) => ({ ...p, qas: p.qas.filter((q) => q.id !== id) }));
       }
     }
