@@ -1555,8 +1555,11 @@ export default function App() {
   };
 
   const removeQA = (id) => {
-    if (formData.qas.length > 1)
-      setFormData((p) => ({ ...p, qas: p.qas.filter((q) => q.id !== id) }));
+    if (formData.qas.length > 1) {
+      if (window.confirm("この質問を削除しますか? (この操作は取り消せません。)")) {
+        setFormData((p) => ({ ...p, qas: p.qas.filter((q) => q.id !== id) }));
+      }
+    }
   };
 
   const updateQA = (id, f, v) =>
