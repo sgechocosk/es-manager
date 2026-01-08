@@ -213,6 +213,8 @@ const ReferenceSidebar = ({ isOpen, onClose, entries, editingId }) => {
             answer: qa.answer,
             company: entry.company,
             selectionType: entry.selectionType,
+            industry: entry.industry || "",
+            note: qa.note || "",
             tags: Array.isArray(qa.tags) ? qa.tags : [],
           });
         });
@@ -229,9 +231,11 @@ const ReferenceSidebar = ({ isOpen, onClose, entries, editingId }) => {
     return allItems.filter((item) => {
       const text = [
         item.company,
+        item.industry,
+        item.selectionType,
         item.question,
         item.answer,
-        item.selectionType,
+        item.note,
         item.tags.join(" "),
       ]
         .filter(Boolean)
@@ -298,11 +302,14 @@ const ReferenceSidebar = ({ isOpen, onClose, entries, editingId }) => {
               <div>
                 <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
                   <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded truncate max-w-[140px] block">
-                    {item.company}
+                    <HighlightText text={item.company} highlight={search} />
                   </span>
                   {item.selectionType && (
                     <span className="text-[10px] text-slate-400 border border-slate-100 px-1.5 py-0.5 rounded">
-                      {item.selectionType}
+                      <HighlightText
+                        text={item.selectionType}
+                        highlight={search}
+                      />
                     </span>
                   )}
                 </div>
@@ -326,7 +333,7 @@ const ReferenceSidebar = ({ isOpen, onClose, entries, editingId }) => {
                     key={i}
                     className="text-[9px] px-1.5 py-0.5 bg-indigo-50 text-indigo-600 rounded border border-indigo-100"
                   >
-                    #{tag}
+                    #<HighlightText text={tag} highlight={search} />
                   </span>
                 ))}
               </div>
@@ -644,6 +651,7 @@ const ReferenceSelectorModal = ({
             company: entry.company,
             industry: entry.industry || "",
             selectionType: entry.selectionType || "",
+            note: qa.note || "",
             tags: Array.isArray(qa.tags) ? qa.tags.join(" ") : qa.tags || "",
           });
         });
@@ -666,6 +674,7 @@ const ReferenceSelectorModal = ({
         item.answer,
         item.industry,
         item.selectionType,
+        item.note,
         item.tags,
       ]
         .filter(Boolean)
@@ -769,22 +778,35 @@ const ReferenceSelectorModal = ({
                     <div className="flex-1 min-w-0 flex flex-col h-full">
                       <div className="flex flex-wrap items-center gap-2 mb-2 shrink-0">
                         <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded truncate max-w-[120px]">
-                          {item.company}
+                          <HighlightText
+                            text={item.company}
+                            highlight={search}
+                          />
                         </span>
                         {item.selectionType && (
                           <span className="text-[10px] text-slate-400 border border-slate-100 px-1.5 py-0.5 rounded">
-                            {item.selectionType}
+                            <HighlightText
+                              text={item.selectionType}
+                              highlight={search}
+                            />
                           </span>
                         )}
                       </div>
 
                       <p className="text-xs font-bold text-slate-800 mb-2 shrink-0 line-clamp-2 border-b border-slate-50 pb-2">
-                        Q. {item.question}
+                        Q.{" "}
+                        <HighlightText
+                          text={item.question}
+                          highlight={search}
+                        />
                       </p>
 
                       <div className="flex-1 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-slate-200">
                         <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap">
-                          {item.answer}
+                          <HighlightText
+                            text={item.answer}
+                            highlight={search}
+                          />
                         </p>
                       </div>
                     </div>
@@ -907,7 +929,7 @@ const AIAssistant = ({
         .join("\n\n");
 
       prompt = `あなたはプロのキャリアアドバイザーです。
-      以下の「参考にする過去の回答」の内容や要素（強み、エピソードなど）をうまく活用・再構成して、
+      以下の「参考にする過去の回答」の内容や要素(強み、エピソードなど)をうまく活用・再構成して、
       今回の「新しい質問」に対する回答を新規に作成してください。
 
       ${contextInfo}
@@ -1810,6 +1832,7 @@ export default function App() {
                 ES Manager
               </h1>
             </div>
+            {/* Mobile View Toggle */}
             {view === "form" && (
               <button
                 onClick={(e) => {
