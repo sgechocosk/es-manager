@@ -27,11 +27,14 @@ import {
   ArrowDown,
   Save,
   AlertTriangle,
+  PanelRight,
+  PanelRightClose,
 } from "lucide-react";
 
 // --- Constants ---
 const STORAGE_KEY_SETTINGS = "ES_MANAGER_SETTINGS";
 const STORAGE_KEY_DATA = "ES_MANAGER_DATA";
+const HEADER_HEIGHT = "57px";
 
 // --- Utilities ---
 const splitTags = (tagInput) => {
@@ -188,6 +191,146 @@ const CopyButton = ({ text }) => {
       {copied ? <Check size={12} /> : <Copy size={12} />}
       {copied ? "Copied" : "Copy"}
     </button>
+  );
+};
+
+// --- Reference Sidebar Component ---
+const ReferenceSidebar = ({ isOpen, onClose, entries }) => {
+  const [search, setSearch] = useState("");
+
+  const filteredQAs = useMemo(() => {
+    let allItems = [];
+    entries.forEach((entry) => {
+      if (entry.qas) {
+        entry.qas.forEach((qa) => {
+          allItems.push({
+            uniqueId: `${entry.id}_${qa.id}`,
+            question: qa.question,
+            answer: qa.answer,
+            company: entry.company,
+            selectionType: entry.selectionType,
+            tags: Array.isArray(qa.tags) ? qa.tags : [],
+          });
+        });
+      }
+    });
+
+    if (!search) return allItems;
+
+    const terms = search
+      .toLowerCase()
+      .split(/[\s\u3000]+/)
+      .filter((t) => t.length > 0);
+
+    return allItems.filter((item) => {
+      const text = [
+        item.company,
+        item.question,
+        item.answer,
+        item.selectionType,
+        item.tags.join(" "),
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      return terms.every((term) => text.includes(term));
+    });
+  }, [entries, search]);
+
+  return (
+    <aside
+      onClick={(e) => e.stopPropagation()}
+      className={`fixed right-0 w-full sm:w-96 bg-white shadow-2xl z-40 border-l border-slate-200 transform transition-transform duration-300 ease-in-out flex flex-col ${
+        isOpen ? "translate-x-0" : "translate-x-full"
+      }`}
+      style={{
+        top: HEADER_HEIGHT,
+        height: `calc(100vh - ${HEADER_HEIGHT})`,
+      }}
+    >
+      <div className="flex items-center justify-between p-4 border-b border-slate-100 bg-slate-50/80 backdrop-blur-sm shrink-0">
+        <h3 className="font-bold text-slate-700 flex items-center gap-2">
+          <BookOpen size={18} className="text-indigo-600" />
+          ES参照
+        </h3>
+        <button
+          onClick={onClose}
+          className="text-slate-400 hover:text-slate-600 p-1 rounded-md hover:bg-slate-200/50 transition-colors"
+          title="パネルを閉じる"
+        >
+          <PanelRightClose size={20} />
+        </button>
+      </div>
+
+      <div className="p-4 border-b border-slate-100 bg-white shrink-0">
+        <div className="relative">
+          <Search
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+            size={14}
+          />
+          <input
+            type="text"
+            placeholder="企業、質問、タグ、回答を検索..."
+            className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-indigo-500 bg-slate-50 focus:bg-white transition-colors"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/30 scrollbar-thin scrollbar-thumb-slate-200">
+        {filteredQAs.length === 0 && (
+          <div className="text-center text-slate-400 text-sm py-10">
+            {search ? "該当する回答がありません" : "データがありません"}
+          </div>
+        )}
+        {filteredQAs.map((item) => (
+          <div
+            key={item.uniqueId}
+            className="bg-white p-3 rounded-xl border border-slate-200 hover:border-indigo-300 hover:shadow-sm transition-all group"
+          >
+            <div className="flex justify-between items-start mb-2 gap-2">
+              <div>
+                <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
+                  <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded truncate max-w-[140px] block">
+                    {item.company}
+                  </span>
+                  {item.selectionType && (
+                    <span className="text-[10px] text-slate-400 border border-slate-100 px-1.5 py-0.5 rounded">
+                      {item.selectionType}
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs font-bold text-slate-800 leading-tight">
+                  <HighlightText text={item.question} highlight={search} />
+                </p>
+              </div>
+              <div className="shrink-0">
+                <CopyButton text={item.answer} />
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap max-h-[200px] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-100 pr-1">
+              <HighlightText text={item.answer} highlight={search} />
+            </p>
+
+            {item.tags.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1">
+                {item.tags.map((tag, i) => (
+                  <span
+                    key={i}
+                    className="text-[9px] px-1.5 py-0.5 bg-indigo-50 text-indigo-600 rounded border border-indigo-100"
+                  >
+                    #{tag}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </aside>
   );
 };
 
@@ -1146,6 +1289,8 @@ export default function App() {
   const [isUrlSettingsOpen, setIsUrlSettingsOpen] = useState(false);
   const [companyUrls, setCompanyUrls] = useState({});
 
+  const [isRefPanelOpen, setIsRefPanelOpen] = useState(false);
+
   const [formData, setFormData] = useState({ ...DEFAULT_FORM_DATA });
   const [initialFormState, setInitialFormState] = useState(null);
 
@@ -1387,6 +1532,7 @@ export default function App() {
     setFormData(newState);
     setInitialFormState(null);
     setActiveQAId(null);
+    setIsRefPanelOpen(false);
     scrollToTop(behavior);
   };
 
@@ -1639,15 +1785,15 @@ export default function App() {
   // --- Render ---
   return (
     <div
-      className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-20"
+      className="min-h-screen bg-slate-50 text-slate-800 font-sans flex flex-col"
       onClick={() => setActiveQAId(null)}
     >
-      <header className="bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-0 z-20 px-4 py-3 shadow-sm">
+      <header className="bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-0 z-50 px-4 py-3 shadow-sm shrink-0">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
           <div className="w-full sm:w-auto flex justify-between items-center">
             <div
               className="flex items-center gap-2 cursor-pointer"
-              onClick={() => handleCancel("smooth")}
+              onClick={() => handleCancel(view === "list" ? "smooth" : "auto")}
             >
               <img
                 src="/favicon.png"
@@ -1658,6 +1804,18 @@ export default function App() {
                 ES Manager
               </h1>
             </div>
+            {view === "form" && (
+              <button
+                onClick={() => setIsRefPanelOpen((prev) => !prev)}
+                className={`sm:hidden p-2 rounded-lg transition-colors ${
+                  isRefPanelOpen
+                    ? "bg-indigo-100 text-indigo-600"
+                    : "text-slate-500 hover:bg-slate-100"
+                }`}
+              >
+                <PanelRight size={20} />
+              </button>
+            )}
           </div>
 
           {view === "list" && (
@@ -1723,7 +1881,20 @@ export default function App() {
           )}
 
           {view !== "list" && (
-            <div className="self-end sm:self-auto">
+            <div className="flex items-center gap-2 self-end sm:self-auto">
+              {view === "form" && (
+                <button
+                  onClick={() => setIsRefPanelOpen((prev) => !prev)}
+                  className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm font-bold transition-colors ${
+                    isRefPanelOpen
+                      ? "bg-indigo-50 border-indigo-200 text-indigo-700"
+                      : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  <PanelRight size={16} />
+                  {isRefPanelOpen ? "参照パネルを閉じる" : "他のESを参照"}
+                </button>
+              )}
               <button
                 onClick={handleCancel}
                 title="一覧に戻る"
@@ -1763,558 +1934,589 @@ export default function App() {
         )}
       </header>
 
-      <main className="max-w-5xl mx-auto p-4 sm:p-6">
-        {view === "list" ? (
-          <div className="space-y-8">
-            {/* View: Company List */}
-            {viewMode === "company" && (
-              <div className="grid gap-6">
-                {processedCompanyEntries.length === 0 && (
-                  <div className="text-center text-slate-400 py-10">
-                    エントリーシートがありません。
-                    <br />
-                    右上のアップロードボタンからJSONを読み込むか、新規作成してください。
-                  </div>
-                )}
-                {processedCompanyEntries.map((entry) => (
-                  <ESEntryDisplay
-                    key={entry.id}
-                    entry={entry}
-                    onEdit={startEdit}
-                    onDelete={handleDelete}
-                    companyUrl={companyUrls[entry.company]}
-                    highlight={searchQuery}
-                  />
-                ))}
-              </div>
-            )}
-
-            {/* View: Question List */}
-            {viewMode === "question" && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {flattenedQAs.length === 0 && (
-                  <div className="col-span-2 text-center text-slate-400 py-10">
-                    該当する質問はありません
-                  </div>
-                )}
-                {flattenedQAs.map((item, idx) => (
-                  <QAItemDisplay
-                    key={`${item.entryId}-${idx}`}
-                    qa={item}
-                    tags={item.tagsArray}
-                    companyName={item.companyName}
-                    status={item.status}
-                    selectionType={item.selectionType}
-                    showCompanyInfo={true}
-                    onEdit={handleEditById}
-                    highlight={searchQuery}
-                  />
-                ))}
-              </div>
-            )}
-
-            {/* View: Tag Group */}
-            {viewMode === "tag" && (
+      {/* Main Container with Sidebar Split/Overlay Logic */}
+      <div className="flex flex-1 overflow-hidden relative">
+        <main
+          className={`flex-1 overflow-y-auto p-4 sm:p-6 transition-all duration-300 ease-in-out ${
+            isRefPanelOpen ? "mr-0 lg:mr-96" : "mr-0"
+          }`}
+        >
+          <div className="max-w-5xl mx-auto pb-20">
+            {view === "list" ? (
               <div className="space-y-8">
-                {Object.keys(tagGroups).length === 0 && (
-                  <div className="text-center text-slate-400 py-10">
-                    タグ付けされた質問はありません
+                {/* View: Company List */}
+                {viewMode === "company" && (
+                  <div className="grid gap-6">
+                    {processedCompanyEntries.length === 0 && (
+                      <div className="text-center text-slate-400 py-10">
+                        エントリーシートがありません。
+                        <br />
+                        右上のアップロードボタンからJSONを読み込むか、新規作成してください。
+                      </div>
+                    )}
+                    {processedCompanyEntries.map((entry) => (
+                      <ESEntryDisplay
+                        key={entry.id}
+                        entry={entry}
+                        onEdit={startEdit}
+                        onDelete={handleDelete}
+                        companyUrl={companyUrls[entry.company]}
+                        highlight={searchQuery}
+                      />
+                    ))}
                   </div>
                 )}
-                {Object.entries(tagGroups).map(([tagName, items]) => (
-                  <div
-                    key={tagName}
-                    className="bg-slate-50/50 rounded-xl border border-slate-200 p-4"
-                  >
-                    <h3 className="text-sm font-bold text-indigo-700 mb-4 flex items-center gap-2">
-                      <Tags size={16} /> #{tagName}
-                      <span className="bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full text-xs">
-                        {items.length}
-                      </span>
-                    </h3>
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                      {items.map((item, idx) => (
-                        <QAItemDisplay
-                          key={`${item.entryId}-${idx}`}
-                          qa={item}
-                          tags={item.tagsArray}
-                          companyName={item.companyName}
-                          status={item.status}
-                          selectionType={item.selectionType}
-                          showCompanyInfo={true}
-                          onEdit={handleEditById}
-                          highlight={searchQuery}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
 
-            {/* View: Status List */}
-            {viewMode === "status" && (
-              <div className="space-y-8">
-                {Object.keys(entriesByStatus).length === 0 && (
-                  <div className="text-center text-slate-400 py-10">
-                    データはありません
+                {/* View: Question List */}
+                {viewMode === "question" && (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    {flattenedQAs.length === 0 && (
+                      <div className="col-span-2 text-center text-slate-400 py-10">
+                        該当する質問はありません
+                      </div>
+                    )}
+                    {flattenedQAs.map((item, idx) => (
+                      <QAItemDisplay
+                        key={`${item.entryId}-${idx}`}
+                        qa={item}
+                        tags={item.tagsArray}
+                        companyName={item.companyName}
+                        status={item.status}
+                        selectionType={item.selectionType}
+                        showCompanyInfo={true}
+                        onEdit={handleEditById}
+                        highlight={searchQuery}
+                      />
+                    ))}
                   </div>
                 )}
-                {["未提出", "作成中", "提出済", "採用", "不採用"].map(
-                  (status) => {
-                    const entries = entriesByStatus[status];
-                    if (!entries || entries.length === 0) return null;
-                    return (
+
+                {/* View: Tag Group */}
+                {viewMode === "tag" && (
+                  <div className="space-y-8">
+                    {Object.keys(tagGroups).length === 0 && (
+                      <div className="text-center text-slate-400 py-10">
+                        タグ付けされた質問はありません
+                      </div>
+                    )}
+                    {Object.entries(tagGroups).map(([tagName, items]) => (
                       <div
-                        key={status}
-                        className="bg-slate-50/50 rounded-xlYB border border-slate-200 p-4"
+                        key={tagName}
+                        className="bg-slate-50/50 rounded-xl border border-slate-200 p-4"
                       >
-                        <div className="mb-4 flex items-center gap-2">
-                          <StatusBadge status={status} />
-                          <span className="text-xs text-slate-400 font-bold">
-                            {entries.length}社
+                        <h3 className="text-sm font-bold text-indigo-700 mb-4 flex items-center gap-2">
+                          <Tags size={16} /> #{tagName}
+                          <span className="bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full text-xs">
+                            {items.length}
                           </span>
-                        </div>
-                        <div className="space-y-6">
-                          {entries.map((entry) => (
-                            <ESEntryDisplay
-                              key={entry.id}
-                              entry={entry}
-                              onEdit={startEdit}
-                              onDelete={handleDelete}
-                              companyUrl={companyUrls[entry.company]}
+                        </h3>
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                          {items.map((item, idx) => (
+                            <QAItemDisplay
+                              key={`${item.entryId}-${idx}`}
+                              qa={item}
+                              tags={item.tagsArray}
+                              companyName={item.companyName}
+                              status={item.status}
+                              selectionType={item.selectionType}
+                              showCompanyInfo={true}
+                              onEdit={handleEditById}
                               highlight={searchQuery}
                             />
                           ))}
                         </div>
                       </div>
-                    );
-                  }
+                    ))}
+                  </div>
                 )}
-                {Object.keys(entriesByStatus)
-                  .filter(
-                    (s) =>
-                      ![
-                        "未提出",
-                        "作成中",
-                        "提出済",
-                        "採用",
-                        "不採用",
-                      ].includes(s)
-                  )
-                  .map((status) => (
-                    <div
-                      key={status}
-                      className="bg-slate-50/50 rounded-xlYB border border-slate-200 p-4"
-                    >
-                      <h3 className="text-sm font-bold text-slate-600 mb-4 px-1">
-                        {status}
-                      </h3>
-                      <div className="space-y-6">
-                        {entriesByStatus[status].map((entry) => (
-                          <ESEntryDisplay
-                            key={entry.id}
-                            entry={entry}
-                            onEdit={startEdit}
-                            onDelete={handleDelete}
-                            companyUrl={companyUrls[entry.company]}
+
+                {/* View: Status List */}
+                {viewMode === "status" && (
+                  <div className="space-y-8">
+                    {Object.keys(entriesByStatus).length === 0 && (
+                      <div className="text-center text-slate-400 py-10">
+                        データはありません
+                      </div>
+                    )}
+                    {["未提出", "作成中", "提出済", "採用", "不採用"].map(
+                      (status) => {
+                        const entries = entriesByStatus[status];
+                        if (!entries || entries.length === 0) return null;
+                        return (
+                          <div
+                            key={status}
+                            className="bg-slate-50/50 rounded-xlYB border border-slate-200 p-4"
+                          >
+                            <div className="mb-4 flex items-center gap-2">
+                              <StatusBadge status={status} />
+                              <span className="text-xs text-slate-400 font-bold">
+                                {entries.length}社
+                              </span>
+                            </div>
+                            <div className="space-y-6">
+                              {entries.map((entry) => (
+                                <ESEntryDisplay
+                                  key={entry.id}
+                                  entry={entry}
+                                  onEdit={startEdit}
+                                  onDelete={handleDelete}
+                                  companyUrl={companyUrls[entry.company]}
+                                  highlight={searchQuery}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      }
+                    )}
+                    {Object.keys(entriesByStatus)
+                      .filter(
+                        (s) =>
+                          ![
+                            "未提出",
+                            "作成中",
+                            "提出済",
+                            "採用",
+                            "不採用",
+                          ].includes(s)
+                      )
+                      .map((status) => (
+                        <div
+                          key={status}
+                          className="bg-slate-50/50 rounded-xlYB border border-slate-200 p-4"
+                        >
+                          <h3 className="text-sm font-bold text-slate-600 mb-4 px-1">
+                            {status}
+                          </h3>
+                          <div className="space-y-6">
+                            {entriesByStatus[status].map((entry) => (
+                              <ESEntryDisplay
+                                key={entry.id}
+                                entry={entry}
+                                onEdit={startEdit}
+                                onDelete={handleDelete}
+                                companyUrl={companyUrls[entry.company]}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              // --- Edit Form ---
+              <div className="max-w-7xl mx-auto">
+                <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden animate-in slide-in-from-bottom-4">
+                  <div className="px-6 py-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+                    <h2 className="text-lg font-bold text-slate-800">
+                      {editingId ? "編集" : "新規登録"}
+                    </h2>
+                  </div>
+                  <div
+                    className="p-6 space-y-4"
+                    onClick={() => setActiveQAId(null)}
+                  >
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
+                      <div>
+                        <label className="text-xs font-bold text-slate-500">
+                          企業名 <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          className="w-full px-3 py-2 border rounded-lg mt-1 outline-none focus:border-indigo-500"
+                          value={formData.company}
+                          onChange={(e) => {
+                            const newCompany = e.target.value;
+                            setFormData({
+                              ...formData,
+                              company: newCompany,
+                              myPageUrl:
+                                companyUrls[newCompany] ||
+                                formData.myPageUrl ||
+                                "",
+                            });
+                          }}
+                          placeholder="例: 株式会社Tech"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-slate-500">
+                          マイページURL
+                        </label>
+                        <div className="relative mt-1">
+                          <input
+                            type="url"
+                            className="w-full pl-3 pr-8 py-2 border rounded-lg outline-none focus:border-indigo-500"
+                            value={formData.myPageUrl}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                myPageUrl: e.target.value,
+                              })
+                            }
+                            placeholder="https://..."
                           />
-                        ))}
+                          {formData.myPageUrl && (
+                            <a
+                              href={formData.myPageUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-indigo-600"
+                              title="マイページを開く"
+                            >
+                              <ExternalLink size={16} />
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-slate-500">
+                          業界・職種
+                        </label>
+                        <input
+                          className="w-full px-3 py-2 border rounded-lg mt-1 outline-none focus:border-indigo-500"
+                          value={formData.industry}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              industry: e.target.value,
+                            })
+                          }
+                          placeholder="例: IT、エンジニア"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-slate-500">
+                          ステータス
+                        </label>
+                        <select
+                          className="w-full px-3 py-2 border rounded-lg mt-1 outline-none focus:border-indigo-500 bg-white"
+                          value={formData.status}
+                          onChange={(e) =>
+                            setFormData({ ...formData, status: e.target.value })
+                          }
+                        >
+                          {["未提出", "作成中", "提出済", "採用", "不採用"].map(
+                            (s) => (
+                              <option key={s} value={s}>
+                                {s}
+                              </option>
+                            )
+                          )}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-slate-500">
+                          選考種別
+                        </label>
+                        <input
+                          type="text"
+                          className="w-full px-3 py-2 border rounded-lg mt-1 outline-none focus:border-indigo-500"
+                          value={formData.selectionType}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              selectionType: e.target.value,
+                            })
+                          }
+                          placeholder="例: 本選考、インターン"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-slate-500">
+                          提出期限
+                        </label>
+                        <input
+                          type="datetime-local"
+                          className="w-full px-3 py-2 border rounded-lg mt-1 outline-none focus:border-indigo-500"
+                          value={formData.deadline}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              deadline: e.target.value,
+                            })
+                          }
+                        />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <label className="text-xs font-bold text-slate-500">
+                          備考
+                        </label>
+                        <input
+                          type="text"
+                          className="w-full px-3 py-2 border rounded-lg mt-1 outline-none focus:border-indigo-500"
+                          value={formData.note || ""}
+                          onChange={(e) =>
+                            setFormData({ ...formData, note: e.target.value })
+                          }
+                          placeholder="メモや関連事項"
+                        />
                       </div>
                     </div>
-                  ))}
+
+                    <div className="border-t border-slate-100 pt-2">
+                      <label className="text-sm font-bold text-slate-700 mb-4 block">
+                        Q&A
+                      </label>
+                      <div className="space-y-6">
+                        {formData.qas.map((qa, idx) => {
+                          const isActive = activeQAId === qa.id;
+
+                          return (
+                            <div
+                              key={qa.id}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveQAId(qa.id);
+                              }}
+                              className={`rounded-xl border transition-all duration-300 ease-in-out p-4 ${
+                                isActive
+                                  ? "bg-slate-50 shadow-sm border-indigo-200 ring-1 ring-indigo-200"
+                                  : "bg-white border-slate-200 hover:border-indigo-300 cursor-pointer opacity-90 hover:opacity-100"
+                              }`}
+                            >
+                              <div className="flex justify-between items-center mb-1">
+                                <div
+                                  className={`text-xs font-bold transition-colors duration-300 ${
+                                    isActive
+                                      ? "text-indigo-600"
+                                      : "text-slate-400"
+                                  }`}
+                                >
+                                  Q{idx + 1}
+                                </div>
+                                <div
+                                  className={`flex items-center gap-3 overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] ${
+                                    isActive
+                                      ? "max-w-[400px] opacity-100 translate-x-0"
+                                      : "max-w-0 opacity-0 translate-x-4"
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-1 min-w-max">
+                                    <span className="text-[10px] text-slate-400 hidden sm:inline">
+                                      文字数:
+                                    </span>
+                                    <input
+                                      type="text"
+                                      className="w-16 text-right text-xs bg-white border border-slate-200 rounded px-1 py-0.5 focus:border-indigo-500 outline-none placeholder-slate-300"
+                                      placeholder="なし"
+                                      value={qa.charLimit || ""}
+                                      onChange={(e) =>
+                                        updateQA(
+                                          qa.id,
+                                          "charLimit",
+                                          e.target.value
+                                        )
+                                      }
+                                    />
+                                  </div>
+
+                                  <div className="flex items-center gap-1 min-w-max">
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        moveQA(idx, "up");
+                                      }}
+                                      disabled={idx === 0}
+                                      className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                                      title="質問を上に移動"
+                                    >
+                                      <ArrowUp size={16} />
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        moveQA(idx, "down");
+                                      }}
+                                      disabled={idx === formData.qas.length - 1}
+                                      className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                                      title="質問を下に移動"
+                                    >
+                                      <ArrowDown size={16} />
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        removeQA(qa.id);
+                                      }}
+                                      title="質問を削除"
+                                      className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors"
+                                    >
+                                      <X size={16} />
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="mb-3 relative">
+                                <input
+                                  className={`w-full bg-transparent font-bold text-slate-800 placeholder-slate-300 outline-none border-b focus:border-indigo-500 transition-all duration-300 ease-out origin-left ${
+                                    isActive
+                                      ? "text-base py-2 border-indigo-300"
+                                      : "text-sm py-1 border-transparent"
+                                  }`}
+                                  placeholder="質問内容"
+                                  value={qa.question}
+                                  onFocus={() => setActiveQAId(qa.id)}
+                                  onChange={(e) =>
+                                    updateQA(qa.id, "question", e.target.value)
+                                  }
+                                />
+                              </div>
+
+                              <div
+                                className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${
+                                  isActive
+                                    ? "grid-rows-[1fr]"
+                                    : "grid-rows-[0fr]"
+                                }`}
+                              >
+                                <div className="overflow-hidden">
+                                  <div className="mb-3 pt-1">
+                                    <input
+                                      className="w-full text-xs px-3 py-2 bg-slate-50/50 border rounded-md outline-none placeholder-slate-400 focus:bg-white focus:border-indigo-500 transition-colors"
+                                      placeholder="補足事項や前提条件"
+                                      value={qa.note || ""}
+                                      onFocus={() => setActiveQAId(qa.id)}
+                                      onChange={(e) =>
+                                        updateQA(qa.id, "note", e.target.value)
+                                      }
+                                      tabIndex={isActive ? 0 : -1}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="mb-1">
+                                <textarea
+                                  className={`w-full p-3 text-sm border rounded-lg bg-white focus:border-indigo-500 outline-none transition-all duration-300 ${
+                                    isActive ? "min-h-[120px]" : "min-h-[80px]"
+                                  }`}
+                                  placeholder="回答..."
+                                  value={qa.answer}
+                                  onFocus={() => setActiveQAId(qa.id)}
+                                  onChange={(e) =>
+                                    updateQA(qa.id, "answer", e.target.value)
+                                  }
+                                />
+                                <div
+                                  className={`grid transition-[grid-template-rows,opacity] duration-300 ease-in-out ${
+                                    isActive
+                                      ? "grid-rows-[1fr] opacity-100"
+                                      : "grid-rows-[0fr] opacity-0"
+                                  }`}
+                                >
+                                  <div className="overflow-hidden">
+                                    <div className="text-right mt-1 flex justify-end gap-2 items-center">
+                                      <span className="text-[10px] font-mono text-slate-500 bg-slate-200 px-2 py-0.5 rounded-full">
+                                        {qa.answer.length}文字
+                                      </span>
+                                      {qa.charLimit && (
+                                        <span
+                                          className={`text-[10px] font-mono px-2 py-0.5 rounded-full ${
+                                            qa.answer.length > qa.charLimit
+                                              ? "bg-rose-100 text-rose-600"
+                                              : "bg-slate-100 text-slate-500"
+                                          }`}
+                                        >
+                                          上限: {qa.charLimit}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <AIAssistant
+                                      question={qa.question}
+                                      answer={qa.answer}
+                                      charLimit={qa.charLimit}
+                                      company={formData.company}
+                                      industry={formData.industry}
+                                      selectionType={formData.selectionType}
+                                      note={qa.note}
+                                      onApply={(text) =>
+                                        updateQA(qa.id, "answer", text)
+                                      }
+                                      allEntries={entries}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+
+                              {isActive ? (
+                                <input
+                                  className="w-full text-xs px-3 py-2 bg-white border rounded-md outline-none focus:border-indigo-500 animate-in fade-in slide-in-from-top-1 duration-200"
+                                  placeholder="タグ (例: 自己PR、ガクチカ)"
+                                  value={qa.tags}
+                                  onFocus={() => setActiveQAId(qa.id)}
+                                  onChange={(e) =>
+                                    updateQA(qa.id, "tags", e.target.value)
+                                  }
+                                />
+                              ) : (
+                                <div className="flex justify-between items-center gap-2 mt-1 animate-in fade-in duration-300">
+                                  <input
+                                    className="flex-1 text-xs px-2 py-1 bg-white border border-slate-200 rounded outline-none focus:border-indigo-500 transition-all placeholder-slate-300"
+                                    placeholder="タグ"
+                                    value={qa.tags}
+                                    onClick={(e) => e.stopPropagation()}
+                                    onChange={(e) =>
+                                      updateQA(qa.id, "tags", e.target.value)
+                                    }
+                                  />
+                                  <div
+                                    className={`text-right text-[10px] font-mono shrink-0 ${
+                                      qa.charLimit &&
+                                      qa.answer.length > Number(qa.charLimit)
+                                        ? "text-rose-500 font-bold"
+                                        : "text-slate-400"
+                                    }`}
+                                  >
+                                    {qa.answer.length}文字
+                                    {qa.charLimit && ` / 上限: ${qa.charLimit}`}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          addQA();
+                        }}
+                        className="mt-4 w-full py-3 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 hover:border-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 flex items-center justify-center gap-2 text-sm font-bold"
+                      >
+                        <Plus size={16} /> 質問を追加
+                      </button>
+                    </div>
+
+                    <div className="flex justify-end gap-3 pt-4 border-t">
+                      <button
+                        onClick={handleCancel}
+                        className="px-5 py-2 rounded-lg text-slate-500 hover:bg-slate-100 font-bold text-sm"
+                      >
+                        キャンセル
+                      </button>
+                      <button
+                        onClick={handleSave}
+                        disabled={!formData.company}
+                        className="px-6 py-2 rounded-lg bg-indigo-600 text-white shadow-md hover:bg-indigo-700 font-bold text-sm flex items-center gap-2 disabled:opacity-50"
+                      >
+                        <Save size={16} /> 保存
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
           </div>
-        ) : (
-          // --- Edit Form ---
-          <div className="max-w-7xl mx-auto">
-            <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden animate-in slide-in-from-bottom-4">
-              <div className="px-6 py-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
-                <h2 className="text-lg font-bold text-slate-800">
-                  {editingId ? "編集" : "新規登録"}
-                </h2>
-              </div>
-              <div
-                className="p-6 space-y-4"
-                onClick={() => setActiveQAId(null)}
-              >
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
-                  <div>
-                    <label className="text-xs font-bold text-slate-500">
-                      企業名 <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      className="w-full px-3 py-2 border rounded-lg mt-1 outline-none focus:border-indigo-500"
-                      value={formData.company}
-                      onChange={(e) => {
-                        const newCompany = e.target.value;
-                        setFormData({
-                          ...formData,
-                          company: newCompany,
-                          myPageUrl:
-                            companyUrls[newCompany] || formData.myPageUrl || "",
-                        });
-                      }}
-                      placeholder="例: 株式会社Tech"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-slate-500">
-                      マイページURL
-                    </label>
-                    <div className="relative mt-1">
-                      <input
-                        type="url"
-                        className="w-full pl-3 pr-8 py-2 border rounded-lg outline-none focus:border-indigo-500"
-                        value={formData.myPageUrl}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            myPageUrl: e.target.value,
-                          })
-                        }
-                        placeholder="https://..."
-                      />
-                      {formData.myPageUrl && (
-                        <a
-                          href={formData.myPageUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-indigo-600"
-                          title="マイページを開く"
-                        >
-                          <ExternalLink size={16} />
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-slate-500">
-                      業界・職種
-                    </label>
-                    <input
-                      className="w-full px-3 py-2 border rounded-lg mt-1 outline-none focus:border-indigo-500"
-                      value={formData.industry}
-                      onChange={(e) =>
-                        setFormData({ ...formData, industry: e.target.value })
-                      }
-                      placeholder="例: IT、エンジニア"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-slate-500">
-                      ステータス
-                    </label>
-                    <select
-                      className="w-full px-3 py-2 border rounded-lg mt-1 outline-none focus:border-indigo-500 bg-white"
-                      value={formData.status}
-                      onChange={(e) =>
-                        setFormData({ ...formData, status: e.target.value })
-                      }
-                    >
-                      {["未提出", "作成中", "提出済", "採用", "不採用"].map(
-                        (s) => (
-                          <option key={s} value={s}>
-                            {s}
-                          </option>
-                        )
-                      )}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-slate-500">
-                      選考種別
-                    </label>
-                    <input
-                      type="text"
-                      className="w-full px-3 py-2 border rounded-lg mt-1 outline-none focus:border-indigo-500"
-                      value={formData.selectionType}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          selectionType: e.target.value,
-                        })
-                      }
-                      placeholder="例: 本選考、インターン"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-slate-500">
-                      提出期限
-                    </label>
-                    <input
-                      type="datetime-local"
-                      className="w-full px-3 py-2 border rounded-lg mt-1 outline-none focus:border-indigo-500"
-                      value={formData.deadline}
-                      onChange={(e) =>
-                        setFormData({ ...formData, deadline: e.target.value })
-                      }
-                    />
-                  </div>
-                  <div className="sm:col-span-2">
-                    <label className="text-xs font-bold text-slate-500">
-                      備考
-                    </label>
-                    <input
-                      type="text"
-                      className="w-full px-3 py-2 border rounded-lg mt-1 outline-none focus:border-indigo-500"
-                      value={formData.note || ""}
-                      onChange={(e) =>
-                        setFormData({ ...formData, note: e.target.value })
-                      }
-                      placeholder="メモや関連事項"
-                    />
-                  </div>
-                </div>
+        </main>
 
-                <div className="border-t border-slate-100 pt-2">
-                  <label className="text-sm font-bold text-slate-700 mb-4 block">
-                    Q&A
-                  </label>
-                  <div className="space-y-6">
-                    {formData.qas.map((qa, idx) => {
-                      const isActive = activeQAId === qa.id;
-
-                      return (
-                        <div
-                          key={qa.id}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setActiveQAId(qa.id);
-                          }}
-                          className={`rounded-xl border transition-all duration-300 ease-in-out p-4 ${
-                            isActive
-                              ? "bg-slate-50 shadow-sm border-indigo-200 ring-1 ring-indigo-200"
-                              : "bg-white border-slate-200 hover:border-indigo-300 cursor-pointer opacity-90 hover:opacity-100"
-                          }`}
-                        >
-                          <div className="flex justify-between items-center mb-1">
-                            <div
-                              className={`text-xs font-bold transition-colors duration-300 ${
-                                isActive ? "text-indigo-600" : "text-slate-400"
-                              }`}
-                            >
-                              Q{idx + 1}
-                            </div>
-                            <div
-                              className={`flex items-center gap-3 overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] ${
-                                isActive
-                                  ? "max-w-[400px] opacity-100 translate-x-0"
-                                  : "max-w-0 opacity-0 translate-x-4"
-                              }`}
-                            >
-                              <div className="flex items-center gap-1 min-w-max">
-                                <span className="text-[10px] text-slate-400 hidden sm:inline">
-                                  文字数:
-                                </span>
-                                <input
-                                  type="text"
-                                  className="w-16 text-right text-xs bg-white border border-slate-200 rounded px-1 py-0.5 focus:border-indigo-500 outline-none placeholder-slate-300"
-                                  placeholder="なし"
-                                  value={qa.charLimit || ""}
-                                  onChange={(e) =>
-                                    updateQA(qa.id, "charLimit", e.target.value)
-                                  }
-                                />
-                              </div>
-
-                              <div className="flex items-center gap-1 min-w-max">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    moveQA(idx, "up");
-                                  }}
-                                  disabled={idx === 0}
-                                  className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
-                                  title="質問を上に移動"
-                                >
-                                  <ArrowUp size={16} />
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    moveQA(idx, "down");
-                                  }}
-                                  disabled={idx === formData.qas.length - 1}
-                                  className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
-                                  title="質問を下に移動"
-                                >
-                                  <ArrowDown size={16} />
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    removeQA(qa.id);
-                                  }}
-                                  title="質問を削除"
-                                  className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors"
-                                >
-                                  <X size={16} />
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="mb-3 relative">
-                            <input
-                              className={`w-full bg-transparent font-bold text-slate-800 placeholder-slate-300 outline-none border-b focus:border-indigo-500 transition-all duration-300 ease-out origin-left ${
-                                isActive
-                                  ? "text-base py-2 border-indigo-300"
-                                  : "text-sm py-1 border-transparent"
-                              }`}
-                              placeholder="質問内容"
-                              value={qa.question}
-                              onFocus={() => setActiveQAId(qa.id)}
-                              onChange={(e) =>
-                                updateQA(qa.id, "question", e.target.value)
-                              }
-                            />
-                          </div>
-
-                          <div
-                            className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${
-                              isActive ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
-                            }`}
-                          >
-                            <div className="overflow-hidden">
-                              <div className="mb-3 pt-1">
-                                <input
-                                  className="w-full text-xs px-3 py-2 bg-slate-50/50 border rounded-md outline-none placeholder-slate-400 focus:bg-white focus:border-indigo-500 transition-colors"
-                                  placeholder="補足事項や前提条件"
-                                  value={qa.note || ""}
-                                  onFocus={() => setActiveQAId(qa.id)}
-                                  onChange={(e) =>
-                                    updateQA(qa.id, "note", e.target.value)
-                                  }
-                                  tabIndex={isActive ? 0 : -1}
-                                />
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="mb-1">
-                            <textarea
-                              className={`w-full p-3 text-sm border rounded-lg bg-white focus:border-indigo-500 outline-none transition-all duration-300 ${
-                                isActive ? "min-h-[120px]" : "min-h-[80px]"
-                              }`}
-                              placeholder="回答..."
-                              value={qa.answer}
-                              onFocus={() => setActiveQAId(qa.id)}
-                              onChange={(e) =>
-                                updateQA(qa.id, "answer", e.target.value)
-                              }
-                            />
-                            <div
-                              className={`grid transition-[grid-template-rows,opacity] duration-300 ease-in-out ${
-                                isActive
-                                  ? "grid-rows-[1fr] opacity-100"
-                                  : "grid-rows-[0fr] opacity-0"
-                              }`}
-                            >
-                              <div className="overflow-hidden">
-                                <div className="text-right mt-1 flex justify-end gap-2 items-center">
-                                  <span className="text-[10px] font-mono text-slate-500 bg-slate-200 px-2 py-0.5 rounded-full">
-                                    {qa.answer.length}文字
-                                  </span>
-                                  {qa.charLimit && (
-                                    <span
-                                      className={`text-[10px] font-mono px-2 py-0.5 rounded-full ${
-                                        qa.answer.length > qa.charLimit
-                                          ? "bg-rose-100 text-rose-600"
-                                          : "bg-slate-100 text-slate-500"
-                                      }`}
-                                    >
-                                      上限: {qa.charLimit}
-                                    </span>
-                                  )}
-                                </div>
-                                <AIAssistant
-                                  question={qa.question}
-                                  answer={qa.answer}
-                                  charLimit={qa.charLimit}
-                                  company={formData.company}
-                                  industry={formData.industry}
-                                  selectionType={formData.selectionType}
-                                  note={qa.note}
-                                  onApply={(text) =>
-                                    updateQA(qa.id, "answer", text)
-                                  }
-                                  allEntries={entries}
-                                />
-                              </div>
-                            </div>
-                          </div>
-
-                          {isActive ? (
-                            <input
-                              className="w-full text-xs px-3 py-2 bg-white border rounded-md outline-none focus:border-indigo-500 animate-in fade-in slide-in-from-top-1 duration-200"
-                              placeholder="タグ (例: 自己PR、ガクチカ)"
-                              value={qa.tags}
-                              onFocus={() => setActiveQAId(qa.id)}
-                              onChange={(e) =>
-                                updateQA(qa.id, "tags", e.target.value)
-                              }
-                            />
-                          ) : (
-                            <div className="flex justify-between items-center gap-2 mt-1 animate-in fade-in duration-300">
-                              <input
-                                className="flex-1 text-xs px-2 py-1 bg-white border border-slate-200 rounded outline-none focus:border-indigo-500 transition-all placeholder-slate-300"
-                                placeholder="タグ"
-                                value={qa.tags}
-                                onClick={(e) => e.stopPropagation()}
-                                onChange={(e) =>
-                                  updateQA(qa.id, "tags", e.target.value)
-                                }
-                              />
-                              <div
-                                className={`text-right text-[10px] font-mono shrink-0 ${
-                                  qa.charLimit &&
-                                  qa.answer.length > Number(qa.charLimit)
-                                    ? "text-rose-500 font-bold"
-                                    : "text-slate-400"
-                                }`}
-                              >
-                                {qa.answer.length}文字
-                                {qa.charLimit && ` / 上限: ${qa.charLimit}`}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      addQA();
-                    }}
-                    className="mt-4 w-full py-3 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 hover:border-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 flex items-center justify-center gap-2 text-sm font-bold"
-                  >
-                    <Plus size={16} /> 質問を追加
-                  </button>
-                </div>
-
-                <div className="flex justify-end gap-3 pt-4 border-t">
-                  <button
-                    onClick={handleCancel}
-                    className="px-5 py-2 rounded-lg text-slate-500 hover:bg-slate-100 font-bold text-sm"
-                  >
-                    キャンセル
-                  </button>
-                  <button
-                    onClick={handleSave}
-                    disabled={!formData.company}
-                    className="px-6 py-2 rounded-lg bg-indigo-600 text-white shadow-md hover:bg-indigo-700 font-bold text-sm flex items-center gap-2 disabled:opacity-50"
-                  >
-                    <Save size={16} /> 保存
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </main>
+        <ReferenceSidebar
+          isOpen={isRefPanelOpen}
+          onClose={() => setIsRefPanelOpen(false)}
+          entries={entries}
+        />
+      </div>
 
       <SettingsModal
         isOpen={isSettingsOpen}
