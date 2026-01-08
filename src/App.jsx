@@ -195,14 +195,18 @@ const CopyButton = ({ text }) => {
 };
 
 // --- Reference Sidebar Component ---
-const ReferenceSidebar = ({ isOpen, onClose, entries }) => {
+const ReferenceSidebar = ({ isOpen, onClose, entries, editingId }) => {
   const [search, setSearch] = useState("");
 
   const filteredQAs = useMemo(() => {
     let allItems = [];
     entries.forEach((entry) => {
+      if (editingId && entry.id === editingId) return;
+
       if (entry.qas) {
         entry.qas.forEach((qa) => {
+          if (!qa.answer || !qa.answer.trim()) return;
+
           allItems.push({
             uniqueId: `${entry.id}_${qa.id}`,
             question: qa.question,
@@ -236,7 +240,7 @@ const ReferenceSidebar = ({ isOpen, onClose, entries }) => {
 
       return terms.every((term) => text.includes(term));
     });
-  }, [entries, search]);
+  }, [entries, search, editingId]);
 
   return (
     <aside
@@ -631,6 +635,8 @@ const ReferenceSelectorModal = ({
     entries.forEach((entry) => {
       if (entry.qas) {
         entry.qas.forEach((qa) => {
+          if (!qa.answer || !qa.answer.trim()) return;
+
           items.push({
             uniqueId: `${entry.id}_${qa.id}`,
             question: qa.question,
@@ -1806,7 +1812,10 @@ export default function App() {
             </div>
             {view === "form" && (
               <button
-                onClick={() => setIsRefPanelOpen((prev) => !prev)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsRefPanelOpen((prev) => !prev);
+                }}
                 className={`sm:hidden p-2 rounded-lg transition-colors ${
                   isRefPanelOpen
                     ? "bg-indigo-100 text-indigo-600"
@@ -1884,7 +1893,10 @@ export default function App() {
             <div className="flex items-center gap-2 self-end sm:self-auto">
               {view === "form" && (
                 <button
-                  onClick={() => setIsRefPanelOpen((prev) => !prev)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsRefPanelOpen((prev) => !prev);
+                  }}
                   className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm font-bold transition-colors ${
                     isRefPanelOpen
                       ? "bg-indigo-50 border-indigo-200 text-indigo-700"
@@ -1892,7 +1904,7 @@ export default function App() {
                   }`}
                 >
                   <PanelRight size={16} />
-                  {isRefPanelOpen ? "参照パネルを閉じる" : "他のESを参照"}
+                  {isRefPanelOpen ? "参照パネルを閉じる" : "過去ESを参照"}
                 </button>
               )}
               <button
@@ -2515,6 +2527,7 @@ export default function App() {
           isOpen={isRefPanelOpen}
           onClose={() => setIsRefPanelOpen(false)}
           entries={entries}
+          editingId={editingId}
         />
       </div>
 
