@@ -1239,6 +1239,10 @@ export default function App() {
   }, [view, entries, formData, initialFormState, appSettings.autoSave]);
 
   // --- Helpers & Memos ---
+  const scrollToTop = (behavior = "auto") => {
+    window.scrollTo({ top: 0, behavior: behavior });
+  };
+
   const isMatch = (text) => {
     if (!searchQuery) return true;
     const lowerQ = searchQuery.toLowerCase();
@@ -1364,7 +1368,7 @@ export default function App() {
     setAppSettings(newSettings);
   };
 
-  const resetForm = () => {
+  const resetForm = (behavior = "auto") => {
     setView("list");
     setEditingId(null);
     const newState = {
@@ -1383,9 +1387,12 @@ export default function App() {
     setFormData(newState);
     setInitialFormState(null);
     setActiveQAId(null);
+    scrollToTop(behavior);
   };
 
-  const handleCancel = () => {
+  const handleCancel = (arg) => {
+    const behavior = typeof arg === "string" ? arg : "auto";
+
     if (view === "form") {
       let isDirty = false;
       if (initialFormState) {
@@ -1406,9 +1413,9 @@ export default function App() {
         );
         if (!isConfirmed) return;
       }
-      resetForm();
+      resetForm(behavior);
     } else {
-      resetForm();
+      resetForm(behavior);
     }
   };
 
@@ -1479,6 +1486,7 @@ export default function App() {
       setActiveQAId(editState.qas[0].id);
     }
     setView("form");
+    scrollToTop();
   };
 
   const handleEditById = (id) => {
@@ -1506,6 +1514,7 @@ export default function App() {
     setInitialFormState(JSON.parse(JSON.stringify(newState)));
     setActiveQAId(newId);
     setView("form");
+    scrollToTop();
   };
 
   // --- Handlers: File IO ---
@@ -1638,7 +1647,7 @@ export default function App() {
           <div className="w-full sm:w-auto flex justify-between items-center">
             <div
               className="flex items-center gap-2 cursor-pointer"
-              onClick={handleCancel}
+              onClick={() => handleCancel("smooth")}
             >
               <img
                 src="/favicon.png"
@@ -1736,7 +1745,10 @@ export default function App() {
             ].map((mode) => (
               <button
                 key={mode.id}
-                onClick={() => setViewMode(mode.id)}
+                onClick={() => {
+                  setViewMode(mode.id);
+                  scrollToTop("smooth");
+                }}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap ${
                   viewMode === mode.id
                     ? "bg-indigo-600 text-white shadow-sm"
