@@ -2016,73 +2016,78 @@ export default function App() {
                           }`}
                         >
                           <div className="flex justify-between items-center mb-1">
-                            <div className="text-xs font-bold text-slate-400">
+                            <div
+                              className={`text-xs font-bold transition-colors duration-300 ${
+                                isActive ? "text-indigo-600" : "text-slate-400"
+                              }`}
+                            >
                               Q{idx + 1}
                             </div>
-
-                            {isActive && (
-                              <div className="flex items-center gap-3 animate-in fade-in slide-in-from-top-1 duration-200">
-                                <div className="flex items-center gap-1">
-                                  <span className="text-[10px] text-slate-400 hidden sm:inline">
-                                    文字数:
-                                  </span>
-                                  <input
-                                    type="text"
-                                    className="w-16 text-right text-xs bg-white border border-slate-200 rounded px-1 py-0.5 focus:border-indigo-500 outline-none placeholder-slate-300"
-                                    placeholder="なし"
-                                    value={qa.charLimit || ""}
-                                    onChange={(e) =>
-                                      updateQA(
-                                        qa.id,
-                                        "charLimit",
-                                        e.target.value
-                                      )
-                                    }
-                                  />
-                                </div>
-
-                                <div className="flex items-center gap-1">
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      moveQA(idx, "up");
-                                    }}
-                                    disabled={idx === 0}
-                                    className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
-                                    title="質問を上に移動"
-                                  >
-                                    <ArrowUp size={16} />
-                                  </button>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      moveQA(idx, "down");
-                                    }}
-                                    disabled={idx === formData.qas.length - 1}
-                                    className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
-                                    title="質問を下に移動"
-                                  >
-                                    <ArrowDown size={16} />
-                                  </button>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      removeQA(qa.id);
-                                    }}
-                                    title="質問を削除"
-                                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors"
-                                  >
-                                    <X size={16} />
-                                  </button>
-                                </div>
+                            <div
+                              className={`flex items-center gap-3 overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] ${
+                                isActive
+                                  ? "max-w-[400px] opacity-100 translate-x-0"
+                                  : "max-w-0 opacity-0 translate-x-4"
+                              }`}
+                            >
+                              <div className="flex items-center gap-1 min-w-max">
+                                <span className="text-[10px] text-slate-400 hidden sm:inline">
+                                  文字数:
+                                </span>
+                                <input
+                                  type="text"
+                                  className="w-16 text-right text-xs bg-white border border-slate-200 rounded px-1 py-0.5 focus:border-indigo-500 outline-none placeholder-slate-300"
+                                  placeholder="なし"
+                                  value={qa.charLimit || ""}
+                                  onChange={(e) =>
+                                    updateQA(qa.id, "charLimit", e.target.value)
+                                  }
+                                />
                               </div>
-                            )}
+
+                              <div className="flex items-center gap-1 min-w-max">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    moveQA(idx, "up");
+                                  }}
+                                  disabled={idx === 0}
+                                  className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                                  title="質問を上に移動"
+                                >
+                                  <ArrowUp size={16} />
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    moveQA(idx, "down");
+                                  }}
+                                  disabled={idx === formData.qas.length - 1}
+                                  className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                                  title="質問を下に移動"
+                                >
+                                  <ArrowDown size={16} />
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    removeQA(qa.id);
+                                  }}
+                                  title="質問を削除"
+                                  className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors"
+                                >
+                                  <X size={16} />
+                                </button>
+                              </div>
+                            </div>
                           </div>
 
-                          <div className="mb-3">
+                          <div className="mb-3 relative">
                             <input
-                              className={`w-full bg-transparent font-bold text-slate-800 placeholder-slate-300 outline-none border-b focus:border-indigo-500 pb-1 ${
-                                !isActive ? "text-sm" : ""
+                              className={`w-full bg-transparent font-bold text-slate-800 placeholder-slate-300 outline-none border-b focus:border-indigo-500 transition-all duration-300 ease-out origin-left ${
+                                isActive
+                                  ? "text-base py-2 border-indigo-300"
+                                  : "text-sm py-1 border-transparent"
                               }`}
                               placeholder="質問内容"
                               value={qa.question}
@@ -2093,19 +2098,26 @@ export default function App() {
                             />
                           </div>
 
-                          {isActive && (
-                            <div className="mb-3 animate-in fade-in slide-in-from-top-1 duration-200">
-                              <input
-                                className="w-full text-xs px-3 py-2 bg-slate-50/50 border rounded-md outline-none placeholder-slate-400 focus:bg-white focus:border-indigo-500 transition-colors"
-                                placeholder="補足事項や前提条件"
-                                value={qa.note || ""}
-                                onFocus={() => setActiveQAId(qa.id)}
-                                onChange={(e) =>
-                                  updateQA(qa.id, "note", e.target.value)
-                                }
-                              />
+                          <div
+                            className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${
+                              isActive ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+                            }`}
+                          >
+                            <div className="overflow-hidden">
+                              <div className="mb-3 pt-1">
+                                <input
+                                  className="w-full text-xs px-3 py-2 bg-slate-50/50 border rounded-md outline-none placeholder-slate-400 focus:bg-white focus:border-indigo-500 transition-colors"
+                                  placeholder="補足事項や前提条件"
+                                  value={qa.note || ""}
+                                  onFocus={() => setActiveQAId(qa.id)}
+                                  onChange={(e) =>
+                                    updateQA(qa.id, "note", e.target.value)
+                                  }
+                                  tabIndex={isActive ? 0 : -1}
+                                />
+                              </div>
                             </div>
-                          )}
+                          </div>
 
                           <div className="mb-1">
                             <textarea
@@ -2119,8 +2131,14 @@ export default function App() {
                                 updateQA(qa.id, "answer", e.target.value)
                               }
                             />
-                            {isActive ? (
-                              <div className="animate-in fade-in slide-in-from-top-1 duration-200">
+                            <div
+                              className={`grid transition-[grid-template-rows,opacity] duration-300 ease-in-out ${
+                                isActive
+                                  ? "grid-rows-[1fr] opacity-100"
+                                  : "grid-rows-[0fr] opacity-0"
+                              }`}
+                            >
+                              <div className="overflow-hidden">
                                 <div className="text-right mt-1 flex justify-end gap-2 items-center">
                                   <span className="text-[10px] font-mono text-slate-500 bg-slate-200 px-2 py-0.5 rounded-full">
                                     {qa.answer.length}文字
@@ -2151,7 +2169,7 @@ export default function App() {
                                   allEntries={entries}
                                 />
                               </div>
-                            ) : null}
+                            </div>
                           </div>
 
                           {isActive ? (
