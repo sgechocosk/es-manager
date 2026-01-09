@@ -2449,7 +2449,7 @@ export default function App() {
 
                               <div className="mb-1">
                                 <textarea
-                                  className={`w-full p-3 text-sm border rounded-lg bg-white focus:border-indigo-500 outline-none transition-all duration-300 ${
+                                  className={`w-full p-3 text-sm border rounded-lg bg-white focus:border-indigo-500 outline-none transition-[min-height,border-color,background-color] duration-300 ${
                                     isActive ? "min-h-[120px]" : "min-h-[80px]"
                                   }`}
                                   placeholder="回答..."
