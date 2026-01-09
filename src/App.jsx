@@ -1327,6 +1327,8 @@ export default function App() {
 
   const [activeQAId, setActiveQAId] = useState(null);
 
+  const [toast, setToast] = useState(null);
+
   // --- Effects: Initialization & Auto Save ---
   useEffect(() => {
     const savedSettingsJson = localStorage.getItem(STORAGE_KEY_SETTINGS);
@@ -1593,7 +1595,7 @@ export default function App() {
     }
   };
 
-  const handleSave = () => {
+  const handleSave = (closeAfterSave = true) => {
     if (!formData.company) return;
 
     try {
@@ -1604,21 +1606,36 @@ export default function App() {
         }));
       }
 
+      const currentId =
+        editingId ||
+        (formData.id && formData.id.toString().startsWith("entry_")
+          ? formData.id
+          : `entry_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
+
       const entryData = {
         ...formData,
-        id: editingId,
+        id: currentId,
         updatedAt: getCurrentJSTTime(),
       };
       const sanitized = sanitizeEntry(entryData);
 
       setEntries((prev) => {
-        if (editingId) {
-          return prev.map((e) => (e.id === editingId ? sanitized : e));
+        const exists = prev.some((e) => e.id === currentId);
+        if (exists) {
+          return prev.map((e) => (e.id === currentId ? sanitized : e));
         } else {
           return [sanitized, ...prev];
         }
       });
-      resetForm();
+
+      if (closeAfterSave) {
+        resetForm();
+      } else {
+        setEditingId(currentId);
+        setInitialFormState(JSON.parse(JSON.stringify(formData)));
+        setToast("保存しました");
+        setTimeout(() => setToast(null), 3000);
+      }
     } catch (error) {
       console.error(error);
       alert("保存に失敗しました。");
@@ -2147,6 +2164,14 @@ export default function App() {
                     <h2 className="text-lg font-bold text-slate-800">
                       {editingId ? "編集" : "新規登録"}
                     </h2>
+                    <button
+                      onClick={() => handleSave(false)}
+                      disabled={!formData.company}
+                      title="保存"
+                      className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 rounded-full transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
+                    >
+                      <Save size={20} />
+                    </button>
                   </div>
                   <div
                     className="p-6 space-y-4"
@@ -2532,7 +2557,7 @@ export default function App() {
                         キャンセル
                       </button>
                       <button
-                        onClick={handleSave}
+                        onClick={() => handleSave(true)}
                         disabled={!formData.company}
                         className="px-6 py-2 rounded-lg bg-indigo-600 text-white shadow-md hover:bg-indigo-700 font-bold text-sm flex items-center gap-2 disabled:opacity-50"
                       >
@@ -2568,6 +2593,14 @@ export default function App() {
         urls={companyUrls}
         onSave={handleSaveUrls}
       />
+
+      {toast && (
+        <div className="fixed bottom-4 right-4 z-[100] animate-in slide-in-from-bottom-2 fade-in duration-300">
+          <div className="bg-slate-800 text-white px-4 py-2 rounded-lg shadow-lg text-sm font-bold">
+            {toast}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
