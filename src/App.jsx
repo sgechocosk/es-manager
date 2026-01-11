@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, {
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+} from "react";
 import {
   Check,
   Copy,
@@ -153,6 +159,77 @@ const HighlightText = ({ text, highlight }) => {
 };
 
 // --- Components ---
+const AutoResizeTextarea = ({
+  value,
+  onChange,
+  onFocus,
+  placeholder,
+  isActive,
+  charLimit,
+}) => {
+  const textareaRef = useRef(null);
+  const ghostRef = useRef(null);
+  const [minHeight, setMinHeight] = useState(0);
+
+  useEffect(() => {
+    const ghost = ghostRef.current;
+    if (!ghost) return;
+
+    const calculateHeight = () => {
+      const BORDER_OFFSET = 2;
+      setMinHeight(ghost.scrollHeight + BORDER_OFFSET);
+    };
+
+    const resizeObserver = new ResizeObserver(calculateHeight);
+    resizeObserver.observe(ghost);
+
+    calculateHeight();
+
+    return () => resizeObserver.disconnect();
+  }, [charLimit, isActive]);
+
+  useLayoutEffect(() => {
+    const ref = textareaRef.current;
+    if (!ref) return;
+
+    ref.style.height = "auto";
+
+    const currentContentHeight = ref.scrollHeight + 2;
+
+    ref.style.height = `${Math.max(currentContentHeight, minHeight)}px`;
+  }, [value, minHeight]);
+
+  const dummyText = useMemo(() => {
+    if (charLimit && Number(charLimit) > 0) {
+      return "あ".repeat(Number(charLimit));
+    }
+    return isActive ? "\n\n\n" : "\n";
+  }, [charLimit, isActive]);
+
+  return (
+    <div className="relative w-full group">
+      <div
+        ref={ghostRef}
+        aria-hidden="true"
+        className="absolute top-0 left-0 w-full p-3 text-sm border border-transparent invisible whitespace-pre-wrap break-words pointer-events-none"
+        style={{ zIndex: -1 }}
+      >
+        {dummyText}
+      </div>
+
+      <textarea
+        ref={textareaRef}
+        className="w-full p-3 text-sm border rounded-lg bg-white focus:border-indigo-500 outline-none transition-colors resize-none overflow-hidden block box-border"
+        style={{ minHeight: minHeight > 0 ? `${minHeight}px` : "auto" }}
+        placeholder={placeholder}
+        value={value}
+        onFocus={onFocus}
+        onChange={onChange}
+      />
+    </div>
+  );
+};
+
 const StatusBadge = ({ status }) => {
   const colorClass = STATUS_COLORS[status] || STATUS_COLORS["未提出"];
   return (
@@ -2448,16 +2525,15 @@ export default function App() {
                               </div>
 
                               <div className="mb-1">
-                                <textarea
-                                  className={`w-full p-3 text-sm border rounded-lg bg-white focus:border-indigo-500 outline-none transition-[min-height,border-color,background-color] duration-300 ${
-                                    isActive ? "min-h-[120px]" : "min-h-[80px]"
-                                  }`}
-                                  placeholder="回答..."
+                                <AutoResizeTextarea
                                   value={qa.answer}
-                                  onFocus={() => setActiveQAId(qa.id)}
                                   onChange={(e) =>
                                     updateQA(qa.id, "answer", e.target.value)
                                   }
+                                  onFocus={() => setActiveQAId(qa.id)}
+                                  placeholder="回答..."
+                                  isActive={isActive}
+                                  charLimit={qa.charLimit}
                                 />
                                 <div
                                   className={`grid transition-[grid-template-rows,opacity] duration-300 ease-in-out ${
