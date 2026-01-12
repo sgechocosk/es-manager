@@ -91,31 +91,55 @@ const sanitizeEntry = (entry) => {
   };
 };
 
-const callGeminiAPI = async (prompt) => {
+// --- Constants ---
+const GEMINI_MODELS = [
+  "gemini-3-pro-preview",
+  "gemini-3-flash-preview",
+  "gemini-2.5-pro",
+  "gemini-2.5-flash",
+  "gemini-2.5-flash-lite",
+];
+
+const callGeminiAPI = async (prompt, onModelChange) => {
   const apiKey = localStorage.getItem("GEMINI_API_KEY");
   if (!apiKey) {
     return "APIキーが設定されていません。右上の設定ボタンからAPIキーを設定してください。";
   }
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+  let lastError = null;
 
-  try {
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
-    });
+  for (const model of GEMINI_MODELS) {
+    if (onModelChange) onModelChange(model);
 
-    if (!response.ok) throw new Error("API Error");
-    const data = await response.json();
-    return (
-      data.candidates?.[0]?.content?.parts?.[0]?.text ||
-      "AIからの応答がありませんでした。"
-    );
-  } catch (error) {
-    console.error("Gemini API Error:", error);
-    return "エラーが発生しました。もう一度お試しください。";
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+      });
+
+      if (!response.ok) {
+        console.warn(
+          `Model ${model} failed with status ${response.status}. Trying next...`
+        );
+        throw new Error(`API Error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return (
+        data.candidates?.[0]?.content?.parts?.[0]?.text ||
+        "AIからの応答がありませんでした。"
+      );
+    } catch (error) {
+      lastError = error;
+      continue;
+    }
   }
+
+  console.error("All Gemini models failed:", lastError);
+  return "エラーが発生しました。すべてのモデルで制限に達したか、通信エラーが発生しました。";
 };
 
 const STATUS_COLORS = {
@@ -937,6 +961,7 @@ const AIAssistant = ({
   const [instruction, setInstruction] = useState("");
   const [isRefModalOpen, setIsRefModalOpen] = useState(false);
   const [selectedRefs, setSelectedRefs] = useState([]);
+  const [currentModel, setCurrentModel] = useState("");
 
   if (!hasApiKey) return null;
 
@@ -947,6 +972,7 @@ const AIAssistant = ({
     setLoading(true);
     setMode(actionType);
     setResult("");
+    setCurrentModel("");
 
     let prompt = "";
 
@@ -1034,7 +1060,7 @@ const AIAssistant = ({
       3. 改行は使用せず、一続きの文章にすること。`;
     }
 
-    const aiText = await callGeminiAPI(prompt);
+    const aiText = await callGeminiAPI(prompt, setCurrentModel);
     setResult(aiText);
     setLoading(false);
   };
@@ -1096,7 +1122,7 @@ const AIAssistant = ({
       {loading && (
         <div className="mt-3 p-4 bg-slate-50 rounded-xl border border-slate-200 flex items-center gap-3 text-sm text-slate-500 animate-pulse">
           <Loader2 size={18} className="animate-spin text-indigo-500" />
-          <span>AIが思考中...</span>
+          <span>AIが思考中... {currentModel && `(${currentModel})`}</span>
         </div>
       )}
 
