@@ -91,16 +91,16 @@ const sanitizeEntry = (entry) => {
   };
 };
 
-// --- Constants ---
+// --- Gemini API Logic ---
 const GEMINI_MODELS = [
-  "gemini-3-pro-preview",
+  // "gemini-3-pro-preview",
   "gemini-3-flash-preview",
-  "gemini-2.5-pro",
+  // "gemini-2.5-pro",
   "gemini-2.5-flash",
   "gemini-2.5-flash-lite",
 ];
 
-const callGeminiAPI = async (prompt, onModelChange) => {
+const callGeminiAPI = async (systemInstruction, userPrompt, onModelChange) => {
   const apiKey = localStorage.getItem("GEMINI_API_KEY");
   if (!apiKey) {
     return "APIキーが設定されていません。右上の設定ボタンからAPIキーを設定してください。";
@@ -113,11 +113,31 @@ const callGeminiAPI = async (prompt, onModelChange) => {
 
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
+    // --- Temperatureの設定意図 ---
+    // Gemini 3系 (Preview): temperature 1.0
+    //   - 理由: プレビューモデルの推奨値であり、高い表現力と創造性を最大化するため。
+    // Gemini 2.5系: temperature 0.8
+    //   - 理由: 創造性と論理性のバランスを保ち、安定したES文章を作成するため。
+
+    const isGemini3 = model.includes("gemini-3");
+    const temperature = isGemini3 ? 1.0 : 0.8;
+
+    const body = {
+      systemInstruction: {
+        parts: [{ text: systemInstruction }],
+      },
+      contents: [{ parts: [{ text: userPrompt }] }],
+      generationConfig: {
+        temperature: temperature,
+        responseMimeType: "text/plain",
+      },
+    };
+
     try {
       const response = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+        body: JSON.stringify(body),
       });
 
       if (!response.ok) {
@@ -139,7 +159,7 @@ const callGeminiAPI = async (prompt, onModelChange) => {
   }
 
   console.error("All Gemini models failed:", lastError);
-  return "エラーが発生しました。すべてのモデルで制限に達したか、通信エラーが発生しました。";
+  return "エラーが発生しました。もう一度お試しください。";
 };
 
 const STATUS_COLORS = {
@@ -974,30 +994,38 @@ const AIAssistant = ({
     setResult("");
     setCurrentModel("");
 
-    let prompt = "";
+    let systemPrompt = "";
+    let userPrompt = "";
 
     const contextInfo = `
-      【応募先情報】
-      ・企業名: ${company || "未定"}
-      ・業界: ${industry || "未定"}
-      ・選考種別: ${selectionType || "未定"}
+    【応募先情報】
+    ・企業名: ${company || "未定"}
+    ・業界: ${industry || "未定"}
+    ・選考種別: ${selectionType || "未定"}
     `;
 
+    // 推敲
     if (actionType === "refine") {
-      prompt = `あなたは${
+      systemPrompt = `あなたは${
         industry || "その"
       }業界に精通したプロのキャリアアドバイザーです。
       応募先企業(${
         company || "指定なし"
-      })の高評価を獲得できるよう、以下のES回答を推敲してください。
-      ${contextInfo}
+      })の高評価を獲得できるよう、ES回答を推敲してください。
+      出力形式はプレーンテキストのみとし、挨拶文や改行は含めないでください。`;
+
+      userPrompt = `${contextInfo}
       【質問内容】${question}
       【補足事項/前提条件】${note || "なし"}
-      【元の回答】${answer}
-      【ユーザー指示】${
+      【元の回答】
+      ${answer}
+
+      【ユーザー指示】
+      ${
         instruction ||
-        "論理構成(結論→理由→具体例→結び)を整理し、STAR法を意識して具体的かつ熱意が伝わる文章にしてください。"
+        "質問に対する適切な回答をすることを前提に、基本的には論理構成(結論→理由→具体例→結び)を整理し、STAR法を意識して具体的かつ熱意が伝わる文章にしてください。"
       }
+
       【制約条件】
       1. ${
         charLimit
@@ -1005,21 +1033,35 @@ const AIAssistant = ({
           : "元の文字数を大きく超えないこと。"
       }
       2. 挨拶文不要。推敲後のテキストのみ出力。
-      3. 改行は使用せず、一続きの文章にすること。`;
+      3. 太字などの装飾をせずにプレーンテキストで出力。
+      4. 改行は使用せず、一続きの文章にすること。`;
+
+      // フィードバック
     } else if (actionType === "feedback") {
-      prompt = `あなたは${
+      systemPrompt = `あなたは${
         company || "企業"
-      }の採用担当者です。以下のES回答を厳しく評価し、改善点を指摘してください。
-      ${contextInfo}
+      }の採用担当者です。以下のES回答を厳しく評価し、改善点を指摘してください。`;
+
+      userPrompt = `${contextInfo}
       【質問内容】${question}
       【補足事項/前提条件】${note || "なし"}
       ${charLimit ? `(制限: ${charLimit}文字)` : ""}
-      【回答内容】${answer}
-      【出力フォーマット】
-      プレーンテキストで出力してください。
+      【回答内容】
+      ${answer}
+
+      【ユーザー指示】
+      ${
+        instruction ||
+        "この回答の良い点と悪い点を具体的に指摘し、改善案を提案してください。"
+      }
+
+      【評価指示】
+      以下の項目についてフィードバックしてください。
       【評価できる点】
       【改善すべき点】
       【具体的な修正案】`;
+
+      // 統合
     } else if (actionType === "generate") {
       const refsToUse = directRefs || selectedRefs;
       const refsText = refsToUse
@@ -1031,12 +1073,11 @@ const AIAssistant = ({
         )
         .join("\n\n");
 
-      prompt = `あなたはプロのキャリアアドバイザーです。
-      以下の「参考にする過去の回答」の内容や要素(強み、エピソードなど)をうまく活用・再構成して、
-      今回の「新しい質問」に対する回答を新規に作成してください。
+      systemPrompt = `あなたはプロのキャリアアドバイザーです。
+      以下の「参考にする過去の回答」の強み、エピソードなどの要素をうまく活用・再構成して、今回の質問に対する回答を新規に作成してください。
+      挨拶文や改行は含めず、回答本文をプレーンテキストで出力してください。`;
 
-      ${contextInfo}
-
+      userPrompt = `${contextInfo}
       【今回の質問】
       ${question}
       【補足事項/前提条件】${note || "なし"}
@@ -1044,7 +1085,7 @@ const AIAssistant = ({
       【参考にする過去の回答】
       ${refsText}
 
-      【ユーザーの指示】
+      【ユーザー指示】
       ${
         instruction ||
         "過去の回答のエピソードを活かして、今回の質問に整合するように回答を作成してください。"
@@ -1053,14 +1094,19 @@ const AIAssistant = ({
       【制約条件】
       1. ${
         charLimit
-          ? `必ず${charLimit}文字以内に収めること。`
-          : "適切な長さで作成すること。"
+          ? charLimit + "文字以内で作成すること。"
+          : "元の文字数を大きく超えないこと。"
       }
-      2. 挨拶文不要。回答のテキストのみを出力すること。
-      3. 改行は使用せず、一続きの文章にすること。`;
+      2. 挨拶文不要。推敲後のテキストのみ出力。
+      3. 太字などの装飾をせずにプレーンテキストで出力。
+      4. 改行は使用せず、一続きの文章にすること。`;
     }
 
-    const aiText = await callGeminiAPI(prompt, setCurrentModel);
+    const aiText = await callGeminiAPI(
+      systemPrompt,
+      userPrompt,
+      setCurrentModel
+    );
     setResult(aiText);
     setLoading(false);
   };
