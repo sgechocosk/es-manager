@@ -211,49 +211,31 @@ const AutoResizeTextarea = ({
   isActive,
   charLimit,
 }) => {
-  const textareaRef = useRef(null);
-  const ghostRef = useRef(null);
-  const [minHeight, setMinHeight] = useState(0);
+  const minHeightGhostRef = useRef(null);
+  const contentGhostRef = useRef(null);
+  const [textareaHeight, setTextareaHeight] = useState("auto");
 
-  useEffect(() => {
-    const ghost = ghostRef.current;
-    if (!ghost) return;
-
-    const calculateHeight = () => {
-      const BORDER_OFFSET = 2;
-      setMinHeight(ghost.scrollHeight + BORDER_OFFSET);
-    };
-
-    const resizeObserver = new ResizeObserver(calculateHeight);
-    resizeObserver.observe(ghost);
-
-    calculateHeight();
-
-    return () => resizeObserver.disconnect();
+  const dummyText = useMemo(() => {
+    if (isActive && charLimit && Number(charLimit) > 0) {
+      return "あ".repeat(Number(charLimit));
+    }
+    return isActive ? "\n\n\n" : "\n\n";
   }, [charLimit, isActive]);
 
   useLayoutEffect(() => {
-    const ref = textareaRef.current;
-    if (!ref) return;
+    const minH = minHeightGhostRef.current?.scrollHeight || 0;
+    const contentH = contentGhostRef.current?.scrollHeight || 0;
 
-    ref.style.height = "auto";
+    const BORDER_OFFSET = 2;
+    const targetHeight = Math.max(minH, contentH) + BORDER_OFFSET;
 
-    const currentContentHeight = ref.scrollHeight + 2;
-
-    ref.style.height = `${Math.max(currentContentHeight, minHeight)}px`;
-  }, [value, minHeight]);
-
-  const dummyText = useMemo(() => {
-    if (charLimit && Number(charLimit) > 0) {
-      return "あ".repeat(Number(charLimit));
-    }
-    return isActive ? "\n\n\n" : "\n";
-  }, [charLimit, isActive]);
+    setTextareaHeight(`${targetHeight}px`);
+  }, [value, dummyText]);
 
   return (
     <div className="relative w-full group">
       <div
-        ref={ghostRef}
+        ref={minHeightGhostRef}
         aria-hidden="true"
         className="absolute top-0 left-0 w-full p-3 text-sm border border-transparent invisible whitespace-pre-wrap break-words pointer-events-none"
         style={{ zIndex: -1 }}
@@ -261,10 +243,19 @@ const AutoResizeTextarea = ({
         {dummyText}
       </div>
 
+      <div
+        ref={contentGhostRef}
+        aria-hidden="true"
+        className="absolute top-0 left-0 w-full p-3 text-sm border border-transparent invisible whitespace-pre-wrap break-words pointer-events-none"
+        style={{ zIndex: -1 }}
+      >
+        {value}
+        {value && value.endsWith("\n") && <br />}
+      </div>
+
       <textarea
-        ref={textareaRef}
-        className="w-full p-3 text-sm border rounded-lg bg-white focus:border-indigo-500 outline-none transition-colors resize-none overflow-hidden block box-border"
-        style={{ minHeight: minHeight > 0 ? `${minHeight}px` : "auto" }}
+        className="w-full p-3 text-sm border rounded-lg bg-white focus:border-indigo-500 outline-none resize-none overflow-hidden block box-border transition-[height,border-color] duration-300 ease-in-out"
+        style={{ height: textareaHeight }}
         placeholder={placeholder}
         value={value}
         onFocus={onFocus}
@@ -2478,15 +2469,15 @@ export default function App() {
                                 e.stopPropagation();
                                 setActiveQAId(qa.id);
                               }}
-                              className={`rounded-xl border transition-all duration-300 ease-in-out p-4 ${
+                              className={`rounded-xl border transition-all duration-300 ease-in-out px-4 pt-2 pb-3 ${
                                 isActive
                                   ? "bg-slate-50 shadow-sm border-indigo-200 ring-1 ring-indigo-200"
                                   : "bg-white border-slate-200 hover:border-indigo-300 cursor-pointer opacity-90 hover:opacity-100"
                               }`}
                             >
-                              <div className="flex justify-between items-center mb-1">
+                              <div className="relative z-10 flex items-center justify-between min-h-[32px] pointer-events-none">
                                 <div
-                                  className={`text-xs font-bold transition-colors duration-300 ${
+                                  className={`text-xs font-bold transition-colors duration-300 shrink-0 ${
                                     isActive
                                       ? "text-indigo-600"
                                       : "text-slate-400"
@@ -2494,8 +2485,9 @@ export default function App() {
                                 >
                                   Q{idx + 1}
                                 </div>
+
                                 <div
-                                  className={`flex items-center gap-3 overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] ${
+                                  className={`flex items-center gap-3 overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] shrink-0 ml-auto pointer-events-auto ${
                                     isActive
                                       ? "max-w-[400px] opacity-100 translate-x-0"
                                       : "max-w-0 opacity-0 translate-x-4"
@@ -2557,20 +2549,30 @@ export default function App() {
                                 </div>
                               </div>
 
-                              <div className="mb-3 relative">
-                                <input
-                                  className={`w-full bg-transparent font-bold text-slate-800 placeholder-slate-300 outline-none border-b focus:border-indigo-500 transition-all duration-300 ease-out origin-left ${
-                                    isActive
-                                      ? "text-base py-2 border-indigo-300"
-                                      : "text-sm py-1 border-transparent"
-                                  }`}
-                                  placeholder="質問内容"
-                                  value={qa.question}
-                                  onFocus={() => setActiveQAId(qa.id)}
-                                  onChange={(e) =>
-                                    updateQA(qa.id, "question", e.target.value)
-                                  }
-                                />
+                              <div
+                                className={`transition-all duration-300 ease-in-out ${
+                                  isActive ? "mt-0" : "-mt-9.5"
+                                }`}
+                              >
+                                <div className="pt-2 pb-1">
+                                  <input
+                                    className={`w-full bg-transparent outline-none transition-all duration-300 ease-in-out ${
+                                      isActive
+                                        ? "font-bold text-slate-800 placeholder-slate-300 border-b border-indigo-300 text-base py-2 pl-0"
+                                        : "font-bold text-slate-700 placeholder-slate-300 border-b border-transparent text-sm py-1 pl-8 truncate"
+                                    }`}
+                                    placeholder="質問内容"
+                                    value={qa.question}
+                                    onFocus={() => setActiveQAId(qa.id)}
+                                    onChange={(e) =>
+                                      updateQA(
+                                        qa.id,
+                                        "question",
+                                        e.target.value
+                                      )
+                                    }
+                                  />
+                                </div>
                               </div>
 
                               <div
@@ -2650,7 +2652,7 @@ export default function App() {
 
                               {isActive ? (
                                 <input
-                                  className="w-full text-xs px-3 py-2 bg-white border rounded-md outline-none focus:border-indigo-500 animate-in fade-in slide-in-from-top-1 duration-200"
+                                  className="mt-2 w-full text-xs px-3 py-2 bg-white border rounded-md outline-none focus:border-indigo-500 animate-in fade-in slide-in-from-top-1 duration-200"
                                   placeholder="タグ (例: 自己PR、ガクチカ)"
                                   value={qa.tags}
                                   onFocus={() => setActiveQAId(qa.id)}
@@ -2659,7 +2661,7 @@ export default function App() {
                                   }
                                 />
                               ) : (
-                                <div className="flex justify-between items-center gap-2 mt-1 animate-in fade-in duration-300">
+                                <div className="flex justify-between items-center gap-2 mt-3 animate-in fade-in duration-300">
                                   <input
                                     className="flex-1 text-xs px-2 py-1 bg-white border border-slate-200 rounded outline-none focus:border-indigo-500 transition-all placeholder-slate-300"
                                     placeholder="タグ"
