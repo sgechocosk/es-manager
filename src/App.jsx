@@ -10,7 +10,6 @@ import {
   Copy,
   Key,
   X,
-  Link as LinkIcon,
   ExternalLink,
   Sparkles,
   Bot,
@@ -35,12 +34,36 @@ import {
   AlertTriangle,
   PanelRight,
   PanelRightClose,
+  Database,
+  MapPin,
+  Users,
+  DollarSign,
+  CalendarCheck,
+  ListOrdered,
+  FileText,
+  Minus,
+  Columns,
 } from "lucide-react";
 
 // --- Constants ---
 const STORAGE_KEY_SETTINGS = "ES_MANAGER_SETTINGS";
 const STORAGE_KEY_DATA = "ES_MANAGER_DATA";
 const HEADER_HEIGHT = "57px";
+
+const COMPANY_DATA_COLUMNS = [
+  { id: "company", label: "企業名", minWidth: "180px" },
+  { id: "industry", label: "業界", minWidth: "120px" },
+  { id: "myPageUrl", label: "マイページURL", minWidth: "200px" },
+  { id: "recruitmentUrl", label: "採用HP URL", minWidth: "200px" },
+  { id: "location", label: "本社所在地", minWidth: "150px" },
+  { id: "workLocation", label: "勤務地", minWidth: "150px" },
+  { id: "hiringNumber", label: "採用人数", minWidth: "100px" },
+  { id: "avgSalary", label: "平均年収", minWidth: "100px" },
+  { id: "startingSalary", label: "初任給", minWidth: "100px" },
+  { id: "annualHoliday", label: "年間休日", minWidth: "100px" },
+  { id: "selectionFlow", label: "選考フロー", minWidth: "350px" },
+  { id: "note", label: "備考", minWidth: "200px" },
+];
 
 // --- Utilities ---
 const splitTags = (tagInput) => {
@@ -80,7 +103,6 @@ const sanitizeEntry = (entry) => {
       entry.id ||
       `entry_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
     company: entry.company || "名称未設定",
-    industry: entry.industry || "",
     status: entry.status || "未提出",
     selectionType: entry.selectionType || "",
     deadline: entry.deadline || "",
@@ -88,6 +110,37 @@ const sanitizeEntry = (entry) => {
     createdAt: entry.createdAt || now,
     updatedAt: entry.updatedAt || now,
     qas: sanitizedQas,
+  };
+};
+
+const normalizeCompanyData = (data) => {
+  if (typeof data === "string") {
+    return {
+      myPageUrl: data,
+      recruitmentUrl: "",
+      industry: "",
+      location: "",
+      workLocation: "",
+      hiringNumber: "",
+      avgSalary: "",
+      startingSalary: "",
+      annualHoliday: "",
+      selectionFlow: [],
+      note: "",
+    };
+  }
+  return {
+    myPageUrl: data?.myPageUrl || "",
+    recruitmentUrl: data?.recruitmentUrl || "",
+    industry: data?.industry || "",
+    location: data?.location || "",
+    workLocation: data?.workLocation || "",
+    hiringNumber: data?.hiringNumber || "",
+    avgSalary: data?.avgSalary || "",
+    startingSalary: data?.startingSalary || "",
+    annualHoliday: data?.annualHoliday || "",
+    selectionFlow: Array.isArray(data?.selectionFlow) ? data.selectionFlow : [],
+    note: data?.note || "",
   };
 };
 
@@ -112,12 +165,6 @@ const callGeminiAPI = async (systemInstruction, userPrompt, onModelChange) => {
     if (onModelChange) onModelChange(model);
 
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-
-    // --- Temperatureの設定意図 ---
-    // Gemini 3系 (Preview): temperature 1.0
-    //   - 理由: プレビューモデルの推奨値であり、高い表現力と創造性を最大化するため。
-    // Gemini 2.5系: temperature 0.8
-    //   - 理由: 創造性と論理性のバランスを保ち、安定したES文章を作成するため。
 
     const isGemini3 = model.includes("gemini-3");
     const temperature = isGemini3 ? 1.0 : 0.8;
@@ -306,7 +353,283 @@ const CopyButton = ({ text }) => {
   );
 };
 
-// --- Reference Sidebar Component ---
+// --- Modal Components ---
+const CompanyDataEditModal = ({
+  isOpen,
+  onClose,
+  companyName,
+  initialData,
+  onSave,
+}) => {
+  const [data, setData] = useState(normalizeCompanyData({}));
+
+  useEffect(() => {
+    if (isOpen) {
+      setData(normalizeCompanyData(initialData || {}));
+    }
+  }, [isOpen, initialData]);
+
+  const handleChange = (field, value) => {
+    setData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleFlowChange = (index, value) => {
+    const newFlow = [...data.selectionFlow];
+    newFlow[index] = value;
+    setData((prev) => ({ ...prev, selectionFlow: newFlow }));
+  };
+
+  const addFlowStep = () => {
+    setData((prev) => ({
+      ...prev,
+      selectionFlow: [...prev.selectionFlow, ""],
+    }));
+  };
+
+  const removeFlowStep = (index) => {
+    const newFlow = data.selectionFlow.filter((_, i) => i !== index);
+    setData((prev) => ({ ...prev, selectionFlow: newFlow }));
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm animate-in fade-in">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col animate-in zoom-in-95">
+        <div className="px-6 py-4 border-b flex justify-between items-center bg-slate-50 rounded-t-xl">
+          <h3 className="font-bold text-slate-700 flex items-center gap-2">
+            <Building2 size={18} className="text-indigo-600" />
+            企業データ編集: {companyName}
+          </h3>
+          <button onClick={onClose} title="閉じる">
+            <X size={20} className="text-slate-400 hover:text-slate-600" />
+          </button>
+        </div>
+
+        <div className="p-6 overflow-y-auto flex-1 space-y-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs font-bold text-slate-500 mb-1 block">
+                マイページURL
+              </label>
+              <input
+                type="url"
+                className="w-full px-3 py-2 border rounded-lg text-sm outline-none focus:border-indigo-500"
+                placeholder="https://..."
+                value={data.myPageUrl}
+                onChange={(e) => handleChange("myPageUrl", e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-500 mb-1 block">
+                採用HP URL
+              </label>
+              <input
+                type="url"
+                className="w-full px-3 py-2 border rounded-lg text-sm outline-none focus:border-indigo-500"
+                placeholder="https://..."
+                value={data.recruitmentUrl}
+                onChange={(e) => handleChange("recruitmentUrl", e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-500 mb-1 block">
+                業界
+              </label>
+              <input
+                type="text"
+                className="w-full px-3 py-2 border rounded-lg text-sm outline-none focus:border-indigo-500"
+                placeholder="例: IT、メーカー"
+                value={data.industry}
+                onChange={(e) => handleChange("industry", e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-500 mb-1 block">
+                本社所在地
+              </label>
+              <div className="relative">
+                <MapPin
+                  size={14}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                />
+                <input
+                  type="text"
+                  className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm outline-none focus:border-indigo-500"
+                  placeholder="例: 東京都港区..."
+                  value={data.location}
+                  onChange={(e) => handleChange("location", e.target.value)}
+                />
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-500 mb-1 block">
+                勤務地
+              </label>
+              <div className="relative">
+                <Building2
+                  size={14}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                />
+                <input
+                  type="text"
+                  className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm outline-none focus:border-indigo-500"
+                  placeholder="例: 全国、東京本社"
+                  value={data.workLocation}
+                  onChange={(e) => handleChange("workLocation", e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 bg-slate-50/50 p-4 rounded-xl border border-slate-100">
+            <div>
+              <label className="text-xs font-bold text-slate-500 mb-1 block">
+                採用人数
+              </label>
+              <div className="relative">
+                <Users
+                  size={14}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400"
+                />
+                <input
+                  type="text"
+                  className="w-full pl-7 pr-2 py-1.5 border rounded-md text-xs outline-none focus:border-indigo-500"
+                  placeholder="例: 50名"
+                  value={data.hiringNumber}
+                  onChange={(e) => handleChange("hiringNumber", e.target.value)}
+                />
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-500 mb-1 block">
+                平均年収
+              </label>
+              <div className="relative">
+                <DollarSign
+                  size={14}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400"
+                />
+                <input
+                  type="text"
+                  className="w-full pl-7 pr-2 py-1.5 border rounded-md text-xs outline-none focus:border-indigo-500"
+                  placeholder="例: 800万"
+                  value={data.avgSalary}
+                  onChange={(e) => handleChange("avgSalary", e.target.value)}
+                />
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-500 mb-1 block">
+                初任給
+              </label>
+              <div className="relative">
+                <DollarSign
+                  size={14}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400"
+                />
+                <input
+                  type="text"
+                  className="w-full pl-7 pr-2 py-1.5 border rounded-md text-xs outline-none focus:border-indigo-500"
+                  placeholder="例: 25万"
+                  value={data.startingSalary}
+                  onChange={(e) =>
+                    handleChange("startingSalary", e.target.value)
+                  }
+                />
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-500 mb-1 block">
+                年間休日
+              </label>
+              <div className="relative">
+                <CalendarCheck
+                  size={14}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400"
+                />
+                <input
+                  type="text"
+                  className="w-full pl-7 pr-2 py-1.5 border rounded-md text-xs outline-none focus:border-indigo-500"
+                  placeholder="例: 125日"
+                  value={data.annualHoliday}
+                  onChange={(e) =>
+                    handleChange("annualHoliday", e.target.value)
+                  }
+                />
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-slate-500 mb-2 flex items-center gap-1.5">
+              <ListOrdered size={14} /> 選考フロー
+            </label>
+            <div className="space-y-2">
+              {data.selectionFlow.map((step, idx) => (
+                <div key={idx} className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-indigo-300 w-6 text-right">
+                    {idx + 1}.
+                  </span>
+                  <input
+                    type="text"
+                    className="flex-1 px-3 py-1.5 border rounded-md text-sm outline-none focus:border-indigo-500"
+                    value={step}
+                    onChange={(e) => handleFlowChange(idx, e.target.value)}
+                    placeholder={`ステップ ${idx + 1}`}
+                  />
+                  <button
+                    onClick={() => removeFlowStep(idx)}
+                    className="p-1.5 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded transition-colors"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              ))}
+              <button
+                onClick={addFlowStep}
+                className="ml-8 mt-1 text-xs font-bold text-indigo-600 hover:bg-indigo-50 px-2 py-1 rounded flex items-center gap-1 transition-colors"
+              >
+                <Plus size={12} /> フローを追加
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-slate-500 mb-1 block flex items-center gap-1.5">
+              <FileText size={14} /> 備考
+            </label>
+            <textarea
+              className="w-full px-3 py-2 border rounded-lg text-sm outline-none focus:border-indigo-500 min-h-[80px]"
+              placeholder="メモや特記事項..."
+              value={data.note}
+              onChange={(e) => handleChange("note", e.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className="p-4 border-t bg-slate-50 rounded-b-xl flex justify-end gap-2">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm font-bold text-slate-500 hover:bg-slate-100 rounded-lg"
+          >
+            キャンセル
+          </button>
+          <button
+            onClick={() => {
+              onSave(companyName, data);
+              onClose();
+            }}
+            className="px-4 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm"
+          >
+            保存する
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const ReferenceSidebar = ({ isOpen, onClose, entries, editingId }) => {
   const [search, setSearch] = useState("");
 
@@ -586,159 +909,6 @@ const SettingsModal = ({
   );
 };
 
-const CompanyUrlModal = ({ isOpen, onClose, entries, urls, onSave }) => {
-  const [localUrls, setLocalUrls] = useState(urls);
-
-  const companyNames = useMemo(() => {
-    const usedCompaniesSet = new Set(
-      entries.map((e) => e.company).filter(Boolean)
-    );
-
-    const entryCompanies = Array.from(usedCompaniesSet);
-    const urlCompanies = Object.keys(localUrls);
-    const names = Array.from(new Set([...entryCompanies, ...urlCompanies]));
-
-    return names.sort((a, b) => {
-      const isUsedA = usedCompaniesSet.has(a);
-      const hasUrlA = !!localUrls[a];
-
-      const isUsedB = usedCompaniesSet.has(b);
-      const hasUrlB = !!localUrls[b];
-
-      const getRank = (isUsed, hasUrl) => {
-        if (isUsed && hasUrl) return 1;
-        if (isUsed && !hasUrl) return 2;
-        if (!isUsed && hasUrl) return 3;
-        return 4;
-      };
-
-      const rankA = getRank(isUsedA, hasUrlA);
-      const rankB = getRank(isUsedB, hasUrlB);
-
-      if (rankA !== rankB) {
-        return rankA - rankB;
-      }
-
-      return a.localeCompare(b, "ja");
-    });
-  }, [entries, localUrls]);
-
-  useEffect(() => {
-    if (isOpen) setLocalUrls(urls);
-  }, [isOpen, urls]);
-
-  const handleChange = (company, url) => {
-    setLocalUrls((prev) => ({ ...prev, [company]: url }));
-  };
-
-  const handleDeleteLine = (company) => {
-    setLocalUrls((prev) => {
-      const next = { ...prev };
-      delete next[company];
-      return next;
-    });
-  };
-
-  const handleSave = () => {
-    onSave(localUrls);
-    onClose();
-  };
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm animate-in fade-in">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col animate-in zoom-in-95">
-        <div className="px-6 py-4 border-b flex justify-between items-center bg-slate-50 rounded-t-xl">
-          <h3 className="font-bold text-slate-700 flex items-center gap-2">
-            <LinkIcon size={18} className="text-indigo-600" /> 企業URL設定
-          </h3>
-          <button onClick={onClose} title="閉じる">
-            <X size={20} className="text-slate-400 hover:text-slate-600" />
-          </button>
-        </div>
-
-        <div className="p-6 overflow-y-auto flex-1">
-          <p className="text-xs text-slate-500 mb-4">
-            企業ごとの採用マイページURLを設定できます。設定したURLは同じ企業名のすべてのエントリーに適用されます。
-          </p>
-          <div className="space-y-3">
-            {companyNames.length === 0 && (
-              <p className="text-sm text-slate-400">
-                登録された企業がありません。
-              </p>
-            )}
-            {companyNames.map((company) => {
-              const isUsed = entries.some((e) => e.company === company);
-
-              return (
-                <div key={company} className="flex items-center gap-3 group">
-                  <div
-                    className="w-1/3 text-sm font-bold text-slate-700 truncate"
-                    title={company}
-                  >
-                    {company}
-                  </div>
-                  <div className="flex-1 flex items-center gap-2">
-                    <input
-                      type="url"
-                      placeholder={isUsed ? "https://..." : "未使用の企業"}
-                      className={`flex-1 px-3 py-2 border rounded-lg text-sm outline-none transition-colors ${
-                        !isUsed && !localUrls[company]
-                          ? "bg-slate-50 text-slate-400 border-slate-200"
-                          : "focus:border-indigo-500"
-                      }`}
-                      value={localUrls[company] || ""}
-                      onChange={(e) => handleChange(company, e.target.value)}
-                    />
-
-                    {localUrls[company] && (
-                      <a
-                        href={localUrls[company]}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="p-2 text-slate-400 hover:text-indigo-600 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors flex-shrink-0"
-                        title="マイページを開く"
-                      >
-                        <ExternalLink size={18} />
-                      </a>
-                    )}
-
-                    {!isUsed && (
-                      <button
-                        onClick={() => handleDeleteLine(company)}
-                        className="p-2 text-slate-300 hover:text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200 rounded-lg transition-all flex-shrink-0"
-                        title="リストから削除"
-                      >
-                        <Trash2 size={18} />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="p-4 border-t bg-slate-50 rounded-b-xl flex justify-end gap-2">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm font-bold text-slate-500 hover:bg-slate-100 rounded-lg"
-          >
-            キャンセル
-          </button>
-          <button
-            onClick={handleSave}
-            className="px-4 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg"
-          >
-            保存する
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 const ReferenceSelectorModal = ({
   isOpen,
   onClose,
@@ -995,7 +1165,6 @@ const AIAssistant = ({
     ・選考種別: ${selectionType || "未定"}
     `;
 
-    // 推敲
     if (actionType === "refine") {
       systemPrompt = `あなたは${
         industry || "その"
@@ -1026,8 +1195,6 @@ const AIAssistant = ({
       2. 挨拶文不要。推敲後のテキストのみ出力。
       3. 太字などの装飾をせずにプレーンテキストで出力。
       4. 改行は使用せず、一続きの文章にすること。`;
-
-      // フィードバック
     } else if (actionType === "feedback") {
       systemPrompt = `あなたは${
         company || "企業"
@@ -1051,8 +1218,6 @@ const AIAssistant = ({
       【評価できる点】
       【改善すべき点】
       【具体的な修正案】`;
-
-      // 統合
     } else if (actionType === "generate") {
       const refsToUse = directRefs || selectedRefs;
       const refsText = refsToUse
@@ -1330,6 +1495,11 @@ const ESEntryDisplay = ({ entry, onEdit, onDelete, companyUrl, highlight }) => {
           <StatusBadge status={entry.status} />
           <span className="text-xs text-slate-500 flex items-center gap-1">
             <Briefcase size={12} />
+            {/* industry は entry ではなく companyData から表示するのが理想だが、
+               ESEntryDisplay は entry オブジェクトを受け取る。
+               呼び出し元で entry.industry を渡すか、このコンポーネントを修正する必要がある。
+               今回は呼び出し元でマージされているか、別途処理される。
+               ここでは単純に表示するだけにする。 */}
             <HighlightText text={entry.industry} highlight={highlight} />
           </span>
           {entry.selectionType && (
@@ -1439,6 +1609,7 @@ const DEFAULT_FORM_DATA = {
   company: "",
   industry: "",
   myPageUrl: "",
+  recruitmentUrl: "",
   status: "未提出",
   selectionType: "",
   deadline: "",
@@ -1454,8 +1625,20 @@ export default function App() {
   const [editingId, setEditingId] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isUrlSettingsOpen, setIsUrlSettingsOpen] = useState(false);
-  const [companyUrls, setCompanyUrls] = useState({});
+
+  // companyUrls から companyData (詳細オブジェクト) に変更
+  const [companyData, setCompanyData] = useState({});
+  const [isCompanyDataEditOpen, setIsCompanyDataEditOpen] = useState(false);
+  const [editingCompanyDataName, setEditingCompanyDataName] = useState(null);
+  const [visibleColumns, setVisibleColumns] = useState([
+    "company",
+    "industry",
+    "myPageUrl",
+    "location",
+    "selectionFlow",
+    "action",
+  ]);
+  const [isColumnSelectorOpen, setIsColumnSelectorOpen] = useState(false);
 
   const [isRefPanelOpen, setIsRefPanelOpen] = useState(false);
 
@@ -1489,11 +1672,42 @@ export default function App() {
       if (savedDataJson) {
         try {
           const parsed = JSON.parse(savedDataJson);
+          let loadedEntries = [];
           if (parsed && Array.isArray(parsed.entries)) {
-            setEntries(parsed.entries);
+            loadedEntries = parsed.entries;
           }
+
+          let loadedCompanyData = {};
           if (parsed && parsed.companyUrls) {
-            setCompanyUrls(parsed.companyUrls);
+            Object.entries(parsed.companyUrls).forEach(([name, val]) => {
+              loadedCompanyData[name] = normalizeCompanyData(val);
+            });
+          } else if (parsed && parsed.companyData) {
+            loadedCompanyData = parsed.companyData;
+          }
+
+          // データ移行ロジック (entry.industry -> companyData.industry)
+          let hasMigration = false;
+          const migratedEntries = loadedEntries.map((entry) => {
+            if (entry.industry && entry.company) {
+              const currentData =
+                loadedCompanyData[entry.company] || normalizeCompanyData({});
+              if (!currentData.industry) {
+                currentData.industry = entry.industry;
+                loadedCompanyData[entry.company] = currentData;
+                hasMigration = true;
+              }
+              // エントリー側の industry は空にする
+              return { ...entry, industry: "" };
+            }
+            return entry;
+          });
+
+          setEntries(migratedEntries);
+          setCompanyData(loadedCompanyData);
+          if (hasMigration) {
+            // マイグレーションが発生したら即座に保存すべきだが、
+            // autoSave が true なら次の useEffect で保存されるためここではセットのみ
           }
         } catch (e) {
           console.error("Failed to parse auto-saved data", e);
@@ -1509,14 +1723,14 @@ export default function App() {
     if (appSettings.autoSave) {
       const dataToSave = {
         entries: entries,
-        companyUrls: companyUrls,
+        companyData: companyData,
         updatedAt: getCurrentJSTTime(),
       };
       localStorage.setItem(STORAGE_KEY_DATA, JSON.stringify(dataToSave));
     } else {
       localStorage.removeItem(STORAGE_KEY_DATA);
     }
-  }, [entries, companyUrls, appSettings.autoSave, isInitialized]);
+  }, [entries, companyData, appSettings.autoSave, isInitialized]);
 
   // --- Effects: BeforeUnload ---
   useEffect(() => {
@@ -1556,14 +1770,6 @@ export default function App() {
   // --- Helpers & Memos ---
   const scrollToTop = (behavior = "auto") => {
     window.scrollTo({ top: 0, behavior: behavior });
-  };
-
-  const isMatch = (text) => {
-    if (!searchQuery) return true;
-    const lowerQ = searchQuery.toLowerCase();
-    const terms = lowerQ.split(/[\s\u3000]+/).filter((t) => t.length > 0);
-    if (!text) return false;
-    return terms.some((term) => text.toLowerCase().includes(term));
   };
 
   const processedCompanyEntries = useMemo(() => {
@@ -1677,7 +1883,12 @@ export default function App() {
   }, [processedCompanyEntries]);
 
   // --- Handlers: Data & Form ---
-  const handleSaveUrls = (newUrls) => setCompanyUrls(newUrls);
+  const handleSaveCompanyData = (companyName, newData) => {
+    setCompanyData((prev) => ({
+      ...prev,
+      [companyName]: newData,
+    }));
+  };
 
   const handleSettingsSave = (newSettings) => {
     setAppSettings(newSettings);
@@ -1739,10 +1950,28 @@ export default function App() {
     if (!formData.company) return;
 
     try {
-      if (formData.myPageUrl) {
-        setCompanyUrls((prev) => ({
+      const existingData = companyData[formData.company]
+        ? { ...companyData[formData.company] }
+        : normalizeCompanyData({});
+
+      let shouldUpdateCompanyData = false;
+      if (formData.myPageUrl && !existingData.myPageUrl) {
+        existingData.myPageUrl = formData.myPageUrl;
+        shouldUpdateCompanyData = true;
+      }
+      if (formData.recruitmentUrl && !existingData.recruitmentUrl) {
+        existingData.recruitmentUrl = formData.recruitmentUrl;
+        shouldUpdateCompanyData = true;
+      }
+      if (formData.industry && !existingData.industry) {
+        existingData.industry = formData.industry;
+        shouldUpdateCompanyData = true;
+      }
+
+      if (shouldUpdateCompanyData) {
+        setCompanyData((prev) => ({
           ...prev,
-          [formData.company]: formData.myPageUrl,
+          [formData.company]: existingData,
         }));
       }
 
@@ -1784,7 +2013,9 @@ export default function App() {
 
   const handleDelete = (id) => {
     if (
-      !confirm("この企業のエントリーシートを削除しますか?\n(URL設定は残ります)")
+      !confirm(
+        "この企業のエントリーシートを削除しますか?\n(企業データは残ります)"
+      )
     )
       return;
     setEntries((prev) => prev.filter((e) => e.id !== id));
@@ -1792,14 +2023,17 @@ export default function App() {
 
   const startEdit = (entry) => {
     const fullEntry = entries.find((e) => e.id === entry.id) || entry;
+    const cData = companyData[fullEntry.company] || normalizeCompanyData({});
+
     const editState = {
       company: fullEntry.company,
-      industry: fullEntry.industry,
+      industry: cData.industry || "",
       status: fullEntry.status || "未提出",
       selectionType: fullEntry.selectionType || "",
       deadline: fullEntry.deadline || "",
       note: fullEntry.note || "",
-      myPageUrl: companyUrls[fullEntry.company] || "",
+      myPageUrl: cData.myPageUrl || "",
+      recruitmentUrl: cData.recruitmentUrl || "",
       createdAt: fullEntry.createdAt,
       qas: fullEntry.qas
         ? fullEntry.qas.map((q) => ({
@@ -1852,7 +2086,7 @@ export default function App() {
   const handleExport = () => {
     const exportData = {
       entries: entries,
-      companyUrls: companyUrls,
+      companyData: companyData,
       exportedAt: getCurrentJSTTime(),
     };
     const dataStr = JSON.stringify(exportData, null, 2);
@@ -1880,13 +2114,20 @@ export default function App() {
       try {
         const importedJson = JSON.parse(e.target.result);
         let entriesToLoad = [];
-        let urlsToLoad = {};
+        let dataToLoad = {};
 
         if (Array.isArray(importedJson)) {
           entriesToLoad = importedJson;
         } else if (importedJson && Array.isArray(importedJson.entries)) {
           entriesToLoad = importedJson.entries;
-          if (importedJson.companyUrls) urlsToLoad = importedJson.companyUrls;
+
+          if (importedJson.companyData) {
+            dataToLoad = importedJson.companyData;
+          } else if (importedJson.companyUrls) {
+            Object.entries(importedJson.companyUrls).forEach(([name, val]) => {
+              dataToLoad[name] = normalizeCompanyData(val);
+            });
+          }
         } else {
           alert(
             "無効なファイル形式です。es-data形式のJSONファイルを選択してください。"
@@ -1899,16 +2140,29 @@ export default function App() {
             "現在のデータを破棄して、ファイルを読み込みますか?\n(未保存のデータは失われます)"
           )
         ) {
-          let migratedUrls = { ...urlsToLoad };
+          let migratedData = { ...dataToLoad };
           const normalizedData = entriesToLoad.map((item) => {
-            if (item.myPageUrl && item.company) {
-              migratedUrls[item.company] = item.myPageUrl;
+            if (item.company) {
+              const currentData =
+                migratedData[item.company] || normalizeCompanyData({});
+              let updated = false;
+              if (item.myPageUrl && !currentData.myPageUrl) {
+                currentData.myPageUrl = item.myPageUrl;
+                updated = true;
+              }
+              if (item.industry && !currentData.industry) {
+                currentData.industry = item.industry;
+                updated = true;
+              }
+              if (updated) {
+                migratedData[item.company] = currentData;
+              }
             }
-            return sanitizeEntry(item);
+            return sanitizeEntry({ ...item, industry: "" });
           });
 
           setEntries(normalizedData);
-          setCompanyUrls((prev) => ({ ...prev, ...migratedUrls }));
+          setCompanyData((prev) => ({ ...prev, ...migratedData }));
         }
       } catch (error) {
         console.error(error);
@@ -1967,6 +2221,31 @@ export default function App() {
       qas: p.qas.map((q) => (q.id === id ? { ...q, [f]: v } : q)),
     }));
 
+  // --- Company Data Calculation ---
+  const companyDataList = useMemo(() => {
+    const set = new Set();
+    entries.forEach((e) => {
+      if (e.company) set.add(e.company);
+    });
+    Object.keys(companyData).forEach((c) => set.add(c));
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "ja"));
+  }, [entries, companyData]);
+
+  const openCompanyEdit = (company) => {
+    setEditingCompanyDataName(company);
+    setIsCompanyDataEditOpen(true);
+  };
+
+  const toggleColumn = (columnId) => {
+    setVisibleColumns((prev) => {
+      if (prev.includes(columnId)) {
+        return prev.filter((id) => id !== columnId);
+      } else {
+        return [...prev, columnId];
+      }
+    });
+  };
+
   // --- Render ---
   return (
     <div
@@ -1989,7 +2268,6 @@ export default function App() {
                 ES Manager
               </h1>
             </div>
-            {/* Mobile View Toggle */}
             {view === "form" && (
               <button
                 onClick={(e) => {
@@ -2043,13 +2321,6 @@ export default function App() {
                   />
                 </label>
                 <button
-                  onClick={() => setIsUrlSettingsOpen(true)}
-                  className="bg-white text-slate-600 border border-slate-200 p-2 rounded-lg hover:bg-slate-50 hover:text-indigo-600 transition-colors"
-                  title="企業URL設定"
-                >
-                  <LinkIcon size={18} />
-                </button>
-                <button
                   onClick={() => setIsSettingsOpen(true)}
                   className="bg-white text-slate-600 border border-slate-200 p-2 rounded-lg hover:bg-slate-50 hover:text-indigo-600 transition-colors"
                   title="設定"
@@ -2099,7 +2370,7 @@ export default function App() {
         </div>
 
         {view === "list" && (
-          <div className="max-w-7xl mx-auto mt-3 flex gap-1 overflow-x-auto pb-1">
+          <div className="max-w-7xl mx-auto mt-3 flex gap-1 overflow-x-auto pb-1 items-center">
             {[
               { id: "company", icon: Building2, label: "会社別" },
               { id: "status", icon: Check, label: "ステータス別" },
@@ -2122,11 +2393,28 @@ export default function App() {
                 {mode.label}
               </button>
             ))}
+
+            <div className="w-px h-6 bg-slate-300 mx-1 shrink-0"></div>
+
+            <button
+              onClick={() => {
+                setViewMode("company_data");
+                scrollToTop("smooth");
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap ${
+                viewMode === "company_data"
+                  ? "bg-indigo-600 text-white shadow-sm"
+                  : "bg-white text-slate-500 border border-slate-200 hover:bg-slate-50"
+              }`}
+            >
+              <Database size={14} />
+              企業データ
+            </button>
           </div>
         )}
       </header>
 
-      {/* Main Container with Sidebar Split/Overlay Logic */}
+      {/* Main Container */}
       <div className="flex flex-1 overflow-hidden relative">
         <main
           className={`flex-1 overflow-y-auto p-4 sm:p-6 transition-all duration-300 ease-in-out ${
@@ -2146,16 +2434,19 @@ export default function App() {
                         右上のアップロードボタンからJSONを読み込むか、新規作成してください。
                       </div>
                     )}
-                    {processedCompanyEntries.map((entry) => (
-                      <ESEntryDisplay
-                        key={entry.id}
-                        entry={entry}
-                        onEdit={startEdit}
-                        onDelete={handleDelete}
-                        companyUrl={companyUrls[entry.company]}
-                        highlight={searchQuery}
-                      />
-                    ))}
+                    {processedCompanyEntries.map((entry) => {
+                      const cData = companyData[entry.company] || {};
+                      return (
+                        <ESEntryDisplay
+                          key={entry.id}
+                          entry={{ ...entry, industry: cData.industry }}
+                          onEdit={startEdit}
+                          onDelete={handleDelete}
+                          companyUrl={cData.myPageUrl}
+                          highlight={searchQuery}
+                        />
+                      );
+                    })}
                   </div>
                 )}
 
@@ -2246,16 +2537,22 @@ export default function App() {
                               </span>
                             </div>
                             <div className="space-y-6">
-                              {entries.map((entry) => (
-                                <ESEntryDisplay
-                                  key={entry.id}
-                                  entry={entry}
-                                  onEdit={startEdit}
-                                  onDelete={handleDelete}
-                                  companyUrl={companyUrls[entry.company]}
-                                  highlight={searchQuery}
-                                />
-                              ))}
+                              {entries.map((entry) => {
+                                const cData = companyData[entry.company] || {};
+                                return (
+                                  <ESEntryDisplay
+                                    key={entry.id}
+                                    entry={{
+                                      ...entry,
+                                      industry: cData.industry,
+                                    }}
+                                    onEdit={startEdit}
+                                    onDelete={handleDelete}
+                                    companyUrl={cData.myPageUrl}
+                                    highlight={searchQuery}
+                                  />
+                                );
+                              })}
                             </div>
                           </div>
                         );
@@ -2281,18 +2578,196 @@ export default function App() {
                             {status}
                           </h3>
                           <div className="space-y-6">
-                            {entriesByStatus[status].map((entry) => (
-                              <ESEntryDisplay
-                                key={entry.id}
-                                entry={entry}
-                                onEdit={startEdit}
-                                onDelete={handleDelete}
-                                companyUrl={companyUrls[entry.company]}
-                              />
-                            ))}
+                            {entriesByStatus[status].map((entry) => {
+                              const cData = companyData[entry.company] || {};
+                              return (
+                                <ESEntryDisplay
+                                  key={entry.id}
+                                  entry={{ ...entry, industry: cData.industry }}
+                                  onEdit={startEdit}
+                                  onDelete={handleDelete}
+                                  companyUrl={cData.myPageUrl}
+                                />
+                              );
+                            })}
                           </div>
                         </div>
                       ))}
+                  </div>
+                )}
+
+                {/* View: Company Data */}
+                {viewMode === "company_data" && (
+                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden relative">
+                    <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                      <div className="flex items-center gap-4">
+                        <h3 className="font-bold text-slate-700 flex items-center gap-2">
+                          <Database size={18} className="text-indigo-600" />
+                          企業データ一覧
+                        </h3>
+                        <span className="text-xs text-slate-500">
+                          {companyDataList.length}社
+                        </span>
+                      </div>
+                      <div className="relative">
+                        <button
+                          onClick={() =>
+                            setIsColumnSelectorOpen(!isColumnSelectorOpen)
+                          }
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 text-slate-600 rounded-lg text-xs font-bold hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 transition-colors"
+                        >
+                          <Columns size={14} /> 表示項目設定
+                        </button>
+
+                        {isColumnSelectorOpen && (
+                          <>
+                            <div
+                              className="fixed inset-0 z-10"
+                              onClick={() => setIsColumnSelectorOpen(false)}
+                            />
+                            <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-slate-200 rounded-lg shadow-lg z-20 p-2 animate-in fade-in zoom-in-95 duration-200">
+                              <div className="text-xs font-bold text-slate-500 px-2 py-1 mb-1 border-b border-slate-100">
+                                表示する列を選択
+                              </div>
+                              <div className="max-h-60 overflow-y-auto space-y-1">
+                                {COMPANY_DATA_COLUMNS.map((col) => (
+                                  <label
+                                    key={col.id}
+                                    className="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-50 rounded cursor-pointer"
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={visibleColumns.includes(col.id)}
+                                      onChange={() => toggleColumn(col.id)}
+                                      className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
+                                    />
+                                    <span className="text-xs text-slate-700">
+                                      {col.label}
+                                    </span>
+                                  </label>
+                                ))}
+                              </div>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="overflow-x-auto pb-2">
+                      <table className="w-full text-sm text-left border-collapse">
+                        <thead className="text-xs text-slate-500 uppercase bg-slate-50/50 border-b border-slate-100">
+                          <tr>
+                            {COMPANY_DATA_COLUMNS.map((col) => {
+                              if (!visibleColumns.includes(col.id)) return null;
+                              return (
+                                <th
+                                  key={col.id}
+                                  className="px-6 py-3 font-bold whitespace-nowrap"
+                                  style={{ minWidth: col.minWidth }}
+                                >
+                                  {col.label}
+                                </th>
+                              );
+                            })}
+                            <th className="px-6 py-3 font-bold text-right sticky right-0 bg-slate-50/95 backdrop-blur-sm border-l border-slate-100 z-10 shadow-sm w-[80px]">
+                              操作
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {companyDataList.length === 0 && (
+                            <tr>
+                              <td
+                                colSpan={visibleColumns.length + 1}
+                                className="px-6 py-8 text-center text-slate-400"
+                              >
+                                データがありません
+                              </td>
+                            </tr>
+                          )}
+                          {companyDataList.map((company) => {
+                            const data =
+                              companyData[company] || normalizeCompanyData({});
+                            return (
+                              <tr
+                                key={company}
+                                className="bg-white hover:bg-slate-50 transition-colors group"
+                              >
+                                {COMPANY_DATA_COLUMNS.map((col) => {
+                                  if (!visibleColumns.includes(col.id))
+                                    return null;
+
+                                  let content = null;
+                                  if (col.id === "company") {
+                                    content = (
+                                      <HighlightText
+                                        text={company}
+                                        highlight={searchQuery}
+                                      />
+                                    );
+                                  } else if (col.id === "myPageUrl") {
+                                    content = data.myPageUrl ? (
+                                      <a
+                                        href={data.myPageUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-indigo-600 hover:text-indigo-800 hover:underline flex items-center gap-1.5 w-fit"
+                                      >
+                                        <ExternalLink size={14} />
+                                        <span className="truncate max-w-[180px]">
+                                          {data.myPageUrl}
+                                        </span>
+                                      </a>
+                                    ) : (
+                                      <span className="text-slate-400">-</span>
+                                    );
+                                  } else if (col.id === "selectionFlow") {
+                                    content =
+                                      data.selectionFlow?.length > 0 ? (
+                                        <span
+                                          className="block whitespace-pre-wrap leading-relaxed"
+                                          title={data.selectionFlow.join(" → ")}
+                                        >
+                                          {data.selectionFlow.join(" → ")}
+                                        </span>
+                                      ) : (
+                                        <span className="text-slate-400">
+                                          -
+                                        </span>
+                                      );
+                                  } else {
+                                    content = data[col.id] || (
+                                      <span className="text-slate-400">-</span>
+                                    );
+                                  }
+
+                                  return (
+                                    <td
+                                      key={col.id}
+                                      className={`px-6 py-4 ${
+                                        col.id === "company"
+                                          ? "font-bold text-slate-700"
+                                          : "text-slate-600"
+                                      }`}
+                                    >
+                                      {content}
+                                    </td>
+                                  );
+                                })}
+                                <td className="px-6 py-4 text-right sticky right-0 bg-white group-hover:bg-slate-50 border-l border-slate-100 z-10 shadow-sm">
+                                  <button
+                                    onClick={() => openCompanyEdit(company)}
+                                    className="px-3 py-1.5 bg-white border border-slate-200 text-slate-600 rounded-lg text-xs font-bold hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 transition-colors whitespace-nowrap"
+                                  >
+                                    編集
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 )}
               </div>
@@ -2322,69 +2797,94 @@ export default function App() {
                         <label className="text-xs font-bold text-slate-500">
                           企業名 <span className="text-red-500">*</span>
                         </label>
-                        <input
-                          className="w-full px-3 py-2 border rounded-lg mt-1 outline-none focus:border-indigo-500"
-                          value={formData.company}
-                          onChange={(e) => {
-                            const newCompany = e.target.value;
-                            setFormData({
-                              ...formData,
-                              company: newCompany,
-                              myPageUrl:
-                                companyUrls[newCompany] ||
-                                formData.myPageUrl ||
-                                "",
-                            });
-                          }}
-                          placeholder="例: 株式会社Tech"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs font-bold text-slate-500">
-                          マイページURL
-                        </label>
                         <div className="relative mt-1">
                           <input
-                            type="url"
-                            className="w-full pl-3 pr-8 py-2 border rounded-lg outline-none focus:border-indigo-500"
-                            value={formData.myPageUrl}
-                            onChange={(e) =>
+                            className="w-full pl-3 pr-16 py-2 border rounded-lg outline-none focus:border-indigo-500"
+                            value={formData.company}
+                            onChange={(e) => {
+                              const newCompany = e.target.value;
+                              const cData =
+                                companyData[newCompany] ||
+                                normalizeCompanyData({});
                               setFormData({
                                 ...formData,
-                                myPageUrl: e.target.value,
-                              })
-                            }
-                            placeholder="https://..."
+                                company: newCompany,
+                                myPageUrl: cData.myPageUrl || "",
+                                recruitmentUrl: cData.recruitmentUrl || "",
+                                industry: formData.industry || cData.industry,
+                              });
+                            }}
+                            placeholder="例: 株式会社Tech"
                           />
-                          {formData.myPageUrl && (
-                            <a
-                              href={formData.myPageUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-indigo-600"
-                              title="マイページを開く"
-                            >
-                              <ExternalLink size={16} />
-                            </a>
-                          )}
+                          <div className="absolute right-1 top-1/2 -translate-y-1/2 flex gap-1">
+                            {formData.recruitmentUrl && (
+                              <a
+                                href={formData.recruitmentUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-md transition-colors"
+                                title="採用HPを開く"
+                                tabIndex="-1"
+                              >
+                                <Briefcase size={16} />
+                              </a>
+                            )}
+                            {formData.myPageUrl && (
+                              <a
+                                href={formData.myPageUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors"
+                                title="マイページを開く"
+                                tabIndex="-1"
+                              >
+                                <ExternalLink size={16} />
+                              </a>
+                            )}
+                          </div>
                         </div>
                       </div>
-                      <div>
-                        <label className="text-xs font-bold text-slate-500">
-                          業界・職種
-                        </label>
-                        <input
-                          className="w-full px-3 py-2 border rounded-lg mt-1 outline-none focus:border-indigo-500"
-                          value={formData.industry}
-                          onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              industry: e.target.value,
-                            })
-                          }
-                          placeholder="例: IT、エンジニア"
-                        />
-                      </div>
+
+                      {!editingId && (
+                        <>
+                          <div>
+                            <label className="text-xs font-bold text-slate-500">
+                              マイページURL
+                            </label>
+                            <div className="relative mt-1">
+                              <input
+                                type="url"
+                                className="w-full pl-3 pr-8 py-2 border rounded-lg outline-none focus:border-indigo-500"
+                                value={formData.myPageUrl}
+                                onChange={(e) =>
+                                  setFormData({
+                                    ...formData,
+                                    myPageUrl: e.target.value,
+                                  })
+                                }
+                                placeholder="https://..."
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <label className="text-xs font-bold text-slate-500">
+                              業界・職種
+                            </label>
+                            <input
+                              className="w-full px-3 py-2 border rounded-lg mt-1 outline-none focus:border-indigo-500"
+                              value={formData.industry}
+                              onChange={(e) =>
+                                setFormData({
+                                  ...formData,
+                                  industry: e.target.value,
+                                })
+                              }
+                              placeholder="例: IT、エンジニア"
+                            />
+                          </div>
+                        </>
+                      )}
+
                       <div>
                         <label className="text-xs font-bold text-slate-500">
                           ステータス
@@ -2736,12 +3236,12 @@ export default function App() {
         onSettingsSave={handleSettingsSave}
       />
 
-      <CompanyUrlModal
-        isOpen={isUrlSettingsOpen}
-        onClose={() => setIsUrlSettingsOpen(false)}
-        entries={entries}
-        urls={companyUrls}
-        onSave={handleSaveUrls}
+      <CompanyDataEditModal
+        isOpen={isCompanyDataEditOpen}
+        onClose={() => setIsCompanyDataEditOpen(false)}
+        companyName={editingCompanyDataName}
+        initialData={companyData[editingCompanyDataName]}
+        onSave={handleSaveCompanyData}
       />
 
       {toast && (
