@@ -48,6 +48,7 @@ import {
 // --- Constants ---
 const STORAGE_KEY_SETTINGS = "ES_MANAGER_SETTINGS";
 const STORAGE_KEY_DATA = "ES_MANAGER_DATA";
+const STORAGE_KEY_VIEW_SETTINGS = "ES_MANAGER_VIEW_SETTINGS";
 const HEADER_HEIGHT = "57px";
 
 const COMPANY_DATA_COLUMNS = [
@@ -1495,11 +1496,6 @@ const ESEntryDisplay = ({ entry, onEdit, onDelete, companyUrl, highlight }) => {
           <StatusBadge status={entry.status} />
           <span className="text-xs text-slate-500 flex items-center gap-1">
             <Briefcase size={12} />
-            {/* industry は entry ではなく companyData から表示するのが理想だが、
-               ESEntryDisplay は entry オブジェクトを受け取る。
-               呼び出し元で entry.industry を渡すか、このコンポーネントを修正する必要がある。
-               今回は呼び出し元でマージされているか、別途処理される。
-               ここでは単純に表示するだけにする。 */}
             <HighlightText text={entry.industry} highlight={highlight} />
           </span>
           {entry.selectionType && (
@@ -1626,18 +1622,28 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
-  // companyUrls から companyData (詳細オブジェクト) に変更
   const [companyData, setCompanyData] = useState({});
   const [isCompanyDataEditOpen, setIsCompanyDataEditOpen] = useState(false);
   const [editingCompanyDataName, setEditingCompanyDataName] = useState(null);
-  const [visibleColumns, setVisibleColumns] = useState([
-    "company",
-    "industry",
-    "myPageUrl",
-    "location",
-    "selectionFlow",
-    "action",
-  ]);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [visibleColumns, setVisibleColumns] = useState(() => {
+    const saved = localStorage.getItem(STORAGE_KEY_VIEW_SETTINGS);
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error("Failed to load view settings", e);
+      }
+    }
+    return [
+      "company",
+      "industry",
+      "myPageUrl",
+      "location",
+      "selectionFlow",
+      "action",
+    ];
+  });
   const [isColumnSelectorOpen, setIsColumnSelectorOpen] = useState(false);
 
   const [isRefPanelOpen, setIsRefPanelOpen] = useState(false);
@@ -1686,7 +1692,6 @@ export default function App() {
             loadedCompanyData = parsed.companyData;
           }
 
-          // データ移行ロジック (entry.industry -> companyData.industry)
           let hasMigration = false;
           const migratedEntries = loadedEntries.map((entry) => {
             if (entry.industry && entry.company) {
@@ -1697,7 +1702,6 @@ export default function App() {
                 loadedCompanyData[entry.company] = currentData;
                 hasMigration = true;
               }
-              // エントリー側の industry は空にする
               return { ...entry, industry: "" };
             }
             return entry;
@@ -1706,8 +1710,6 @@ export default function App() {
           setEntries(migratedEntries);
           setCompanyData(loadedCompanyData);
           if (hasMigration) {
-            // マイグレーションが発生したら即座に保存すべきだが、
-            // autoSave が true なら次の useEffect で保存されるためここではセットのみ
           }
         } catch (e) {
           console.error("Failed to parse auto-saved data", e);
@@ -1731,6 +1733,13 @@ export default function App() {
       localStorage.removeItem(STORAGE_KEY_DATA);
     }
   }, [entries, companyData, appSettings.autoSave, isInitialized]);
+
+  useEffect(() => {
+    localStorage.setItem(
+      STORAGE_KEY_VIEW_SETTINGS,
+      JSON.stringify(visibleColumns)
+    );
+  }, [visibleColumns]);
 
   // --- Effects: BeforeUnload ---
   useEffect(() => {
@@ -1950,30 +1959,18 @@ export default function App() {
     if (!formData.company) return;
 
     try {
-      const existingData = companyData[formData.company]
-        ? { ...companyData[formData.company] }
+      const oldCompany = initialFormState?.company;
+      const newCompany = formData.company;
+      const isRenaming = oldCompany && oldCompany !== newCompany;
+
+      const existingData = companyData[newCompany]
+        ? { ...companyData[newCompany] }
         : normalizeCompanyData({});
 
-      let shouldUpdateCompanyData = false;
-      if (formData.myPageUrl && !existingData.myPageUrl) {
-        existingData.myPageUrl = formData.myPageUrl;
-        shouldUpdateCompanyData = true;
-      }
-      if (formData.recruitmentUrl && !existingData.recruitmentUrl) {
+      if (formData.myPageUrl) existingData.myPageUrl = formData.myPageUrl;
+      if (formData.recruitmentUrl)
         existingData.recruitmentUrl = formData.recruitmentUrl;
-        shouldUpdateCompanyData = true;
-      }
-      if (formData.industry && !existingData.industry) {
-        existingData.industry = formData.industry;
-        shouldUpdateCompanyData = true;
-      }
-
-      if (shouldUpdateCompanyData) {
-        setCompanyData((prev) => ({
-          ...prev,
-          [formData.company]: existingData,
-        }));
-      }
+      if (formData.industry) existingData.industry = formData.industry;
 
       const currentId =
         editingId ||
@@ -1988,13 +1985,33 @@ export default function App() {
       };
       const sanitized = sanitizeEntry(entryData);
 
-      setEntries((prev) => {
-        const exists = prev.some((e) => e.id === currentId);
+      setEntries((prevEntries) => {
+        let newEntries;
+        const exists = prevEntries.some((e) => e.id === currentId);
         if (exists) {
-          return prev.map((e) => (e.id === currentId ? sanitized : e));
+          newEntries = prevEntries.map((e) =>
+            e.id === currentId ? sanitized : e
+          );
         } else {
-          return [sanitized, ...prev];
+          newEntries = [sanitized, ...prevEntries];
         }
+
+        setCompanyData((prevData) => {
+          const nextData = { ...prevData };
+          nextData[newCompany] = existingData;
+
+          if (isRenaming) {
+            const isStillUsed = newEntries.some(
+              (e) => e.company === oldCompany
+            );
+            if (!isStillUsed) {
+              delete nextData[oldCompany];
+            }
+          }
+          return nextData;
+        });
+
+        return newEntries;
       });
 
       if (closeAfterSave) {
@@ -2019,6 +2036,16 @@ export default function App() {
     )
       return;
     setEntries((prev) => prev.filter((e) => e.id !== id));
+  };
+
+  const handleDeleteCompanyData = (companyName) => {
+    if (confirm(`${companyName}のデータを削除しますか？`)) {
+      setCompanyData((prev) => {
+        const next = { ...prev };
+        delete next[companyName];
+        return next;
+      });
+    }
   };
 
   const startEdit = (entry) => {
@@ -2609,7 +2636,18 @@ export default function App() {
                           {companyDataList.length}社
                         </span>
                       </div>
-                      <div className="relative">
+                      <div className="relative flex items-center gap-2">
+                        <button
+                          onClick={() => setIsEditMode(!isEditMode)}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-xs font-bold transition-colors ${
+                            isEditMode
+                              ? "bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700"
+                              : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                          }`}
+                        >
+                          <Edit2 size={14} />
+                          {isEditMode ? "編集を終了" : "編集"}
+                        </button>
                         <button
                           onClick={() =>
                             setIsColumnSelectorOpen(!isColumnSelectorOpen)
@@ -2627,10 +2665,12 @@ export default function App() {
                             />
                             <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-slate-200 rounded-lg shadow-lg z-20 p-2 animate-in fade-in zoom-in-95 duration-200">
                               <div className="text-xs font-bold text-slate-500 px-2 py-1 mb-1 border-b border-slate-100">
-                                表示する列を選択
+                                表示する項目を選択
                               </div>
                               <div className="max-h-60 overflow-y-auto space-y-1">
-                                {COMPANY_DATA_COLUMNS.map((col) => (
+                                {COMPANY_DATA_COLUMNS.filter(
+                                  (col) => col.id !== "company"
+                                ).map((col) => (
                                   <label
                                     key={col.id}
                                     className="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-50 rounded cursor-pointer"
@@ -2662,23 +2702,31 @@ export default function App() {
                               return (
                                 <th
                                   key={col.id}
-                                  className="px-6 py-3 font-bold whitespace-nowrap"
+                                  className={`px-6 py-3 font-bold whitespace-nowrap ${
+                                    col.id === "company"
+                                      ? "sticky left-0 z-20 bg-slate-50 border-r border-slate-200"
+                                      : ""
+                                  }`}
                                   style={{ minWidth: col.minWidth }}
                                 >
                                   {col.label}
                                 </th>
                               );
                             })}
-                            <th className="px-6 py-3 font-bold text-right sticky right-0 bg-slate-50/95 backdrop-blur-sm border-l border-slate-100 z-10 shadow-sm w-[80px]">
-                              操作
-                            </th>
+                            {isEditMode && (
+                              <th className="px-6 py-3 font-bold text-right sticky right-0 bg-slate-50/95 backdrop-blur-sm border-l border-slate-100 z-10 shadow-sm w-[130px]">
+                                操作
+                              </th>
+                            )}
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                           {companyDataList.length === 0 && (
                             <tr>
                               <td
-                                colSpan={visibleColumns.length + 1}
+                                colSpan={
+                                  visibleColumns.length + (isEditMode ? 1 : 0)
+                                }
                                 className="px-6 py-8 text-center text-slate-400"
                               >
                                 データがありません
@@ -2721,6 +2769,33 @@ export default function App() {
                                     ) : (
                                       <span className="text-slate-400">-</span>
                                     );
+                                  } else if (col.id === "recruitmentUrl") {
+                                    content = data.recruitmentUrl ? (
+                                      <a
+                                        href={data.recruitmentUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-indigo-600 hover:text-indigo-800 hover:underline flex items-center gap-1.5 w-fit"
+                                      >
+                                        <ExternalLink size={14} />
+                                        <span className="truncate max-w-[180px]">
+                                          {data.recruitmentUrl}
+                                        </span>
+                                      </a>
+                                    ) : (
+                                      <span className="text-slate-400">-</span>
+                                    );
+                                  } else if (col.id === "location") {
+                                    content = data.location ? (
+                                      <div
+                                        className="truncate max-w-[150px]"
+                                        title={data.location}
+                                      >
+                                        {data.location}
+                                      </div>
+                                    ) : (
+                                      <span className="text-slate-400">-</span>
+                                    );
                                   } else if (col.id === "selectionFlow") {
                                     content =
                                       data.selectionFlow?.length > 0 ? (
@@ -2746,7 +2821,7 @@ export default function App() {
                                       key={col.id}
                                       className={`px-6 py-4 ${
                                         col.id === "company"
-                                          ? "font-bold text-slate-700"
+                                          ? "font-bold text-slate-700 sticky left-0 z-10 bg-white group-hover:bg-slate-50 border-r border-slate-100"
                                           : "text-slate-600"
                                       }`}
                                     >
@@ -2754,14 +2829,41 @@ export default function App() {
                                     </td>
                                   );
                                 })}
-                                <td className="px-6 py-4 text-right sticky right-0 bg-white group-hover:bg-slate-50 border-l border-slate-100 z-10 shadow-sm">
-                                  <button
-                                    onClick={() => openCompanyEdit(company)}
-                                    className="px-3 py-1.5 bg-white border border-slate-200 text-slate-600 rounded-lg text-xs font-bold hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 transition-colors whitespace-nowrap"
-                                  >
-                                    編集
-                                  </button>
-                                </td>
+                                {isEditMode && (
+                                  <td className="px-6 py-4 text-right sticky right-0 bg-white group-hover:bg-slate-50 border-l border-slate-100 z-10 shadow-sm whitespace-nowrap">
+                                    <button
+                                      onClick={() => openCompanyEdit(company)}
+                                      className="px-3 py-1.5 bg-white border border-slate-200 text-slate-600 rounded-lg text-xs font-bold hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 transition-colors whitespace-nowrap"
+                                    >
+                                      編集
+                                    </button>
+                                    {(() => {
+                                      const hasEntries = entries.some(
+                                        (e) => e.company === company
+                                      );
+                                      return (
+                                        <button
+                                          onClick={() =>
+                                            handleDeleteCompanyData(company)
+                                          }
+                                          disabled={hasEntries}
+                                          title={
+                                            hasEntries
+                                              ? "ESが存在しています"
+                                              : ""
+                                          }
+                                          className={`ml-2 px-3 py-1.5 bg-white border rounded-lg text-xs font-bold transition-colors whitespace-nowrap ${
+                                            hasEntries
+                                              ? "text-slate-300 border-slate-100 cursor-not-allowed"
+                                              : "text-rose-500 border-slate-200 hover:bg-rose-50 hover:border-rose-200"
+                                          }`}
+                                        >
+                                          削除
+                                        </button>
+                                      );
+                                    })()}
+                                  </td>
+                                )}
                               </tr>
                             );
                           })}
