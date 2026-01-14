@@ -360,15 +360,41 @@ const CompanyDataEditModal = ({
   onClose,
   companyName,
   initialData,
+  existingCompanies = [],
   onSave,
 }) => {
   const [data, setData] = useState(normalizeCompanyData({}));
+  const [newCompanyName, setNewCompanyName] = useState("");
+  const [nameError, setNameError] = useState("");
 
   useEffect(() => {
     if (isOpen) {
       setData(normalizeCompanyData(initialData || {}));
+      setNewCompanyName(companyName || "");
+      setNameError("");
     }
-  }, [isOpen, initialData]);
+  }, [isOpen, initialData, companyName]);
+
+  const handleNameChange = (e) => {
+    const val = e.target.value;
+    setNewCompanyName(val);
+
+    if (!val.trim()) {
+      setNameError("企業名を入力してください");
+      return;
+    }
+
+    if (companyName && val.trim() === companyName) {
+      setNameError("");
+      return;
+    }
+
+    if (existingCompanies.includes(val.trim())) {
+      setNameError("この企業名は既に登録されています");
+    } else {
+      setNameError("");
+    }
+  };
 
   const handleChange = (field, value) => {
     setData((prev) => ({ ...prev, [field]: value }));
@@ -378,6 +404,22 @@ const CompanyDataEditModal = ({
     const newFlow = [...data.selectionFlow];
     newFlow[index] = value;
     setData((prev) => ({ ...prev, selectionFlow: newFlow }));
+  };
+
+  const handleSaveClick = () => {
+    const targetName = newCompanyName.trim();
+
+    if (!targetName) {
+      alert("企業名を入力してください。");
+      return;
+    }
+
+    if (nameError) {
+      return;
+    }
+
+    onSave(targetName, data, companyName);
+    onClose();
   };
 
   const addFlowStep = () => {
@@ -400,7 +442,9 @@ const CompanyDataEditModal = ({
         <div className="px-6 py-4 border-b flex justify-between items-center bg-slate-50 rounded-t-xl">
           <h3 className="font-bold text-slate-700 flex items-center gap-2">
             <Building2 size={18} className="text-indigo-600" />
-            企業データ編集: {companyName}
+            {companyName
+              ? `企業データ編集: ${companyName}`
+              : "企業データ新規作成"}
           </h3>
           <button onClick={onClose} title="閉じる">
             <X size={20} className="text-slate-400 hover:text-slate-600" />
@@ -408,6 +452,34 @@ const CompanyDataEditModal = ({
         </div>
 
         <div className="p-6 overflow-y-auto flex-1 space-y-5">
+          <div>
+            <label className="text-xs font-bold text-slate-500 mb-1 block">
+              企業名 <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <Building2
+                size={14}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+              />
+              <input
+                type="text"
+                className={`w-full pl-9 pr-3 py-2 border rounded-lg text-sm outline-none font-bold ${
+                  nameError
+                    ? "border-rose-300 focus:border-rose-500 bg-rose-50 text-rose-900"
+                    : "focus:border-indigo-500"
+                }`}
+                placeholder="例: 株式会社Tech"
+                value={newCompanyName}
+                onChange={handleNameChange}
+                autoFocus
+              />
+            </div>
+            {nameError && (
+              <p className="text-xs text-rose-500 mt-1 font-bold flex items-center gap-1 animate-in slide-in-from-top-1">
+                <AlertTriangle size={12} /> {nameError}
+              </p>
+            )}
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="text-xs font-bold text-slate-500 mb-1 block">
@@ -617,11 +689,9 @@ const CompanyDataEditModal = ({
             キャンセル
           </button>
           <button
-            onClick={() => {
-              onSave(companyName, data);
-              onClose();
-            }}
-            className="px-4 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm"
+            onClick={handleSaveClick}
+            disabled={!!nameError || (!companyName && !newCompanyName)}
+            className="px-4 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all"
           >
             保存する
           </button>
@@ -1892,11 +1962,32 @@ export default function App() {
   }, [processedCompanyEntries]);
 
   // --- Handlers: Data & Form ---
-  const handleSaveCompanyData = (companyName, newData) => {
-    setCompanyData((prev) => ({
-      ...prev,
-      [companyName]: newData,
-    }));
+  const handleSaveCompanyData = (newCompanyName, newData, oldCompanyName) => {
+    if (newCompanyName !== oldCompanyName && companyData[newCompanyName]) {
+      alert(`企業名『${newCompanyName}』のデータは既に存在します。`);
+      return;
+    }
+
+    setCompanyData((prev) => {
+      const next = { ...prev };
+
+      if (oldCompanyName && oldCompanyName !== newCompanyName) {
+        delete next[oldCompanyName];
+      }
+
+      next[newCompanyName] = newData;
+      return next;
+    });
+
+    if (oldCompanyName && oldCompanyName !== newCompanyName) {
+      setEntries((prev) =>
+        prev.map((entry) =>
+          entry.company === oldCompanyName
+            ? { ...entry, company: newCompanyName }
+            : entry
+        )
+      );
+    }
   };
 
   const handleSettingsSave = (newSettings) => {
@@ -1956,21 +2047,51 @@ export default function App() {
   };
 
   const handleSave = (closeAfterSave = true) => {
-    if (!formData.company) return;
+    const newCompany = formData.company?.trim();
+    if (!newCompany) return;
 
     try {
       const oldCompany = initialFormState?.company;
-      const newCompany = formData.company;
       const isRenaming = oldCompany && oldCompany !== newCompany;
+      let shouldDeleteOldData = false;
 
-      const existingData = companyData[newCompany]
-        ? { ...companyData[newCompany] }
-        : normalizeCompanyData({});
+      if (isRenaming) {
+        const targetExists =
+          companyData[newCompany] ||
+          entries.some((e) => e.company === newCompany);
 
-      if (formData.myPageUrl) existingData.myPageUrl = formData.myPageUrl;
+        const oldEntriesCount = entries.filter(
+          (e) => e.company === oldCompany
+        ).length;
+
+        const isLastEntry = oldEntriesCount <= 1;
+
+        if (targetExists) {
+          let msg = `企業名『${newCompany}』は既に存在します。\nこのエントリーを『${newCompany}』に移動・統合しますか？`;
+          if (isLastEntry) {
+            msg += `\n(旧企業名『${oldCompany}』のデータは削除されます)`;
+          }
+          if (!window.confirm(msg)) return;
+        }
+
+        if (isLastEntry) {
+          shouldDeleteOldData = true;
+        }
+      }
+
+      let nextCompanyDataObj = {};
+      if (companyData[newCompany]) {
+        nextCompanyDataObj = { ...companyData[newCompany] };
+      } else if (isRenaming && companyData[oldCompany]) {
+        nextCompanyDataObj = { ...companyData[oldCompany] };
+      } else {
+        nextCompanyDataObj = normalizeCompanyData({});
+      }
+
+      if (formData.myPageUrl) nextCompanyDataObj.myPageUrl = formData.myPageUrl;
       if (formData.recruitmentUrl)
-        existingData.recruitmentUrl = formData.recruitmentUrl;
-      if (formData.industry) existingData.industry = formData.industry;
+        nextCompanyDataObj.recruitmentUrl = formData.recruitmentUrl;
+      if (formData.industry) nextCompanyDataObj.industry = formData.industry;
 
       const currentId =
         editingId ||
@@ -1981,44 +2102,38 @@ export default function App() {
       const entryData = {
         ...formData,
         id: currentId,
+        company: newCompany,
         updatedAt: getCurrentJSTTime(),
       };
       const sanitized = sanitizeEntry(entryData);
 
       setEntries((prevEntries) => {
-        let newEntries;
         const exists = prevEntries.some((e) => e.id === currentId);
         if (exists) {
-          newEntries = prevEntries.map((e) =>
-            e.id === currentId ? sanitized : e
-          );
+          return prevEntries.map((e) => (e.id === currentId ? sanitized : e));
         } else {
-          newEntries = [sanitized, ...prevEntries];
+          return [sanitized, ...prevEntries];
         }
+      });
 
-        setCompanyData((prevData) => {
-          const nextData = { ...prevData };
-          nextData[newCompany] = existingData;
+      setCompanyData((prevData) => {
+        const nextData = { ...prevData };
+        nextData[newCompany] = nextCompanyDataObj;
 
-          if (isRenaming) {
-            const isStillUsed = newEntries.some(
-              (e) => e.company === oldCompany
-            );
-            if (!isStillUsed) {
-              delete nextData[oldCompany];
-            }
-          }
-          return nextData;
-        });
-
-        return newEntries;
+        if (shouldDeleteOldData && oldCompany) {
+          delete nextData[oldCompany];
+        }
+        return nextData;
       });
 
       if (closeAfterSave) {
         resetForm();
       } else {
         setEditingId(currentId);
-        setInitialFormState(JSON.parse(JSON.stringify(formData)));
+        const newFormState = { ...entryData };
+        setFormData(newFormState);
+        setInitialFormState(JSON.parse(JSON.stringify(newFormState)));
+
         setToast("保存しました");
         setTimeout(() => setToast(null), 3000);
       }
@@ -2039,7 +2154,11 @@ export default function App() {
   };
 
   const handleDeleteCompanyData = (companyName) => {
-    if (confirm(`${companyName}のデータを削除しますか？`)) {
+    if (
+      confirm(
+        `${companyName}のデータを削除しますか？(この操作は取り消せません。)`
+      )
+    ) {
       setCompanyData((prev) => {
         const next = { ...prev };
         delete next[companyName];
@@ -2637,6 +2756,16 @@ export default function App() {
                         </span>
                       </div>
                       <div className="relative flex items-center gap-2">
+                        <button
+                          onClick={() => {
+                            setEditingCompanyDataName(null);
+                            setIsCompanyDataEditOpen(true);
+                          }}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 shadow-sm transition-colors"
+                        >
+                          <Plus size={14} /> 新規作成
+                        </button>
+
                         <button
                           onClick={() => setIsEditMode(!isEditMode)}
                           className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-xs font-bold transition-colors ${
@@ -3342,8 +3471,11 @@ export default function App() {
         isOpen={isCompanyDataEditOpen}
         onClose={() => setIsCompanyDataEditOpen(false)}
         companyName={editingCompanyDataName}
-        initialData={companyData[editingCompanyDataName]}
+        initialData={
+          editingCompanyDataName ? companyData[editingCompanyDataName] : {}
+        }
         onSave={handleSaveCompanyData}
+        existingCompanies={companyDataList}
       />
 
       {toast && (
