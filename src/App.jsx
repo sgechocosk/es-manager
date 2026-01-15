@@ -2529,7 +2529,7 @@ export default function App() {
                   setViewMode(mode.id);
                   scrollToTop("smooth");
                 }}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap border ${
                   viewMode === mode.id
                     ? "bg-indigo-600 text-white shadow-sm"
                     : "bg-white text-slate-500 border border-slate-200 hover:bg-slate-50"
@@ -2547,7 +2547,7 @@ export default function App() {
                 setViewMode("company_data");
                 scrollToTop("smooth");
               }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap border ${
                 viewMode === "company_data"
                   ? "bg-indigo-600 text-white shadow-sm"
                   : "bg-white text-slate-500 border border-slate-200 hover:bg-slate-50"
@@ -2763,7 +2763,8 @@ export default function App() {
                           }}
                           className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 shadow-sm transition-colors"
                         >
-                          <Plus size={14} /> 新規作成
+                          <Plus size={14} />{" "}
+                          <span className="hidden sm:inline">新規作成</span>
                         </button>
 
                         <button
@@ -2775,7 +2776,9 @@ export default function App() {
                           }`}
                         >
                           <Edit2 size={14} />
-                          {isEditMode ? "編集を終了" : "編集"}
+                          <span className="hidden sm:inline">
+                            {isEditMode ? "編集を終了" : "編集"}
+                          </span>
                         </button>
                         <button
                           onClick={() =>
@@ -2783,7 +2786,8 @@ export default function App() {
                           }
                           className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 text-slate-600 rounded-lg text-xs font-bold hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 transition-colors"
                         >
-                          <Columns size={14} /> 表示項目設定
+                          <Columns size={14} />{" "}
+                          <span className="hidden sm:inline">表示項目設定</span>
                         </button>
 
                         {isColumnSelectorOpen && (
