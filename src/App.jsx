@@ -41,8 +41,8 @@ import {
   CalendarCheck,
   ListOrdered,
   FileText,
-  Minus,
   Columns,
+  StickyNote,
 } from "lucide-react";
 
 // --- Constants ---
@@ -1696,6 +1696,7 @@ export default function App() {
   const [isCompanyDataEditOpen, setIsCompanyDataEditOpen] = useState(false);
   const [editingCompanyDataName, setEditingCompanyDataName] = useState(null);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [isMemoMode, setIsMemoMode] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState(() => {
     const saved = localStorage.getItem(STORAGE_KEY_VIEW_SETTINGS);
     if (saved) {
@@ -2047,6 +2048,7 @@ export default function App() {
   };
 
   const handleSave = (closeAfterSave = true) => {
+    if (isMemoMode) return;
     const newCompany = formData.company?.trim();
     if (!newCompany) return;
 
@@ -2168,6 +2170,7 @@ export default function App() {
   };
 
   const startEdit = (entry) => {
+    setIsMemoMode(false);
     const fullEntry = entries.find((e) => e.id === entry.id) || entry;
     const cData = companyData[fullEntry.company] || normalizeCompanyData({});
 
@@ -2207,6 +2210,7 @@ export default function App() {
 
   const startNewEntry = () => {
     resetForm();
+    setIsMemoMode(false);
     const newId = Date.now();
     const newState = {
       ...DEFAULT_FORM_DATA,
@@ -2224,6 +2228,30 @@ export default function App() {
     setFormData(newState);
     setInitialFormState(JSON.parse(JSON.stringify(newState)));
     setActiveQAId(newId);
+    setView("form");
+    scrollToTop();
+  };
+
+  const startNewMemo = () => {
+    resetForm();
+    const newId = Date.now();
+    const newState = {
+      ...DEFAULT_FORM_DATA,
+      qas: [
+        {
+          id: newId,
+          question: "",
+          answer: "",
+          tags: "",
+          charLimit: "",
+          note: "",
+        },
+      ],
+    };
+    setFormData(newState);
+    setInitialFormState(JSON.parse(JSON.stringify(newState)));
+    setActiveQAId(newId);
+    setIsMemoMode(true);
     setView("form");
     scrollToTop();
   };
@@ -2476,9 +2504,18 @@ export default function App() {
               </div>
 
               <button
+                onClick={startNewMemo}
+                title="メモ登録"
+                className="bg-orange-500 hover:bg-orange-600 text-white p-2 rounded-lg sm:px-4 flex items-center gap-1.5 shadow-md transition-all active:scale-95 ml-auto shrink-0"
+              >
+                <StickyNote size={18} />
+                <span className="hidden md:inline font-medium">メモ登録</span>
+              </button>
+
+              <button
                 onClick={startNewEntry}
                 title="新規作成"
-                className="bg-indigo-600 hover:bg-indigo-700 text-white p-2 rounded-lg sm:px-4 flex items-center gap-1.5 shadow-md transition-all active:scale-95 ml-auto shrink-0"
+                className="bg-indigo-600 hover:bg-indigo-700 text-white p-2 rounded-lg sm:px-4 flex items-center gap-1.5 shadow-md transition-all active:scale-95 ml-2 shrink-0"
               >
                 <Plus size={18} />
                 <span className="hidden md:inline font-medium">新規作成</span>
@@ -3012,7 +3049,11 @@ export default function App() {
                 <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden animate-in slide-in-from-bottom-4">
                   <div className="px-6 py-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
                     <h2 className="text-lg font-bold text-slate-800">
-                      {editingId ? "編集" : "新規登録"}
+                      {editingId
+                        ? "編集"
+                        : isMemoMode
+                        ? "メモ登録"
+                        : "新規登録"}
                     </h2>
                     <button
                       onClick={() => handleSave(false)}
