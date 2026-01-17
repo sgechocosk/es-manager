@@ -1671,111 +1671,139 @@ const ESEntryDisplay = ({ entry, onEdit, onDelete, companyUrl, highlight }) => {
   );
 };
 
+const DraftDisplay = ({ draft, onEdit, onDelete, highlight }) => {
+  return (
+    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-all duration-300">
+      <div className="px-5 py-3 border-b border-slate-100 bg-gradient-to-r from-orange-50/50 to-white flex justify-between items-center">
+        <div className="flex flex-wrap items-center gap-3">
+          <h2 className="text-lg font-bold text-slate-800">
+            <HighlightText text={draft.title} highlight={highlight} />
+          </h2>
+          <span className="text-xs text-slate-500">
+            {new Date(draft.updatedAt).toLocaleDateString()} 更新
+          </span>
+        </div>
+        <div className="flex gap-1">
+          <button
+            onClick={() => onEdit(draft)}
+            title="編集"
+            className="p-1.5 text-slate-400 hover:text-orange-600 rounded-md transition-colors"
+          >
+            <Edit2 size={16} />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(draft.id);
+            }}
+            title="削除"
+            className="p-1.5 text-slate-400 hover:text-rose-600 rounded-md transition-colors"
+          >
+            <Trash2 size={16} />
+          </button>
+        </div>
+      </div>
+
+      <div className="divide-y divide-slate-50 bg-slate-50/30">
+        {(draft.items || []).map((item, idx) => (
+          <div key={idx} className="p-5 hover:bg-white transition-colors">
+            <div className="flex justify-between items-start gap-4 mb-2">
+              <div className="flex gap-2 flex-1">
+                <span className="text-orange-500 font-black text-sm">Q.</span>
+                <h3 className="font-bold text-sm text-slate-700 leading-relaxed">
+                  <HighlightText text={item.question} highlight={highlight} />
+                </h3>
+              </div>
+              <CopyButton text={item.answer} />
+            </div>
+
+            <p className="text-sm text-slate-600 whitespace-pre-wrap leading-7 pl-6">
+              <HighlightText text={item.answer} highlight={highlight} />
+            </p>
+          </div>
+        ))}
+        {(!draft.items || draft.items.length === 0) && (
+          <div className="p-5 text-sm text-slate-400 text-center">
+            メモがありません
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const DraftEditor = ({
-  initialData,
+  data,
+  onChange,
   onSave,
   onCancel,
-  onDelete,
   companyNames = [],
 }) => {
-  const [title, setTitle] = useState("");
-  const [items, setItems] = useState([]);
   const [activeItemId, setActiveItemId] = useState(null);
 
-  const getDateString = () => {
+  const getTodayDateString = () => {
     const now = new Date();
     return `${now.getMonth() + 1}月${now.getDate()}日のメモ`;
   };
 
-  const getDateStringWithCompany = (company) => {
-    const now = new Date();
-    return `${now.getMonth() + 1}月${now.getDate()}日の${company}のメモ`;
-  };
-
-  useEffect(() => {
-    if (initialData) {
-      setTitle(initialData.title || getDateString());
-      const loadedItems = initialData.items ? [...initialData.items] : [];
-      const lastItem = loadedItems[loadedItems.length - 1];
-      if (
-        !lastItem ||
-        lastItem.question.trim() !== "" ||
-        lastItem.answer.trim() !== ""
-      ) {
-        loadedItems.push({
-          id: `item_${Date.now()}_${Math.random()}`,
-          question: "",
-          answer: "",
-        });
-      }
-      setItems(loadedItems);
-    } else {
-      setTitle(getDateString());
-      setItems([
-        {
-          id: `item_${Date.now()}_${Math.random()}`,
-          question: "",
-          answer: "",
-        },
-      ]);
-    }
-  }, [initialData]);
-
   const handleTitleChange = (e) => {
     const val = e.target.value;
-    const matchedCompany = companyNames.find((c) => c === val);
-    if (matchedCompany) {
-      setTitle(getDateStringWithCompany(matchedCompany));
-    } else {
-      setTitle(val);
+    const isCompanySelect = companyNames.includes(val);
+    let newTitle = val;
+
+    if (isCompanySelect) {
+      const now = new Date();
+      newTitle = `${now.getMonth() + 1}月${now.getDate()}日の${val}のメモ`;
     }
+    onChange({ ...data, title: newTitle });
   };
 
   const handleItemChange = (index, field, val) => {
-    const newItems = [...items];
+    const newItems = [...data.items];
     newItems[index][field] = val;
-    setItems(newItems);
 
-    if (index === items.length - 1) {
+    if (index === newItems.length - 1) {
       const currentItem = newItems[index];
       if (
         currentItem.question.trim() !== "" ||
         currentItem.answer.trim() !== ""
       ) {
-        setItems((prev) => [
-          ...prev,
-          {
-            id: `item_${Date.now()}_${Math.random()}`,
-            question: "",
-            answer: "",
-          },
-        ]);
+        newItems.push({
+          id: `item_${Date.now()}_${Math.random()}`,
+          question: "",
+          answer: "",
+        });
       }
     }
+    onChange({ ...data, items: newItems });
   };
 
-  const handleSaveClick = () => {
-    const validItems = items.filter(
+  const handleSaveClick = (close = true) => {
+    const validItems = data.items.filter(
       (item) => item.question.trim() !== "" || item.answer.trim() !== ""
     );
-    const finalTitle = title.trim() || getDateString();
+    const finalTitle = data.title.trim() || getTodayDateString();
 
-    onSave({
-      title: finalTitle,
-      items: validItems,
-    });
+    onSave({ title: finalTitle, items: validItems }, close);
   };
 
   return (
     <div className="max-w-4xl mx-auto">
+      <style>{`
+        input::-webkit-calendar-picker-indicator {
+          display: none !important;
+        }
+      `}</style>
       <div className="bg-white rounded-2xl shadow-lg border border-orange-200 overflow-hidden animate-in slide-in-from-bottom-4">
         <div className="px-6 py-4 border-b border-orange-100 bg-orange-50/50 flex items-center justify-between sticky top-0 z-20 backdrop-blur-sm">
-          <div className="flex-1 mr-4">
+          <div className="flex-1 mr-4 relative">
             <input
               type="text"
-              className="w-full bg-transparent text-lg font-bold text-slate-800 placeholder-orange-300 outline-none border-b border-transparent focus:border-orange-300 transition-colors"
-              placeholder="タイトルを入力..."
-              value={title}
+              className={`w-full bg-transparent text-lg font-bold outline-none border-b border-transparent focus:border-orange-300 transition-colors ${
+                data.title ? "text-slate-800" : "text-slate-400/70"
+              }`}
+              placeholder={getTodayDateString()}
+              value={data.title}
               onChange={handleTitleChange}
               list="company-list-suggestions"
             />
@@ -1786,28 +1814,19 @@ const DraftEditor = ({
             </datalist>
           </div>
           <div className="flex items-center gap-2">
-            {onDelete && (
-              <button
-                onClick={onDelete}
-                className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-colors"
-                title="削除"
-              >
-                <Trash2 size={20} />
-              </button>
-            )}
             <button
-              onClick={handleSaveClick}
-              className="flex items-center gap-1.5 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-bold shadow-sm transition-all active:scale-95"
+              onClick={() => handleSaveClick(false)}
+              className="p-2 text-slate-400 hover:text-orange-600 hover:bg-orange-100 rounded-full transition-colors"
+              title="保存"
             >
-              <Save size={18} />
-              保存
+              <Save size={20} />
             </button>
           </div>
         </div>
 
         <div className="p-6 space-y-4 min-h-[50vh]">
-          {items.map((item, idx) => {
-            const isLast = idx === items.length - 1;
+          {data.items.map((item, idx) => {
+            const isLast = idx === data.items.length - 1;
             const isActive = activeItemId === item.id;
             return (
               <div
@@ -1856,12 +1875,18 @@ const DraftEditor = ({
           })}
         </div>
 
-        <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-end">
+        <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
           <button
             onClick={onCancel}
-            className="px-4 py-2 text-slate-500 hover:bg-slate-200 rounded-lg font-bold text-sm transition-colors"
+            className="px-5 py-2 rounded-lg text-slate-500 hover:bg-slate-100 font-bold text-sm"
           >
             キャンセル
+          </button>
+          <button
+            onClick={() => handleSaveClick(true)}
+            className="px-6 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white shadow-md font-bold text-sm flex items-center gap-2"
+          >
+            <Save size={16} /> 保存
           </button>
         </div>
       </div>
@@ -1921,6 +1946,9 @@ export default function App() {
 
   const [formData, setFormData] = useState({ ...DEFAULT_FORM_DATA });
   const [initialFormState, setInitialFormState] = useState(null);
+
+  const [draftFormData, setDraftFormData] = useState({ title: "", items: [] });
+  const [initialDraftState, setInitialDraftState] = useState(null);
 
   const [appSettings, setAppSettings] = useState({ autoSave: false });
   const [isInitialized, setIsInitialized] = useState(false);
@@ -2071,10 +2099,28 @@ export default function App() {
   };
 
   const companyNames = useMemo(() => {
-    const set = new Set();
-    entries.forEach((e) => set.add(e.company));
-    Object.keys(companyData).forEach((k) => set.add(k));
-    return Array.from(set).sort((a, b) => a.localeCompare(b, "ja"));
+    const lastUpdateMap = new Map();
+    entries.forEach((e) => {
+      if (!e.company) return;
+      const current = lastUpdateMap.get(e.company);
+      const entryDate = new Date(e.updatedAt || 0);
+      if (!current || entryDate > current) {
+        lastUpdateMap.set(e.company, entryDate);
+      }
+    });
+
+    const allNames = new Set(Object.keys(companyData));
+    entries.forEach((e) => {
+      if (e.company) allNames.add(e.company);
+    });
+
+    return Array.from(allNames).sort((a, b) => {
+      const dateA = lastUpdateMap.get(a) || new Date(0);
+      const dateB = lastUpdateMap.get(b) || new Date(0);
+      if (dateA > dateB) return -1;
+      if (dateA < dateB) return 1;
+      return a.localeCompare(b, "ja");
+    });
   }, [entries, companyData]);
 
   const processedCompanyEntries = useMemo(() => {
@@ -2235,6 +2281,19 @@ export default function App() {
   const handleCancel = (arg) => {
     const behavior = typeof arg === "string" ? arg : "auto";
     if (isMemoMode) {
+      let isDirty = false;
+      if (initialDraftState) {
+        const currentJson = JSON.stringify(draftFormData);
+        const initialJson = JSON.stringify(initialDraftState);
+        isDirty = currentJson !== initialJson;
+      }
+
+      if (isDirty) {
+        const isConfirmed = window.confirm(
+          "編集中のメモは保存されていません。\n一覧画面に戻るとデータは失われますが、よろしいですか?"
+        );
+        if (!isConfirmed) return;
+      }
       resetForm(behavior);
       return;
     }
@@ -2266,7 +2325,7 @@ export default function App() {
   };
 
   // --- Handler: Save Draft ---
-  const handleSaveDraft = (draftData) => {
+  const handleSaveDraft = (draftData, close = true) => {
     const now = getCurrentJSTTime();
     const currentId =
       editingId ||
@@ -2290,7 +2349,12 @@ export default function App() {
 
     setToast("メモを保存しました");
     setTimeout(() => setToast(null), 3000);
-    resetForm();
+
+    if (close) {
+      resetForm();
+    } else if (!editingId) {
+      setEditingId(currentId);
+    }
   };
 
   // --- Handler: Save Entry ---
@@ -2429,11 +2493,27 @@ export default function App() {
     setIsMemoMode(isDraft);
 
     if (isDraft) {
-      // メモ編集モード: データはDraftEditor側でidを使って特定、またはここで渡す
-      // ここでは simple な処理として DraftEditor には初期データは渡さず、
-      // drafts から検索して渡す設計にする（rendering 側で処理）
+      const draft = drafts.find((d) => d.id === entry.id);
+      if (draft) {
+        const loadedItems = draft.items ? [...draft.items] : [];
+        const lastItem = loadedItems[loadedItems.length - 1];
+        if (
+          !lastItem ||
+          lastItem.question.trim() !== "" ||
+          lastItem.answer.trim() !== ""
+        ) {
+          loadedItems.push({
+            id: `item_${Date.now()}`,
+            question: "",
+            answer: "",
+          });
+        }
+
+        const editState = { title: draft.title, items: loadedItems };
+        setDraftFormData(editState);
+        setInitialDraftState(JSON.parse(JSON.stringify(editState)));
+      }
     } else {
-      // 通常編集モード
       const fullEntry = entries.find((e) => e.id === entry.id) || entry;
       const cData = companyData[fullEntry.company] || normalizeCompanyData({});
       const editState = {
@@ -2497,6 +2577,14 @@ export default function App() {
     resetForm();
     setIsMemoMode(true);
     setEditingId(null);
+
+    const initial = {
+      title: "",
+      items: [{ id: `item_${Date.now()}`, question: "", answer: "" }],
+    };
+    setDraftFormData(initial);
+    setInitialDraftState(JSON.parse(JSON.stringify(initial)));
+
     setView("form");
     scrollToTop();
   };
@@ -2803,21 +2891,25 @@ export default function App() {
 
         {view === "list" && (
           <div className="max-w-7xl mx-auto mt-3 flex gap-1 overflow-x-auto pb-1 items-center">
-            <button
-              onClick={() => {
-                setViewMode("drafts");
-                scrollToTop("smooth");
-              }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap border ${
-                viewMode === "drafts"
-                  ? "bg-orange-500 text-white shadow-sm border-orange-600"
-                  : "bg-white text-orange-600 border-orange-200 hover:bg-orange-50"
-              }`}
-            >
-              <StickyNote size={14} />
-              メモ
-            </button>
-            <div className="w-px h-6 bg-slate-300 mx-1 shrink-0"></div>
+            {drafts.length > 0 && (
+              <>
+                <button
+                  onClick={() => {
+                    setViewMode("drafts");
+                    scrollToTop("smooth");
+                  }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap border ${
+                    viewMode === "drafts"
+                      ? "bg-orange-500 text-white shadow-sm border-orange-600"
+                      : "bg-white text-orange-600 border-orange-200 hover:bg-orange-50"
+                  }`}
+                >
+                  <StickyNote size={14} />
+                  メモ
+                </button>
+                <div className="w-px h-6 bg-slate-300 mx-1 shrink-0"></div>
+              </>
+            )}
 
             {[
               { id: "company", icon: Building2, label: "会社別" },
@@ -2873,65 +2965,16 @@ export default function App() {
             {view === "list" ? (
               <div className="space-y-8">
                 {/* View: Drafts List */}
-                {viewMode === "drafts" && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {drafts.length === 0 && (
-                      <div className="col-span-full text-center text-slate-400 py-10">
-                        メモデータはありません
-                      </div>
-                    )}
+                {viewMode === "drafts" && drafts.length > 0 && (
+                  <div className="space-y-6">
                     {drafts.map((draft) => (
-                      <div
+                      <DraftDisplay
                         key={draft.id}
-                        onClick={() => startEdit(draft)}
-                        className="bg-white p-4 rounded-xl border border-slate-200 hover:shadow-md hover:border-orange-300 transition-all cursor-pointer group flex flex-col h-full"
-                      >
-                        <div className="flex justify-between items-start mb-2">
-                          <h3 className="font-bold text-slate-800 line-clamp-1 flex-1 mr-2">
-                            <HighlightText
-                              text={draft.title}
-                              highlight={searchQuery}
-                            />
-                          </h3>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDelete(draft.id);
-                            }}
-                            className="text-slate-300 hover:text-rose-500 p-1 rounded transition-colors"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-
-                        <div className="flex-1 space-y-2 mb-3">
-                          {(draft.items || []).slice(0, 3).map((item, i) => (
-                            <div key={i} className="text-xs">
-                              <p className="font-bold text-slate-600 line-clamp-1 mb-0.5">
-                                Q. {item.question}
-                              </p>
-                              <p className="text-slate-400 line-clamp-1 pl-3">
-                                {item.answer}
-                              </p>
-                            </div>
-                          ))}
-                          {(draft.items || []).length > 3 && (
-                            <p className="text-[10px] text-slate-400 text-center pt-1">
-                              ...
-                            </p>
-                          )}
-                        </div>
-
-                        <div className="text-[10px] text-slate-400 border-t pt-2 mt-auto flex justify-between items-center">
-                          <span>
-                            {new Date(draft.updatedAt).toLocaleDateString()}{" "}
-                            更新
-                          </span>
-                          <span className="bg-orange-50 text-orange-600 px-1.5 py-0.5 rounded font-medium">
-                            Memo
-                          </span>
-                        </div>
-                      </div>
+                        draft={draft}
+                        onEdit={startEdit}
+                        onDelete={handleDelete}
+                        highlight={searchQuery}
+                      />
                     ))}
                   </div>
                 )}
@@ -3375,12 +3418,10 @@ export default function App() {
             ) : // --- Edit Form ---
             isMemoMode ? (
               <DraftEditor
-                initialData={
-                  editingId ? drafts.find((d) => d.id === editingId) : null
-                }
+                data={draftFormData}
+                onChange={setDraftFormData}
                 onSave={handleSaveDraft}
                 onCancel={handleCancel}
-                onDelete={editingId ? () => handleDelete(editingId) : undefined}
                 companyNames={companyNames}
               />
             ) : (
