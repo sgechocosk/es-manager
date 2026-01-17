@@ -41,6 +41,7 @@ import {
   CalendarCheck,
   ListOrdered,
   FileText,
+  Minus,
   Columns,
   StickyNote,
 } from "lucide-react";
@@ -1670,6 +1671,204 @@ const ESEntryDisplay = ({ entry, onEdit, onDelete, companyUrl, highlight }) => {
   );
 };
 
+const DraftEditor = ({
+  initialData,
+  onSave,
+  onCancel,
+  onDelete,
+  companyNames = [],
+}) => {
+  const [title, setTitle] = useState("");
+  const [items, setItems] = useState([]);
+  const [activeItemId, setActiveItemId] = useState(null);
+
+  const getDateString = () => {
+    const now = new Date();
+    return `${now.getMonth() + 1}月${now.getDate()}日のメモ`;
+  };
+
+  const getDateStringWithCompany = (company) => {
+    const now = new Date();
+    return `${now.getMonth() + 1}月${now.getDate()}日の${company}のメモ`;
+  };
+
+  useEffect(() => {
+    if (initialData) {
+      setTitle(initialData.title || getDateString());
+      const loadedItems = initialData.items ? [...initialData.items] : [];
+      const lastItem = loadedItems[loadedItems.length - 1];
+      if (
+        !lastItem ||
+        lastItem.question.trim() !== "" ||
+        lastItem.answer.trim() !== ""
+      ) {
+        loadedItems.push({
+          id: `item_${Date.now()}_${Math.random()}`,
+          question: "",
+          answer: "",
+        });
+      }
+      setItems(loadedItems);
+    } else {
+      setTitle(getDateString());
+      setItems([
+        {
+          id: `item_${Date.now()}_${Math.random()}`,
+          question: "",
+          answer: "",
+        },
+      ]);
+    }
+  }, [initialData]);
+
+  const handleTitleChange = (e) => {
+    const val = e.target.value;
+    const matchedCompany = companyNames.find((c) => c === val);
+    if (matchedCompany) {
+      setTitle(getDateStringWithCompany(matchedCompany));
+    } else {
+      setTitle(val);
+    }
+  };
+
+  const handleItemChange = (index, field, val) => {
+    const newItems = [...items];
+    newItems[index][field] = val;
+    setItems(newItems);
+
+    if (index === items.length - 1) {
+      const currentItem = newItems[index];
+      if (
+        currentItem.question.trim() !== "" ||
+        currentItem.answer.trim() !== ""
+      ) {
+        setItems((prev) => [
+          ...prev,
+          {
+            id: `item_${Date.now()}_${Math.random()}`,
+            question: "",
+            answer: "",
+          },
+        ]);
+      }
+    }
+  };
+
+  const handleSaveClick = () => {
+    const validItems = items.filter(
+      (item) => item.question.trim() !== "" || item.answer.trim() !== ""
+    );
+    const finalTitle = title.trim() || getDateString();
+
+    onSave({
+      title: finalTitle,
+      items: validItems,
+    });
+  };
+
+  return (
+    <div className="max-w-4xl mx-auto">
+      <div className="bg-white rounded-2xl shadow-lg border border-orange-200 overflow-hidden animate-in slide-in-from-bottom-4">
+        <div className="px-6 py-4 border-b border-orange-100 bg-orange-50/50 flex items-center justify-between sticky top-0 z-20 backdrop-blur-sm">
+          <div className="flex-1 mr-4">
+            <input
+              type="text"
+              className="w-full bg-transparent text-lg font-bold text-slate-800 placeholder-orange-300 outline-none border-b border-transparent focus:border-orange-300 transition-colors"
+              placeholder="タイトルを入力..."
+              value={title}
+              onChange={handleTitleChange}
+              list="company-list-suggestions"
+            />
+            <datalist id="company-list-suggestions">
+              {companyNames.map((name) => (
+                <option key={name} value={name} />
+              ))}
+            </datalist>
+          </div>
+          <div className="flex items-center gap-2">
+            {onDelete && (
+              <button
+                onClick={onDelete}
+                className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-colors"
+                title="削除"
+              >
+                <Trash2 size={20} />
+              </button>
+            )}
+            <button
+              onClick={handleSaveClick}
+              className="flex items-center gap-1.5 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-bold shadow-sm transition-all active:scale-95"
+            >
+              <Save size={18} />
+              保存
+            </button>
+          </div>
+        </div>
+
+        <div className="p-6 space-y-4 min-h-[50vh]">
+          {items.map((item, idx) => {
+            const isLast = idx === items.length - 1;
+            const isActive = activeItemId === item.id;
+            return (
+              <div
+                key={item.id}
+                onClick={() => setActiveItemId(item.id)}
+                className={`group transition-all duration-200 ${
+                  isActive ? "opacity-100" : "opacity-80 hover:opacity-100"
+                }`}
+              >
+                <div className="flex gap-3">
+                  <div className="pt-3 shrink-0">
+                    <div
+                      className={`w-1.5 h-1.5 rounded-full transition-colors ${
+                        isActive
+                          ? "bg-orange-400"
+                          : isLast
+                          ? "bg-slate-200"
+                          : "bg-orange-200"
+                      }`}
+                    />
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    <input
+                      type="text"
+                      className="w-full font-bold text-slate-700 placeholder-slate-300 bg-transparent outline-none border-b border-transparent focus:border-orange-300 transition-colors py-1"
+                      placeholder="質問・項目"
+                      value={item.question}
+                      onChange={(e) =>
+                        handleItemChange(idx, "question", e.target.value)
+                      }
+                      onFocus={() => setActiveItemId(item.id)}
+                    />
+                    <AutoResizeTextarea
+                      value={item.answer}
+                      onChange={(e) =>
+                        handleItemChange(idx, "answer", e.target.value)
+                      }
+                      onFocus={() => setActiveItemId(item.id)}
+                      placeholder="回答・内容..."
+                      isActive={isActive}
+                    />
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-end">
+          <button
+            onClick={onCancel}
+            className="px-4 py-2 text-slate-500 hover:bg-slate-200 rounded-lg font-bold text-sm transition-colors"
+          >
+            キャンセル
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // --- Default Data ---
 const DEFAULT_FORM_DATA = {
   company: "",
@@ -1686,17 +1885,18 @@ const DEFAULT_FORM_DATA = {
 export default function App() {
   // --- State ---
   const [entries, setEntries] = useState([]);
+  const [drafts, setDrafts] = useState([]);
   const [view, setView] = useState("list");
   const [viewMode, setViewMode] = useState("company");
   const [editingId, setEditingId] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isMemoMode, setIsMemoMode] = useState(false);
 
   const [companyData, setCompanyData] = useState({});
   const [isCompanyDataEditOpen, setIsCompanyDataEditOpen] = useState(false);
   const [editingCompanyDataName, setEditingCompanyDataName] = useState(null);
   const [isEditMode, setIsEditMode] = useState(false);
-  const [isMemoMode, setIsMemoMode] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState(() => {
     const saved = localStorage.getItem(STORAGE_KEY_VIEW_SETTINGS);
     if (saved) {
@@ -1749,9 +1949,15 @@ export default function App() {
       if (savedDataJson) {
         try {
           const parsed = JSON.parse(savedDataJson);
+
           let loadedEntries = [];
           if (parsed && Array.isArray(parsed.entries)) {
             loadedEntries = parsed.entries;
+          }
+
+          let loadedDrafts = [];
+          if (parsed && Array.isArray(parsed.drafts)) {
+            loadedDrafts = parsed.drafts;
           }
 
           let loadedCompanyData = {};
@@ -1779,8 +1985,10 @@ export default function App() {
           });
 
           setEntries(migratedEntries);
+          setDrafts(loadedDrafts);
           setCompanyData(loadedCompanyData);
           if (hasMigration) {
+            console.log("Migrated industry data to companyData");
           }
         } catch (e) {
           console.error("Failed to parse auto-saved data", e);
@@ -1796,6 +2004,7 @@ export default function App() {
     if (appSettings.autoSave) {
       const dataToSave = {
         entries: entries,
+        drafts: drafts,
         companyData: companyData,
         updatedAt: getCurrentJSTTime(),
       };
@@ -1803,7 +2012,7 @@ export default function App() {
     } else {
       localStorage.removeItem(STORAGE_KEY_DATA);
     }
-  }, [entries, companyData, appSettings.autoSave, isInitialized]);
+  }, [entries, drafts, companyData, appSettings.autoSave, isInitialized]);
 
   useEffect(() => {
     localStorage.setItem(
@@ -1817,9 +2026,10 @@ export default function App() {
     const handleBeforeUnload = (e) => {
       if (appSettings.autoSave) return;
 
-      const hasEntries = entries.length > 0;
+      const hasEntries = entries.length > 0 || drafts.length > 0;
       let isFormDirty = false;
-      if (view === "form" && initialFormState) {
+
+      if (view === "form" && !isMemoMode && initialFormState) {
         const currentJson = JSON.stringify({
           ...formData,
           qas: formData.qas.map(({ id, ...rest }) => rest),
@@ -1845,12 +2055,27 @@ export default function App() {
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [view, entries, formData, initialFormState, appSettings.autoSave]);
+  }, [
+    view,
+    entries,
+    drafts,
+    formData,
+    initialFormState,
+    appSettings.autoSave,
+    isMemoMode,
+  ]);
 
   // --- Helpers & Memos ---
   const scrollToTop = (behavior = "auto") => {
     window.scrollTo({ top: 0, behavior: behavior });
   };
+
+  const companyNames = useMemo(() => {
+    const set = new Set();
+    entries.forEach((e) => set.add(e.company));
+    Object.keys(companyData).forEach((k) => set.add(k));
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "ja"));
+  }, [entries, companyData]);
 
   const processedCompanyEntries = useMemo(() => {
     let result = entries;
@@ -1998,19 +2223,8 @@ export default function App() {
   const resetForm = (behavior = "auto") => {
     setView("list");
     setEditingId(null);
-    const newState = {
-      ...DEFAULT_FORM_DATA,
-      qas: [
-        {
-          id: Date.now(),
-          question: "",
-          answer: "",
-          tags: "",
-          charLimit: "",
-          note: "",
-        },
-      ],
-    };
+    setIsMemoMode(false);
+    const newState = { ...DEFAULT_FORM_DATA };
     setFormData(newState);
     setInitialFormState(null);
     setActiveQAId(null);
@@ -2020,6 +2234,10 @@ export default function App() {
 
   const handleCancel = (arg) => {
     const behavior = typeof arg === "string" ? arg : "auto";
+    if (isMemoMode) {
+      resetForm(behavior);
+      return;
+    }
 
     if (view === "form") {
       let isDirty = false;
@@ -2047,8 +2265,36 @@ export default function App() {
     }
   };
 
-  const handleSave = (closeAfterSave = true) => {
-    if (isMemoMode) return;
+  // --- Handler: Save Draft ---
+  const handleSaveDraft = (draftData) => {
+    const now = getCurrentJSTTime();
+    const currentId =
+      editingId ||
+      `draft_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    const newDraft = {
+      id: currentId,
+      title: draftData.title,
+      items: draftData.items,
+      updatedAt: now,
+    };
+
+    setDrafts((prev) => {
+      const exists = prev.some((d) => d.id === currentId);
+      if (exists) {
+        return prev.map((d) => (d.id === currentId ? newDraft : d));
+      } else {
+        return [newDraft, ...prev];
+      }
+    });
+
+    setToast("メモを保存しました");
+    setTimeout(() => setToast(null), 3000);
+    resetForm();
+  };
+
+  // --- Handler: Save Entry ---
+  const handleSaveEntry = (closeAfterSave = true) => {
     const newCompany = formData.company?.trim();
     if (!newCompany) return;
 
@@ -2146,13 +2392,20 @@ export default function App() {
   };
 
   const handleDelete = (id) => {
-    if (
-      !confirm(
-        "この企業のエントリーシートを削除しますか?\n(企業データは残ります)"
+    const isDraft = id.toString().startsWith("draft_");
+    if (isDraft) {
+      if (!confirm("このメモを削除しますか?")) return;
+      setDrafts((prev) => prev.filter((d) => d.id !== id));
+      if (isMemoMode) resetForm();
+    } else {
+      if (
+        !confirm(
+          "この企業のエントリーシートを削除しますか?\n(企業データは残ります)"
+        )
       )
-    )
-      return;
-    setEntries((prev) => prev.filter((e) => e.id !== id));
+        return;
+      setEntries((prev) => prev.filter((e) => e.id !== id));
+    }
   };
 
   const handleDeleteCompanyData = (companyName) => {
@@ -2170,36 +2423,44 @@ export default function App() {
   };
 
   const startEdit = (entry) => {
-    setIsMemoMode(false);
-    const fullEntry = entries.find((e) => e.id === entry.id) || entry;
-    const cData = companyData[fullEntry.company] || normalizeCompanyData({});
-
-    const editState = {
-      company: fullEntry.company,
-      industry: cData.industry || "",
-      status: fullEntry.status || "未提出",
-      selectionType: fullEntry.selectionType || "",
-      deadline: fullEntry.deadline || "",
-      note: fullEntry.note || "",
-      myPageUrl: cData.myPageUrl || "",
-      recruitmentUrl: cData.recruitmentUrl || "",
-      createdAt: fullEntry.createdAt,
-      qas: fullEntry.qas
-        ? fullEntry.qas.map((q) => ({
-            ...q,
-            tags: Array.isArray(q.tags) ? q.tags.join(", ") : q.tags || "",
-            note: q.note || "",
-          }))
-        : [],
-    };
-
-    setFormData(editState);
-    setInitialFormState(JSON.parse(JSON.stringify(editState)));
-    setEditingId(fullEntry.id);
-    if (editState.qas.length > 0) {
-      setActiveQAId(editState.qas[0].id);
-    }
+    const isDraft = entry.id.toString().startsWith("draft_");
+    setEditingId(entry.id);
     setView("form");
+    setIsMemoMode(isDraft);
+
+    if (isDraft) {
+      // メモ編集モード: データはDraftEditor側でidを使って特定、またはここで渡す
+      // ここでは simple な処理として DraftEditor には初期データは渡さず、
+      // drafts から検索して渡す設計にする（rendering 側で処理）
+    } else {
+      // 通常編集モード
+      const fullEntry = entries.find((e) => e.id === entry.id) || entry;
+      const cData = companyData[fullEntry.company] || normalizeCompanyData({});
+      const editState = {
+        company: fullEntry.company,
+        industry: cData.industry || "",
+        status: fullEntry.status || "未提出",
+        selectionType: fullEntry.selectionType || "",
+        deadline: fullEntry.deadline || "",
+        note: fullEntry.note || "",
+        myPageUrl: cData.myPageUrl || "",
+        recruitmentUrl: cData.recruitmentUrl || "",
+        createdAt: fullEntry.createdAt,
+        qas: fullEntry.qas
+          ? fullEntry.qas.map((q) => ({
+              ...q,
+              tags: Array.isArray(q.tags) ? q.tags.join(", ") : q.tags || "",
+              note: q.note || "",
+            }))
+          : [],
+      };
+
+      setFormData(editState);
+      setInitialFormState(JSON.parse(JSON.stringify(editState)));
+      if (editState.qas.length > 0) {
+        setActiveQAId(editState.qas[0].id);
+      }
+    }
     scrollToTop();
   };
 
@@ -2234,24 +2495,8 @@ export default function App() {
 
   const startNewMemo = () => {
     resetForm();
-    const newId = Date.now();
-    const newState = {
-      ...DEFAULT_FORM_DATA,
-      qas: [
-        {
-          id: newId,
-          question: "",
-          answer: "",
-          tags: "",
-          charLimit: "",
-          note: "",
-        },
-      ],
-    };
-    setFormData(newState);
-    setInitialFormState(JSON.parse(JSON.stringify(newState)));
-    setActiveQAId(newId);
     setIsMemoMode(true);
+    setEditingId(null);
     setView("form");
     scrollToTop();
   };
@@ -2260,6 +2505,7 @@ export default function App() {
   const handleExport = () => {
     const exportData = {
       entries: entries,
+      drafts: drafts,
       companyData: companyData,
       exportedAt: getCurrentJSTTime(),
     };
@@ -2288,12 +2534,14 @@ export default function App() {
       try {
         const importedJson = JSON.parse(e.target.result);
         let entriesToLoad = [];
+        let draftsToLoad = [];
         let dataToLoad = {};
 
         if (Array.isArray(importedJson)) {
           entriesToLoad = importedJson;
         } else if (importedJson && Array.isArray(importedJson.entries)) {
           entriesToLoad = importedJson.entries;
+          if (importedJson.drafts) draftsToLoad = importedJson.drafts;
 
           if (importedJson.companyData) {
             dataToLoad = importedJson.companyData;
@@ -2336,6 +2584,7 @@ export default function App() {
           });
 
           setEntries(normalizedData);
+          setDrafts(draftsToLoad);
           setCompanyData((prev) => ({ ...prev, ...migratedData }));
         }
       } catch (error) {
@@ -2442,7 +2691,7 @@ export default function App() {
                 ES Manager
               </h1>
             </div>
-            {view === "form" && (
+            {view === "form" && !isMemoMode && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -2525,7 +2774,7 @@ export default function App() {
 
           {view !== "list" && (
             <div className="flex items-center gap-2 self-end sm:self-auto">
-              {view === "form" && (
+              {view === "form" && !isMemoMode && (
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -2554,6 +2803,22 @@ export default function App() {
 
         {view === "list" && (
           <div className="max-w-7xl mx-auto mt-3 flex gap-1 overflow-x-auto pb-1 items-center">
+            <button
+              onClick={() => {
+                setViewMode("drafts");
+                scrollToTop("smooth");
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap border ${
+                viewMode === "drafts"
+                  ? "bg-orange-500 text-white shadow-sm border-orange-600"
+                  : "bg-white text-orange-600 border-orange-200 hover:bg-orange-50"
+              }`}
+            >
+              <StickyNote size={14} />
+              メモ
+            </button>
+            <div className="w-px h-6 bg-slate-300 mx-1 shrink-0"></div>
+
             {[
               { id: "company", icon: Building2, label: "会社別" },
               { id: "status", icon: Check, label: "ステータス別" },
@@ -2601,12 +2866,76 @@ export default function App() {
       <div className="flex flex-1 overflow-hidden relative">
         <main
           className={`flex-1 overflow-y-auto p-4 sm:p-6 transition-all duration-300 ease-in-out ${
-            isRefPanelOpen ? "mr-0 lg:mr-96" : "mr-0"
+            isRefPanelOpen && !isMemoMode ? "mr-0 lg:mr-96" : "mr-0"
           }`}
         >
           <div className="max-w-5xl mx-auto pb-20">
             {view === "list" ? (
               <div className="space-y-8">
+                {/* View: Drafts List */}
+                {viewMode === "drafts" && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {drafts.length === 0 && (
+                      <div className="col-span-full text-center text-slate-400 py-10">
+                        メモデータはありません
+                      </div>
+                    )}
+                    {drafts.map((draft) => (
+                      <div
+                        key={draft.id}
+                        onClick={() => startEdit(draft)}
+                        className="bg-white p-4 rounded-xl border border-slate-200 hover:shadow-md hover:border-orange-300 transition-all cursor-pointer group flex flex-col h-full"
+                      >
+                        <div className="flex justify-between items-start mb-2">
+                          <h3 className="font-bold text-slate-800 line-clamp-1 flex-1 mr-2">
+                            <HighlightText
+                              text={draft.title}
+                              highlight={searchQuery}
+                            />
+                          </h3>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDelete(draft.id);
+                            }}
+                            className="text-slate-300 hover:text-rose-500 p-1 rounded transition-colors"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+
+                        <div className="flex-1 space-y-2 mb-3">
+                          {(draft.items || []).slice(0, 3).map((item, i) => (
+                            <div key={i} className="text-xs">
+                              <p className="font-bold text-slate-600 line-clamp-1 mb-0.5">
+                                Q. {item.question}
+                              </p>
+                              <p className="text-slate-400 line-clamp-1 pl-3">
+                                {item.answer}
+                              </p>
+                            </div>
+                          ))}
+                          {(draft.items || []).length > 3 && (
+                            <p className="text-[10px] text-slate-400 text-center pt-1">
+                              ...
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="text-[10px] text-slate-400 border-t pt-2 mt-auto flex justify-between items-center">
+                          <span>
+                            {new Date(draft.updatedAt).toLocaleDateString()}{" "}
+                            更新
+                          </span>
+                          <span className="bg-orange-50 text-orange-600 px-1.5 py-0.5 rounded font-medium">
+                            Memo
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 {/* View: Company List */}
                 {viewMode === "company" && (
                   <div className="grid gap-6">
@@ -3043,20 +3372,27 @@ export default function App() {
                   </div>
                 )}
               </div>
+            ) : // --- Edit Form ---
+            isMemoMode ? (
+              <DraftEditor
+                initialData={
+                  editingId ? drafts.find((d) => d.id === editingId) : null
+                }
+                onSave={handleSaveDraft}
+                onCancel={handleCancel}
+                onDelete={editingId ? () => handleDelete(editingId) : undefined}
+                companyNames={companyNames}
+              />
             ) : (
-              // --- Edit Form ---
+              // --- Standard Entry Editor Mode ---
               <div className="max-w-7xl mx-auto">
                 <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden animate-in slide-in-from-bottom-4">
                   <div className="px-6 py-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
                     <h2 className="text-lg font-bold text-slate-800">
-                      {editingId
-                        ? "編集"
-                        : isMemoMode
-                        ? "メモ登録"
-                        : "新規登録"}
+                      {editingId ? "編集" : "新規登録"}
                     </h2>
                     <button
-                      onClick={() => handleSave(false)}
+                      onClick={() => handleSaveEntry(false)}
                       disabled={!formData.company}
                       title="保存"
                       className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 rounded-full transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
@@ -3121,45 +3457,43 @@ export default function App() {
                         </div>
                       </div>
 
-                      {!editingId && (
-                        <>
-                          <div>
-                            <label className="text-xs font-bold text-slate-500">
-                              マイページURL
-                            </label>
-                            <div className="relative mt-1">
-                              <input
-                                type="url"
-                                className="w-full pl-3 pr-8 py-2 border rounded-lg outline-none focus:border-indigo-500"
-                                value={formData.myPageUrl}
-                                onChange={(e) =>
-                                  setFormData({
-                                    ...formData,
-                                    myPageUrl: e.target.value,
-                                  })
-                                }
-                                placeholder="https://..."
-                              />
-                            </div>
-                          </div>
-                          <div>
-                            <label className="text-xs font-bold text-slate-500">
-                              業界・職種
-                            </label>
+                      <>
+                        <div>
+                          <label className="text-xs font-bold text-slate-500">
+                            マイページURL
+                          </label>
+                          <div className="relative mt-1">
                             <input
-                              className="w-full px-3 py-2 border rounded-lg mt-1 outline-none focus:border-indigo-500"
-                              value={formData.industry}
+                              type="url"
+                              className="w-full pl-3 pr-8 py-2 border rounded-lg outline-none focus:border-indigo-500"
+                              value={formData.myPageUrl}
                               onChange={(e) =>
                                 setFormData({
                                   ...formData,
-                                  industry: e.target.value,
+                                  myPageUrl: e.target.value,
                                 })
                               }
-                              placeholder="例: IT、エンジニア"
+                              placeholder="https://..."
                             />
                           </div>
-                        </>
-                      )}
+                        </div>
+                        <div>
+                          <label className="text-xs font-bold text-slate-500">
+                            業界・職種
+                          </label>
+                          <input
+                            className="w-full px-3 py-2 border rounded-lg mt-1 outline-none focus:border-indigo-500"
+                            value={formData.industry}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                industry: e.target.value,
+                              })
+                            }
+                            placeholder="例: IT、エンジニア"
+                          />
+                        </div>
+                      </>
 
                       <div>
                         <label className="text-xs font-bold text-slate-500">
@@ -3483,7 +3817,7 @@ export default function App() {
                         キャンセル
                       </button>
                       <button
-                        onClick={() => handleSave(true)}
+                        onClick={() => handleSaveEntry(true)}
                         disabled={!formData.company}
                         className="px-6 py-2 rounded-lg bg-indigo-600 text-white shadow-md hover:bg-indigo-700 font-bold text-sm flex items-center gap-2 disabled:opacity-50"
                       >
