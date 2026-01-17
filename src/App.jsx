@@ -1762,17 +1762,25 @@ const DraftEditor = ({
     const newItems = [...data.items];
     newItems[index][field] = val;
 
-    if (index === newItems.length - 1) {
-      const currentItem = newItems[index];
-      if (
-        currentItem.question.trim() !== "" ||
-        currentItem.answer.trim() !== ""
+    const lastItem = newItems[newItems.length - 1];
+    const isLastEmpty =
+      lastItem.question.trim() === "" && lastItem.answer.trim() === "";
+
+    if (!isLastEmpty) {
+      newItems.push({
+        id: `item_${Date.now()}_${Math.random()}`,
+        question: "",
+        answer: "",
+      });
+    } else {
+      while (
+        newItems.length > 1 &&
+        newItems[newItems.length - 1].question.trim() === "" &&
+        newItems[newItems.length - 1].answer.trim() === "" &&
+        newItems[newItems.length - 2].question.trim() === "" &&
+        newItems[newItems.length - 2].answer.trim() === ""
       ) {
-        newItems.push({
-          id: `item_${Date.now()}_${Math.random()}`,
-          question: "",
-          answer: "",
-        });
+        newItems.pop();
       }
     }
     onChange({ ...data, items: newItems });
@@ -2093,6 +2101,12 @@ export default function App() {
     isMemoMode,
   ]);
 
+  useEffect(() => {
+    if (viewMode === "drafts" && drafts.length === 0) {
+      setViewMode("company");
+    }
+  }, [drafts, viewMode]);
+
   // --- Helpers & Memos ---
   const scrollToTop = (behavior = "auto") => {
     window.scrollTo({ top: 0, behavior: behavior });
@@ -2351,9 +2365,18 @@ export default function App() {
     setTimeout(() => setToast(null), 3000);
 
     if (close) {
+      setViewMode("drafts");
       resetForm();
-    } else if (!editingId) {
-      setEditingId(currentId);
+    } else {
+      if (!editingId) {
+        setEditingId(currentId);
+      }
+      const nextFormState = {
+        ...draftFormData,
+        title: draftData.title,
+      };
+      setDraftFormData(nextFormState);
+      setInitialDraftState(JSON.parse(JSON.stringify(nextFormState)));
     }
   };
 
@@ -2379,7 +2402,7 @@ export default function App() {
         const isLastEntry = oldEntriesCount <= 1;
 
         if (targetExists) {
-          let msg = `企業名『${newCompany}』は既に存在します。\nこのエントリーを『${newCompany}』に移動・統合しますか？`;
+          let msg = `企業名『${newCompany}』は既に存在します。\nこのエントリーを『${newCompany}』に移動・統合しますか?`;
           if (isLastEntry) {
             msg += `\n(旧企業名『${oldCompany}』のデータは削除されます)`;
           }
@@ -2458,7 +2481,8 @@ export default function App() {
   const handleDelete = (id) => {
     const isDraft = id.toString().startsWith("draft_");
     if (isDraft) {
-      if (!confirm("このメモを削除しますか?")) return;
+      if (!confirm("このメモを削除しますか?\n(この操作は取り消せません。)"))
+        return;
       setDrafts((prev) => prev.filter((d) => d.id !== id));
       if (isMemoMode) resetForm();
     } else {
@@ -2475,7 +2499,7 @@ export default function App() {
   const handleDeleteCompanyData = (companyName) => {
     if (
       confirm(
-        `${companyName}のデータを削除しますか？(この操作は取り消せません。)`
+        `${companyName}のデータを削除しますか?\n(この操作は取り消せません。)`
       )
     ) {
       setCompanyData((prev) => {
@@ -2842,11 +2866,11 @@ export default function App() {
 
               <button
                 onClick={startNewMemo}
-                title="メモ登録"
+                title="メモ作成"
                 className="bg-orange-500 hover:bg-orange-600 text-white p-2 rounded-lg sm:px-4 flex items-center gap-1.5 shadow-md transition-all active:scale-95 ml-auto shrink-0"
               >
                 <StickyNote size={18} />
-                <span className="hidden md:inline font-medium">メモ登録</span>
+                <span className="hidden md:inline font-medium">メモ作成</span>
               </button>
 
               <button
