@@ -44,6 +44,7 @@ import {
   Minus,
   Columns,
   StickyNote,
+  Eye,
 } from "lucide-react";
 
 // --- Constants ---
@@ -55,7 +56,7 @@ const HEADER_HEIGHT = "57px";
 const STYLE_PATTERNS = {
   keigo: {
     pattern:
-      /(?:だ|である|だった|であった|(?<!て)いる|(?<!で)ある|ない)(?=[。\n]|$)/g,
+      /(?:だ|である|だった|であった|できた|(?<!て)いる|(?<!で)ある|ない)(?=[。\n]|$)/g,
     color: "bg-rose-200",
   },
   joutai: {
@@ -66,7 +67,8 @@ const STYLE_PATTERNS = {
 };
 
 const NG_WORD_PATTERN = {
-  pattern: /(?:御社)/g,
+  pattern:
+    /(?:御社|御行|なので|ですが|お伺い|おっしゃられ|拝見させていただき|仰っていただき)/g,
   color: "bg-rose-200",
 };
 
@@ -237,34 +239,83 @@ const STATUS_COLORS = {
   不採用: "bg-rose-50 text-rose-400",
 };
 
-const HighlightText = ({ text, highlight }) => {
-  if (!highlight || !text) return <>{text}</>;
-  const terms = highlight
-    .toLowerCase()
-    .split(/[\s\u3000]+/)
-    .filter((t) => t.length > 0);
-  if (terms.length === 0) return <>{text}</>;
+const HighlightText = ({ text, highlight, writingStyle, checkNgWords }) => {
+  if (!text) return <>{text}</>;
 
-  const pattern = new RegExp(
-    `(${terms.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})`,
-    "gi"
-  );
-  const parts = text.toString().split(pattern);
+  const searchTerms = highlight
+    ? highlight
+        .toLowerCase()
+        .split(/[\s\u3000]+/)
+        .filter((t) => t.length > 0)
+    : [];
+
+  const checkPatterns = [];
+  if (checkNgWords) {
+    checkPatterns.push({
+      regex: NG_WORD_PATTERN.pattern,
+      color: NG_WORD_PATTERN.color,
+    });
+  }
+  if (writingStyle && STYLE_PATTERNS[writingStyle]) {
+    checkPatterns.push({
+      regex: STYLE_PATTERNS[writingStyle].pattern,
+      color: STYLE_PATTERNS[writingStyle].color,
+    });
+  }
+
+  if (searchTerms.length === 0 && checkPatterns.length === 0) {
+    return <>{text}</>;
+  }
+
+  const searchRegexSource =
+    searchTerms.length > 0
+      ? `(${searchTerms
+          .map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+          .join("|")})`
+      : null;
+
+  const allSources = [];
+  if (searchRegexSource) allSources.push(searchRegexSource);
+  checkPatterns.forEach((p) => allSources.push(`(${p.regex.source})`));
+
+  if (allSources.length === 0) return <>{text}</>;
+
+  const combinedRegex = new RegExp(allSources.join("|"), "gi");
+  const parts = text.toString().split(combinedRegex);
 
   return (
     <>
-      {parts.map((part, i) =>
-        terms.some((t) => t === part.toLowerCase()) ? (
-          <span
-            key={i}
-            className="bg-yellow-200 text-slate-900 px-0.5 rounded-sm box-decoration-clone"
-          >
-            {part}
-          </span>
-        ) : (
-          part
-        )
-      )}
+      {parts
+        .filter((part) => part !== undefined)
+        .map((part, i) => {
+          if (!part) return null;
+
+          const isSearchMatch = searchTerms.some(
+            (t) => t.toLowerCase() === part.toLowerCase()
+          );
+          if (isSearchMatch) {
+            return (
+              <span
+                key={i}
+                className="bg-yellow-200 text-slate-900 px-0.5 rounded-sm box-decoration-clone"
+              >
+                {part}
+              </span>
+            );
+          }
+
+          for (const cp of checkPatterns) {
+            if (new RegExp(cp.regex.source, "i").test(part)) {
+              return (
+                <span key={i} className={`${cp.color} rounded-sm px-0.5`}>
+                  {part}
+                </span>
+              );
+            }
+          }
+
+          return <span key={i}>{part}</span>;
+        })}
     </>
   );
 };
@@ -283,6 +334,9 @@ const AutoResizeTextarea = ({
   const minHeightGhostRef = useRef(null);
   const contentGhostRef = useRef(null);
   const [textareaHeight, setTextareaHeight] = useState("auto");
+
+  const sharedClasses =
+    "w-full p-3 text-sm font-sans leading-relaxed border rounded-lg break-words whitespace-pre-wrap";
 
   const highlightRenderer = useMemo(() => {
     if (!value) return null;
@@ -326,7 +380,10 @@ const AutoResizeTextarea = ({
         }
 
         return (
-          <span key={i} className={`${appliedColor} rounded-sm`}>
+          <span
+            key={i}
+            className={`${appliedColor} rounded-sm box-decoration-clone`}
+          >
             {part}
           </span>
         );
@@ -356,12 +413,8 @@ const AutoResizeTextarea = ({
     <div className="relative w-full group">
       <div
         aria-hidden="true"
-        className="absolute top-0 left-0 w-full p-3 text-sm border border-transparent whitespace-pre-wrap break-words pointer-events-none text-transparent"
-        style={{
-          zIndex: 0,
-          fontFamily: "inherit",
-          lineHeight: "inherit",
-        }}
+        className={`absolute top-0 left-0 text-transparent border-transparent pointer-events-none ${sharedClasses}`}
+        style={{ zIndex: 0 }}
       >
         {highlightRenderer}
       </div>
@@ -369,7 +422,7 @@ const AutoResizeTextarea = ({
       <div
         ref={minHeightGhostRef}
         aria-hidden="true"
-        className="absolute top-0 left-0 w-full p-3 text-sm border border-transparent invisible whitespace-pre-wrap break-words pointer-events-none"
+        className={`absolute top-0 left-0 invisible pointer-events-none border-transparent ${sharedClasses}`}
         style={{ zIndex: -1 }}
       >
         {dummyText}
@@ -378,7 +431,7 @@ const AutoResizeTextarea = ({
       <div
         ref={contentGhostRef}
         aria-hidden="true"
-        className="absolute top-0 left-0 w-full p-3 text-sm border border-transparent invisible whitespace-pre-wrap break-words pointer-events-none"
+        className={`absolute top-0 left-0 invisible pointer-events-none border-transparent ${sharedClasses}`}
         style={{ zIndex: -1 }}
       >
         {value}
@@ -386,7 +439,7 @@ const AutoResizeTextarea = ({
       </div>
 
       <textarea
-        className="relative z-10 w-full p-3 text-sm border rounded-lg bg-transparent focus:border-indigo-500 outline-none resize-none overflow-hidden block box-border transition-[height,border-color] duration-300 ease-in-out"
+        className={`relative z-10 bg-transparent focus:border-indigo-500 outline-none resize-none overflow-hidden block box-border transition-[height,border-color] duration-300 ease-in-out text-slate-700 ${sharedClasses}`}
         style={{ height: textareaHeight }}
         placeholder={placeholder}
         value={value}
@@ -787,7 +840,13 @@ const CompanyDataEditModal = ({
   );
 };
 
-const ReferenceSidebar = ({ isOpen, onClose, entries, editingId }) => {
+const ReferenceSidebar = ({
+  isOpen,
+  onClose,
+  entries,
+  editingId,
+  appSettings,
+}) => {
   const [search, setSearch] = useState("");
 
   const filteredQAs = useMemo(() => {
@@ -915,7 +974,18 @@ const ReferenceSidebar = ({ isOpen, onClose, entries, editingId }) => {
             </div>
 
             <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap max-h-[200px] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-100 pr-1">
-              <HighlightText text={item.answer} highlight={search} />
+              <HighlightText
+                text={item.answer}
+                highlight={search}
+                writingStyle={
+                  appSettings?.showChecksInList ? appSettings.writingStyle : ""
+                }
+                checkNgWords={
+                  appSettings?.showChecksInList
+                    ? appSettings.checkNgWords
+                    : false
+                }
+              />
             </p>
 
             {item.tags.length > 0 && (
@@ -948,6 +1018,7 @@ const SettingsModal = ({
   const [autoSave, setAutoSave] = useState(false);
   const [writingStyle, setWritingStyle] = useState("");
   const [checkNgWords, setCheckNgWords] = useState(true);
+  const [showChecksInList, setShowChecksInList] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -955,6 +1026,7 @@ const SettingsModal = ({
       setAutoSave(initialSettings?.autoSave || false);
       setWritingStyle(initialSettings?.writingStyle || "");
       setCheckNgWords(initialSettings?.checkNgWords ?? true);
+      setShowChecksInList(initialSettings?.showChecksInList ?? false);
     }
   }, [isOpen, initialSettings]);
 
@@ -965,7 +1037,12 @@ const SettingsModal = ({
       localStorage.removeItem("GEMINI_API_KEY");
     }
 
-    const newSettings = { autoSave, writingStyle, checkNgWords };
+    const newSettings = {
+      autoSave,
+      writingStyle,
+      checkNgWords,
+      showChecksInList,
+    };
     onSettingsSave(newSettings);
 
     localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(newSettings));
@@ -1011,86 +1088,117 @@ const SettingsModal = ({
           <hr className="border-slate-100" />
 
           <div>
-            <h4 className="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
-              <Edit2 size={16} /> 入力チェック設定
+            <h4 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
+              <Edit2 size={16} /> 文章校正ハイライト設定
             </h4>
 
-            {/* NGワード設定 */}
-            <label className="flex items-center gap-3 p-3 border rounded-lg hover:bg-slate-50 cursor-pointer transition-colors mb-4 bg-rose-50/30 border-rose-100">
-              <input
-                type="checkbox"
-                checked={checkNgWords}
-                onChange={(e) => setCheckNgWords(e.target.checked)}
-                className="w-4 h-4 text-rose-600 focus:ring-rose-500 border-gray-300 rounded"
-              />
-              <div>
-                <span className="block text-sm font-bold text-slate-700">
-                  NGワードを警告
-                </span>
-                <span className="block text-xs text-slate-500 mt-0.5">
-                  書き言葉として不適切な「御社」などをハイライト
-                </span>
+            <div className="border border-slate-200 rounded-xl overflow-hidden">
+              <div className="p-4 space-y-5 bg-white">
+                <div>
+                  <h5 className="text-xs font-bold text-slate-500 mb-2">
+                    1. NGワードチェック
+                  </h5>
+                  <label className="flex items-center gap-3 p-3 border rounded-lg hover:bg-slate-50 cursor-pointer transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={checkNgWords}
+                      onChange={(e) => setCheckNgWords(e.target.checked)}
+                      className="w-4 h-4 text-rose-600 focus:ring-rose-500 border-gray-300 rounded"
+                    />
+                    <div>
+                      <span className="block text-sm font-bold text-slate-700">
+                        不適切な表現を警告
+                      </span>
+                      <span className="block text-xs text-slate-500 mt-0.5">
+                        「御社」「なので」などの話し言葉や不適切な表現を警告
+                      </span>
+                    </div>
+                  </label>
+                </div>
+
+                <div>
+                  <h5 className="text-xs font-bold text-slate-500 mb-2">
+                    2. 文体統一チェック
+                  </h5>
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-3 p-3 border rounded-lg hover:bg-slate-50 cursor-pointer transition-colors">
+                      <input
+                        type="radio"
+                        name="writingStyle"
+                        value="keigo"
+                        checked={writingStyle === "keigo"}
+                        onChange={(e) => setWritingStyle(e.target.value)}
+                        className="w-4 h-4 text-indigo-600 focus:ring-indigo-500 border-gray-300"
+                      />
+                      <div>
+                        <span className="block text-sm font-bold text-slate-700">
+                          敬体 (です・ます)
+                        </span>
+                        <span className="block text-xs text-slate-400 mt-0.5">
+                          「だ・である」調が混ざっている場合に警告
+                        </span>
+                      </div>
+                    </label>
+
+                    <label className="flex items-center gap-3 p-3 border rounded-lg hover:bg-slate-50 cursor-pointer transition-colors">
+                      <input
+                        type="radio"
+                        name="writingStyle"
+                        value="joutai"
+                        checked={writingStyle === "joutai"}
+                        onChange={(e) => setWritingStyle(e.target.value)}
+                        className="w-4 h-4 text-indigo-600 focus:ring-indigo-500 border-gray-300"
+                      />
+                      <div>
+                        <span className="block text-sm font-bold text-slate-700">
+                          常体 (だ・である)
+                        </span>
+                        <span className="block text-xs text-slate-400 mt-0.5">
+                          「です・ます」調が混ざっている場合に警告
+                        </span>
+                      </div>
+                    </label>
+
+                    <label className="flex items-center gap-3 p-3 border rounded-lg hover:bg-slate-50 cursor-pointer transition-colors">
+                      <input
+                        type="radio"
+                        name="writingStyle"
+                        value=""
+                        checked={writingStyle === ""}
+                        onChange={(e) => setWritingStyle(e.target.value)}
+                        className="w-4 h-4 text-indigo-600 focus:ring-indigo-500 border-gray-300"
+                      />
+                      <span className="text-sm font-bold text-slate-700">
+                        指定なし
+                      </span>
+                      <span className="block text-xs text-slate-400 mt-0.5">
+                        チェックを行いません。
+                      </span>
+                    </label>
+                  </div>
+                </div>
               </div>
-            </label>
 
-            <h4 className="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
-              <Edit2 size={16} /> 文体チェック設定
-            </h4>
-            <p className="text-xs text-slate-500 mb-3 leading-relaxed">
-              指定した文体にそぐわない表現（「です・ます」や「だ・である」の混在）をハイライト表示します。
-            </p>
-            <div className="space-y-2">
-              <label className="flex items-center gap-3 p-3 border rounded-lg hover:bg-slate-50 cursor-pointer transition-colors">
-                <input
-                  type="radio"
-                  name="writingStyle"
-                  value=""
-                  checked={writingStyle === ""}
-                  onChange={(e) => setWritingStyle(e.target.value)}
-                  className="w-4 h-4 text-indigo-600 focus:ring-indigo-500 border-gray-300"
-                />
-                <span className="text-sm font-bold text-slate-700">
-                  未設定 (チェックしない)
-                </span>
-              </label>
-
-              <label className="flex items-center gap-3 p-3 border rounded-lg hover:bg-slate-50 cursor-pointer transition-colors">
-                <input
-                  type="radio"
-                  name="writingStyle"
-                  value="keigo"
-                  checked={writingStyle === "keigo"}
-                  onChange={(e) => setWritingStyle(e.target.value)}
-                  className="w-4 h-4 text-indigo-600 focus:ring-indigo-500 border-gray-300"
-                />
-                <div>
-                  <span className="block text-sm font-bold text-slate-700">
-                    敬体 (です・ます調)
-                  </span>
-                  <span className="block text-xs text-slate-400 mt-0.5">
-                    「だ・である」等を警告
-                  </span>
-                </div>
-              </label>
-
-              <label className="flex items-center gap-3 p-3 border rounded-lg hover:bg-slate-50 cursor-pointer transition-colors">
-                <input
-                  type="radio"
-                  name="writingStyle"
-                  value="joutai"
-                  checked={writingStyle === "joutai"}
-                  onChange={(e) => setWritingStyle(e.target.value)}
-                  className="w-4 h-4 text-indigo-600 focus:ring-indigo-500 border-gray-300"
-                />
-                <div>
-                  <span className="block text-sm font-bold text-slate-700">
-                    常体 (だ・である調)
-                  </span>
-                  <span className="block text-xs text-slate-400 mt-0.5">
-                    「です・ます」等を警告
-                  </span>
-                </div>
-              </label>
+              <div className="px-4 py-3 bg-slate-50 border-t border-slate-200">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <div className="mt-0.5">
+                    <input
+                      type="checkbox"
+                      checked={showChecksInList}
+                      onChange={(e) => setShowChecksInList(e.target.checked)}
+                      className="w-4 h-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                    />
+                  </div>
+                  <div>
+                    <span className="block text-sm font-bold text-indigo-900">
+                      一覧画面にも適用する
+                    </span>
+                    <span className="block text-xs text-slate-500 mt-1 leading-relaxed">
+                      リスト表示や参照パネルでも、校正箇所をハイライトします。
+                    </span>
+                  </div>
+                </label>
+              </div>
             </div>
           </div>
 
@@ -1161,6 +1269,7 @@ const ReferenceSelectorModal = ({
   entries,
   onSelect,
   currentQuestion,
+  appSettings,
 }) => {
   const [search, setSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState(new Set());
@@ -1334,6 +1443,16 @@ const ReferenceSelectorModal = ({
                           <HighlightText
                             text={item.answer}
                             highlight={search}
+                            writingStyle={
+                              appSettings?.showChecksInList
+                                ? appSettings.writingStyle
+                                : ""
+                            }
+                            checkNgWords={
+                              appSettings?.showChecksInList
+                                ? appSettings.checkNgWords
+                                : false
+                            }
                           />
                         </p>
                       </div>
@@ -1639,6 +1758,7 @@ const QAItemDisplay = ({
   showCompanyInfo = false,
   onEdit,
   highlight,
+  appSettings,
 }) => (
   <div className="p-4 bg-white border border-slate-200 rounded-xl hover:shadow-md transition-all group">
     {showCompanyInfo && (
@@ -1693,7 +1813,16 @@ const QAItemDisplay = ({
     )}
 
     <p className="text-sm text-slate-600 whitespace-pre-wrap leading-7 mb-3 pl-7">
-      <HighlightText text={qa.answer} highlight={highlight} />
+      <HighlightText
+        text={qa.answer}
+        highlight={highlight}
+        writingStyle={
+          appSettings?.showChecksInList ? appSettings.writingStyle : ""
+        }
+        checkNgWords={
+          appSettings?.showChecksInList ? appSettings.checkNgWords : false
+        }
+      />
     </p>
 
     <div className="pl-7 flex flex-wrap justify-between items-end gap-2">
@@ -1715,7 +1844,14 @@ const QAItemDisplay = ({
   </div>
 );
 
-const ESEntryDisplay = ({ entry, onEdit, onDelete, companyUrl, highlight }) => {
+const ESEntryDisplay = ({
+  entry,
+  onEdit,
+  onDelete,
+  companyUrl,
+  highlight,
+  appSettings,
+}) => {
   const qas = entry.qas || [];
   const isExpired = entry.deadline && new Date(entry.deadline) < new Date();
 
@@ -1819,7 +1955,20 @@ const ESEntryDisplay = ({ entry, onEdit, onDelete, companyUrl, highlight }) => {
               )}
 
               <p className="text-sm text-slate-600 whitespace-pre-wrap leading-7 mb-3 pl-6">
-                <HighlightText text={qa.answer} highlight={highlight} />
+                <HighlightText
+                  text={qa.answer}
+                  highlight={highlight}
+                  writingStyle={
+                    appSettings?.showChecksInList
+                      ? appSettings.writingStyle
+                      : ""
+                  }
+                  checkNgWords={
+                    appSettings?.showChecksInList
+                      ? appSettings.checkNgWords
+                      : false
+                  }
+                />
               </p>
               <div className="pl-6 flex flex-wrap justify-between items-end gap-2">
                 <div className="flex flex-wrap gap-2">
@@ -1845,7 +1994,7 @@ const ESEntryDisplay = ({ entry, onEdit, onDelete, companyUrl, highlight }) => {
   );
 };
 
-const DraftDisplay = ({ draft, onEdit, onDelete, highlight }) => {
+const DraftDisplay = ({ draft, onEdit, onDelete, highlight, appSettings }) => {
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-all duration-300">
       <div className="px-5 py-3 border-b border-slate-100 bg-gradient-to-r from-orange-50/50 to-white flex justify-between items-center">
@@ -1892,7 +2041,18 @@ const DraftDisplay = ({ draft, onEdit, onDelete, highlight }) => {
             </div>
 
             <p className="text-sm text-slate-600 whitespace-pre-wrap leading-7 pl-6">
-              <HighlightText text={item.answer} highlight={highlight} />
+              <HighlightText
+                text={item.answer}
+                highlight={highlight}
+                writingStyle={
+                  appSettings?.showChecksInList ? appSettings.writingStyle : ""
+                }
+                checkNgWords={
+                  appSettings?.showChecksInList
+                    ? appSettings.checkNgWords
+                    : false
+                }
+              />
             </p>
           </div>
         ))}
@@ -2140,6 +2300,7 @@ export default function App() {
     autoSave: false,
     writingStyle: "",
     checkNgWords: true,
+    showChecksInList: false,
   });
   const [isInitialized, setIsInitialized] = useState(false);
 
@@ -2150,7 +2311,12 @@ export default function App() {
   // --- Effects: Initialization & Auto Save ---
   useEffect(() => {
     const savedSettingsJson = localStorage.getItem(STORAGE_KEY_SETTINGS);
-    let initialSettings = { autoSave: false, writingStyle: "" };
+    let initialSettings = {
+      autoSave: false,
+      writingStyle: "",
+      checkNgWords: true,
+      showChecksInList: false,
+    };
 
     if (savedSettingsJson) {
       try {
@@ -3183,6 +3349,7 @@ export default function App() {
                         onEdit={startEdit}
                         onDelete={handleDelete}
                         highlight={searchQuery}
+                        appSettings={appSettings}
                       />
                     ))}
                   </div>
@@ -3208,6 +3375,7 @@ export default function App() {
                           onDelete={handleDelete}
                           companyUrl={cData.myPageUrl}
                           highlight={searchQuery}
+                          appSettings={appSettings}
                         />
                       );
                     })}
@@ -3233,6 +3401,7 @@ export default function App() {
                         showCompanyInfo={true}
                         onEdit={handleEditById}
                         highlight={searchQuery}
+                        appSettings={appSettings}
                       />
                     ))}
                   </div>
@@ -3269,6 +3438,7 @@ export default function App() {
                               showCompanyInfo={true}
                               onEdit={handleEditById}
                               highlight={searchQuery}
+                              appSettings={appSettings}
                             />
                           ))}
                         </div>
@@ -3314,6 +3484,7 @@ export default function App() {
                                     onDelete={handleDelete}
                                     companyUrl={cData.myPageUrl}
                                     highlight={searchQuery}
+                                    appSettings={appSettings}
                                   />
                                 );
                               })}
@@ -3351,6 +3522,7 @@ export default function App() {
                                   onEdit={startEdit}
                                   onDelete={handleDelete}
                                   companyUrl={cData.myPageUrl}
+                                  appSettings={appSettings}
                                 />
                               );
                             })}
@@ -4090,6 +4262,7 @@ export default function App() {
           onClose={() => setIsRefPanelOpen(false)}
           entries={entries}
           editingId={editingId}
+          appSettings={appSettings}
         />
       </div>
 
