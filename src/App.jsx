@@ -52,6 +52,19 @@ const STORAGE_KEY_DATA = "ES_MANAGER_DATA";
 const STORAGE_KEY_VIEW_SETTINGS = "ES_MANAGER_VIEW_SETTINGS";
 const HEADER_HEIGHT = "57px";
 
+const STYLE_PATTERNS = {
+  keigo: {
+    pattern:
+      /(だ|である|だった|であった|(?<!て)いる|(?<!で)ある|ない)(?=[。\n]|$)/g,
+    color: "bg-rose-200",
+  },
+  joutai: {
+    pattern:
+      /(です|ます|でした|ました|ません|ましょう|ございます|おります|いたします)(?=[。\n]|$)/g,
+    color: "bg-rose-200",
+  },
+};
+
 const COMPANY_DATA_COLUMNS = [
   { id: "company", label: "企業名", minWidth: "180px" },
   { id: "industry", label: "業界", minWidth: "120px" },
@@ -259,10 +272,29 @@ const AutoResizeTextarea = ({
   placeholder,
   isActive,
   charLimit,
+  writingStyle,
 }) => {
   const minHeightGhostRef = useRef(null);
   const contentGhostRef = useRef(null);
   const [textareaHeight, setTextareaHeight] = useState("auto");
+
+  const highlightRenderer = useMemo(() => {
+    if (!writingStyle || !STYLE_PATTERNS[writingStyle] || !value) return null;
+
+    const { pattern, color } = STYLE_PATTERNS[writingStyle];
+    const parts = value.split(pattern);
+
+    return parts.map((part, i) => {
+      if (part.match(pattern)) {
+        return (
+          <span key={i} className={`${color} rounded-sm`}>
+            {part}
+          </span>
+        );
+      }
+      return <span key={i}>{part}</span>;
+    });
+  }, [value, writingStyle]);
 
   const dummyText = useMemo(() => {
     if (isActive && charLimit && Number(charLimit) > 0) {
@@ -284,6 +316,18 @@ const AutoResizeTextarea = ({
   return (
     <div className="relative w-full group">
       <div
+        aria-hidden="true"
+        className="absolute top-0 left-0 w-full p-3 text-sm border border-transparent whitespace-pre-wrap break-words pointer-events-none text-transparent"
+        style={{
+          zIndex: 0,
+          fontFamily: "inherit",
+          lineHeight: "inherit",
+        }}
+      >
+        {highlightRenderer}
+      </div>
+
+      <div
         ref={minHeightGhostRef}
         aria-hidden="true"
         className="absolute top-0 left-0 w-full p-3 text-sm border border-transparent invisible whitespace-pre-wrap break-words pointer-events-none"
@@ -303,13 +347,15 @@ const AutoResizeTextarea = ({
       </div>
 
       <textarea
-        className="w-full p-3 text-sm border rounded-lg bg-white focus:border-indigo-500 outline-none resize-none overflow-hidden block box-border transition-[height,border-color] duration-300 ease-in-out"
+        className="relative z-10 w-full p-3 text-sm border rounded-lg bg-transparent focus:border-indigo-500 outline-none resize-none overflow-hidden block box-border transition-[height,border-color] duration-300 ease-in-out"
         style={{ height: textareaHeight }}
         placeholder={placeholder}
         value={value}
         onFocus={onFocus}
         onChange={onChange}
       />
+
+      <div className="absolute inset-0 bg-white rounded-lg -z-10 border border-slate-300 pointer-events-none" />
     </div>
   );
 };
@@ -855,18 +901,21 @@ const ReferenceSidebar = ({ isOpen, onClose, entries, editingId }) => {
 const SettingsModal = ({
   isOpen,
   onClose,
+  initialSettings,
   initialAutoSave,
   onSettingsSave,
 }) => {
   const [apiKey, setApiKey] = useState("");
   const [autoSave, setAutoSave] = useState(false);
+  const [writingStyle, setWritingStyle] = useState("");
 
   useEffect(() => {
     if (isOpen) {
       setApiKey(localStorage.getItem("GEMINI_API_KEY") || "");
-      setAutoSave(initialAutoSave);
+      setAutoSave(initialSettings?.autoSave || false);
+      setWritingStyle(initialSettings?.writingStyle || "");
     }
-  }, [isOpen, initialAutoSave]);
+  }, [isOpen, initialSettings]);
 
   const handleSave = () => {
     if (apiKey.trim()) {
@@ -875,10 +924,10 @@ const SettingsModal = ({
       localStorage.removeItem("GEMINI_API_KEY");
     }
 
-    onSettingsSave({ autoSave });
+    const newSettings = { autoSave, writingStyle };
+    onSettingsSave(newSettings);
 
-    localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify({ autoSave }));
-
+    localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(newSettings));
     onClose();
   };
 
@@ -886,7 +935,7 @@ const SettingsModal = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
         <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
           <h3 className="font-bold text-slate-700 flex items-center gap-2">
             <Settings size={18} className="text-indigo-600" /> 設定
@@ -899,7 +948,7 @@ const SettingsModal = ({
             <X size={20} />
           </button>
         </div>
-        <div className="p-6 space-y-6">
+        <div className="p-6 space-y-6 overflow-y-auto">
           {/* API Key Section */}
           <div>
             <h4 className="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
@@ -919,6 +968,68 @@ const SettingsModal = ({
           </div>
 
           <hr className="border-slate-100" />
+
+          <div>
+            <h4 className="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+              <Edit2 size={16} /> 文体チェック設定
+            </h4>
+            <p className="text-xs text-slate-500 mb-3 leading-relaxed">
+              指定した文体にそぐわない表現（「です・ます」や「だ・である」の混在）をハイライト表示します。
+            </p>
+            <div className="space-y-2">
+              <label className="flex items-center gap-3 p-3 border rounded-lg hover:bg-slate-50 cursor-pointer transition-colors">
+                <input
+                  type="radio"
+                  name="writingStyle"
+                  value=""
+                  checked={writingStyle === ""}
+                  onChange={(e) => setWritingStyle(e.target.value)}
+                  className="w-4 h-4 text-indigo-600 focus:ring-indigo-500 border-gray-300"
+                />
+                <span className="text-sm font-bold text-slate-700">
+                  未設定 (チェックしない)
+                </span>
+              </label>
+
+              <label className="flex items-center gap-3 p-3 border rounded-lg hover:bg-slate-50 cursor-pointer transition-colors">
+                <input
+                  type="radio"
+                  name="writingStyle"
+                  value="keigo"
+                  checked={writingStyle === "keigo"}
+                  onChange={(e) => setWritingStyle(e.target.value)}
+                  className="w-4 h-4 text-indigo-600 focus:ring-indigo-500 border-gray-300"
+                />
+                <div>
+                  <span className="block text-sm font-bold text-slate-700">
+                    敬体 (です・ます調)
+                  </span>
+                  <span className="block text-xs text-slate-400 mt-0.5">
+                    「だ・である」等を警告
+                  </span>
+                </div>
+              </label>
+
+              <label className="flex items-center gap-3 p-3 border rounded-lg hover:bg-slate-50 cursor-pointer transition-colors">
+                <input
+                  type="radio"
+                  name="writingStyle"
+                  value="joutai"
+                  checked={writingStyle === "joutai"}
+                  onChange={(e) => setWritingStyle(e.target.value)}
+                  className="w-4 h-4 text-indigo-600 focus:ring-indigo-500 border-gray-300"
+                />
+                <div>
+                  <span className="block text-sm font-bold text-slate-700">
+                    常体 (だ・である調)
+                  </span>
+                  <span className="block text-xs text-slate-400 mt-0.5">
+                    「です・ます」等を警告
+                  </span>
+                </div>
+              </label>
+            </div>
+          </div>
 
           {/* Auto Save Section */}
           <div>
@@ -1738,6 +1849,7 @@ const DraftEditor = ({
   onSave,
   onCancel,
   companyNames = [],
+  writingStyle,
 }) => {
   const [activeItemId, setActiveItemId] = useState(null);
 
@@ -1875,6 +1987,7 @@ const DraftEditor = ({
                       onFocus={() => setActiveItemId(item.id)}
                       placeholder="回答・内容..."
                       isActive={isActive}
+                      writingStyle={writingStyle}
                     />
                   </div>
                 </div>
@@ -1958,7 +2071,10 @@ export default function App() {
   const [draftFormData, setDraftFormData] = useState({ title: "", items: [] });
   const [initialDraftState, setInitialDraftState] = useState(null);
 
-  const [appSettings, setAppSettings] = useState({ autoSave: false });
+  const [appSettings, setAppSettings] = useState({
+    autoSave: false,
+    writingStyle: "",
+  });
   const [isInitialized, setIsInitialized] = useState(false);
 
   const [activeQAId, setActiveQAId] = useState(null);
@@ -1968,11 +2084,14 @@ export default function App() {
   // --- Effects: Initialization & Auto Save ---
   useEffect(() => {
     const savedSettingsJson = localStorage.getItem(STORAGE_KEY_SETTINGS);
-    let initialSettings = { autoSave: false };
+    let initialSettings = { autoSave: false, writingStyle: "" };
 
     if (savedSettingsJson) {
       try {
-        initialSettings = JSON.parse(savedSettingsJson);
+        initialSettings = {
+          ...initialSettings,
+          ...JSON.parse(savedSettingsJson),
+        };
       } catch (e) {
         console.error("Failed to parse settings", e);
       }
@@ -3447,6 +3566,7 @@ export default function App() {
                 onSave={handleSaveDraft}
                 onCancel={handleCancel}
                 companyNames={companyNames}
+                writingStyle={appSettings.writingStyle}
               />
             ) : (
               // --- Standard Entry Editor Mode ---
@@ -3783,6 +3903,7 @@ export default function App() {
                                   placeholder="回答..."
                                   isActive={isActive}
                                   charLimit={qa.charLimit}
+                                  writingStyle={appSettings.writingStyle}
                                 />
                                 <div
                                   className={`grid transition-[grid-template-rows,opacity] duration-300 ease-in-out ${
@@ -3907,7 +4028,7 @@ export default function App() {
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
-        initialAutoSave={appSettings.autoSave}
+        initialSettings={appSettings}
         onSettingsSave={handleSettingsSave}
       />
 
