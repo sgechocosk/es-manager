@@ -55,14 +55,19 @@ const HEADER_HEIGHT = "57px";
 const STYLE_PATTERNS = {
   keigo: {
     pattern:
-      /(だ|である|だった|であった|(?<!て)いる|(?<!で)ある|ない)(?=[。\n]|$)/g,
+      /(?:だ|である|だった|であった|(?<!て)いる|(?<!で)ある|ない)(?=[。\n]|$)/g,
     color: "bg-rose-200",
   },
   joutai: {
     pattern:
-      /(です|ます|でした|ました|ません|ましょう|ございます|おります|いたします)(?=[。\n]|$)/g,
+      /(?:です|ます|でした|ました|ません|ましょう|ございます|おります|いたします)(?=[。\n]|$)/g,
     color: "bg-rose-200",
   },
+};
+
+const NG_WORD_PATTERN = {
+  pattern: /(?:御社)/g,
+  color: "bg-rose-200",
 };
 
 const COMPANY_DATA_COLUMNS = [
@@ -273,28 +278,62 @@ const AutoResizeTextarea = ({
   isActive,
   charLimit,
   writingStyle,
+  checkNgWords,
 }) => {
   const minHeightGhostRef = useRef(null);
   const contentGhostRef = useRef(null);
   const [textareaHeight, setTextareaHeight] = useState("auto");
 
   const highlightRenderer = useMemo(() => {
-    if (!writingStyle || !STYLE_PATTERNS[writingStyle] || !value) return null;
+    if (!value) return null;
 
-    const { pattern, color } = STYLE_PATTERNS[writingStyle];
-    const parts = value.split(pattern);
+    const activePatterns = [];
+
+    if (checkNgWords) {
+      activePatterns.push({
+        source: NG_WORD_PATTERN.pattern.source,
+        color: NG_WORD_PATTERN.color,
+      });
+    }
+
+    if (writingStyle && STYLE_PATTERNS[writingStyle]) {
+      activePatterns.push({
+        source: STYLE_PATTERNS[writingStyle].pattern.source,
+        color: STYLE_PATTERNS[writingStyle].color,
+      });
+    }
+
+    if (activePatterns.length === 0) return null;
+
+    const combinedSource =
+      "(" + activePatterns.map((p) => p.source).join("|") + ")";
+    const combinedRegex = new RegExp(combinedSource, "g");
+
+    const parts = value.split(combinedRegex);
 
     return parts.map((part, i) => {
-      if (part.match(pattern)) {
+      if (i % 2 === 1) {
+        let appliedColor = "bg-yellow-200";
+
+        if (checkNgWords && part.match(NG_WORD_PATTERN.pattern)) {
+          appliedColor = NG_WORD_PATTERN.color;
+        } else if (
+          writingStyle &&
+          STYLE_PATTERNS[writingStyle] &&
+          part.match(STYLE_PATTERNS[writingStyle].pattern)
+        ) {
+          appliedColor = STYLE_PATTERNS[writingStyle].color;
+        }
+
         return (
-          <span key={i} className={`${color} rounded-sm`}>
+          <span key={i} className={`${appliedColor} rounded-sm`}>
             {part}
           </span>
         );
       }
       return <span key={i}>{part}</span>;
     });
-  }, [value, writingStyle]);
+  }, [value, writingStyle, checkNgWords]);
 
   const dummyText = useMemo(() => {
     if (isActive && charLimit && Number(charLimit) > 0) {
@@ -908,12 +947,14 @@ const SettingsModal = ({
   const [apiKey, setApiKey] = useState("");
   const [autoSave, setAutoSave] = useState(false);
   const [writingStyle, setWritingStyle] = useState("");
+  const [checkNgWords, setCheckNgWords] = useState(true);
 
   useEffect(() => {
     if (isOpen) {
       setApiKey(localStorage.getItem("GEMINI_API_KEY") || "");
       setAutoSave(initialSettings?.autoSave || false);
       setWritingStyle(initialSettings?.writingStyle || "");
+      setCheckNgWords(initialSettings?.checkNgWords ?? true);
     }
   }, [isOpen, initialSettings]);
 
@@ -924,7 +965,7 @@ const SettingsModal = ({
       localStorage.removeItem("GEMINI_API_KEY");
     }
 
-    const newSettings = { autoSave, writingStyle };
+    const newSettings = { autoSave, writingStyle, checkNgWords };
     onSettingsSave(newSettings);
 
     localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(newSettings));
@@ -970,6 +1011,28 @@ const SettingsModal = ({
           <hr className="border-slate-100" />
 
           <div>
+            <h4 className="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+              <Edit2 size={16} /> 入力チェック設定
+            </h4>
+
+            {/* NGワード設定 */}
+            <label className="flex items-center gap-3 p-3 border rounded-lg hover:bg-slate-50 cursor-pointer transition-colors mb-4 bg-rose-50/30 border-rose-100">
+              <input
+                type="checkbox"
+                checked={checkNgWords}
+                onChange={(e) => setCheckNgWords(e.target.checked)}
+                className="w-4 h-4 text-rose-600 focus:ring-rose-500 border-gray-300 rounded"
+              />
+              <div>
+                <span className="block text-sm font-bold text-slate-700">
+                  NGワードを警告
+                </span>
+                <span className="block text-xs text-slate-500 mt-0.5">
+                  書き言葉として不適切な「御社」などをハイライト
+                </span>
+              </div>
+            </label>
+
             <h4 className="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
               <Edit2 size={16} /> 文体チェック設定
             </h4>
@@ -1850,6 +1913,7 @@ const DraftEditor = ({
   onCancel,
   companyNames = [],
   writingStyle,
+  checkNgWords,
 }) => {
   const [activeItemId, setActiveItemId] = useState(null);
 
@@ -1988,6 +2052,7 @@ const DraftEditor = ({
                       placeholder="回答・内容..."
                       isActive={isActive}
                       writingStyle={writingStyle}
+                      checkNgWords={checkNgWords}
                     />
                   </div>
                 </div>
@@ -2074,6 +2139,7 @@ export default function App() {
   const [appSettings, setAppSettings] = useState({
     autoSave: false,
     writingStyle: "",
+    checkNgWords: true,
   });
   const [isInitialized, setIsInitialized] = useState(false);
 
@@ -3567,6 +3633,7 @@ export default function App() {
                 onCancel={handleCancel}
                 companyNames={companyNames}
                 writingStyle={appSettings.writingStyle}
+                checkNgWords={appSettings.checkNgWords}
               />
             ) : (
               // --- Standard Entry Editor Mode ---
@@ -3904,6 +3971,7 @@ export default function App() {
                                   isActive={isActive}
                                   charLimit={qa.charLimit}
                                   writingStyle={appSettings.writingStyle}
+                                  checkNgWords={appSettings.checkNgWords}
                                 />
                                 <div
                                   className={`grid transition-[grid-template-rows,opacity] duration-300 ease-in-out ${
