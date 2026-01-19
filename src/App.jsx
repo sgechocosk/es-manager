@@ -3229,23 +3229,25 @@ export default function App() {
                 </button>
               </div>
 
-              <button
-                onClick={startNewMemo}
-                title="メモ作成"
-                className="bg-orange-500 hover:bg-orange-600 text-white p-2 rounded-lg sm:px-4 flex items-center gap-1.5 shadow-md transition-all active:scale-95 ml-auto shrink-0"
-              >
-                <StickyNote size={18} />
-                <span className="hidden md:inline font-medium">メモ作成</span>
-              </button>
+              <div className="flex items-center gap-1 ml-auto shrink-0">
+                <button
+                  onClick={startNewMemo}
+                  title="メモ作成"
+                  className="bg-orange-500 hover:bg-orange-600 text-white p-2 rounded-lg sm:px-4 flex items-center gap-1.5 shadow-md transition-all active:scale-95 ml-2 shrink-0"
+                >
+                  <StickyNote size={18} />
+                  <span className="hidden md:inline font-medium">メモ作成</span>
+                </button>
 
-              <button
-                onClick={startNewEntry}
-                title="新規作成"
-                className="bg-indigo-600 hover:bg-indigo-700 text-white p-2 rounded-lg sm:px-4 flex items-center gap-1.5 shadow-md transition-all active:scale-95 ml-2 shrink-0"
-              >
-                <Plus size={18} />
-                <span className="hidden md:inline font-medium">新規作成</span>
-              </button>
+                <button
+                  onClick={startNewEntry}
+                  title="新規作成"
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white p-2 rounded-lg sm:px-4 flex items-center gap-1.5 shadow-md transition-all active:scale-95 ml-1 shrink-0"
+                >
+                  <Plus size={18} />
+                  <span className="hidden md:inline font-medium">新規作成</span>
+                </button>
+              </div>
             </div>
           )}
 
