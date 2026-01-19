@@ -41,10 +41,8 @@ import {
   CalendarCheck,
   ListOrdered,
   FileText,
-  Minus,
   Columns,
   StickyNote,
-  Eye,
 } from "lucide-react";
 
 // --- Constants ---
@@ -84,6 +82,7 @@ const COMPANY_DATA_COLUMNS = [
   { id: "startingSalary", label: "初任給", minWidth: "100px" },
   { id: "annualHoliday", label: "年間休日", minWidth: "100px" },
   { id: "selectionFlow", label: "選考フロー", minWidth: "350px" },
+  { id: "idNumber", label: "ID番号", minWidth: "100px" },
   { id: "note", label: "備考", minWidth: "200px" },
 ];
 
@@ -97,7 +96,7 @@ const splitTags = (tagInput) => {
 const getCurrentJSTTime = () => {
   const date = new Date();
   const jstDate = new Date(
-    date.toLocaleString("en-US", { timeZone: "Asia/Tokyo" })
+    date.toLocaleString("en-US", { timeZone: "Asia/Tokyo" }),
   );
   const y = jstDate.getFullYear();
   const m = String(jstDate.getMonth() + 1).padStart(2, "0");
@@ -148,6 +147,7 @@ const normalizeCompanyData = (data) => {
       startingSalary: "",
       annualHoliday: "",
       selectionFlow: [],
+      idNumber: "",
       note: "",
     };
   }
@@ -162,6 +162,7 @@ const normalizeCompanyData = (data) => {
     startingSalary: data?.startingSalary || "",
     annualHoliday: data?.annualHoliday || "",
     selectionFlow: Array.isArray(data?.selectionFlow) ? data.selectionFlow : [],
+    idNumber: data?.idNumber || "",
     note: data?.note || "",
   };
 };
@@ -211,7 +212,7 @@ const callGeminiAPI = async (systemInstruction, userPrompt, onModelChange) => {
 
       if (!response.ok) {
         console.warn(
-          `Model ${model} failed with status ${response.status}. Trying next...`
+          `Model ${model} failed with status ${response.status}. Trying next...`,
         );
         throw new Error(`API Error: ${response.status}`);
       }
@@ -291,7 +292,7 @@ const HighlightText = ({ text, highlight, writingStyle, checkNgWords }) => {
           if (!part) return null;
 
           const isSearchMatch = searchTerms.some(
-            (t) => t.toLowerCase() === part.toLowerCase()
+            (t) => t.toLowerCase() === part.toLowerCase(),
           );
           if (isSearchMatch) {
             return (
@@ -691,6 +692,18 @@ const CompanyDataEditModal = ({
                   onChange={(e) => handleChange("workLocation", e.target.value)}
                 />
               </div>
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-500 mb-1 block">
+                ID番号
+              </label>
+              <input
+                type="text"
+                className="w-full px-3 py-2 border rounded-lg text-sm outline-none focus:border-indigo-500"
+                placeholder="例: AA12345"
+                value={data.idNumber}
+                onChange={(e) => handleChange("idNumber", e.target.value)}
+              />
             </div>
           </div>
 
@@ -1331,7 +1344,7 @@ const ReferenceSelectorModal = ({
 
   const handleConfirm = () => {
     const selectedItems = allQAs.filter((item) =>
-      selectedIds.has(item.uniqueId)
+      selectedIds.has(item.uniqueId),
     );
     onSelect(selectedItems);
     setSearch("");
@@ -1590,7 +1603,7 @@ const AIAssistant = ({
           (r, i) =>
             `[参考${i + 1}] (企業: ${r.company})\nQ: ${r.question}\nA: ${
               r.answer
-            }`
+            }`,
         )
         .join("\n\n");
 
@@ -1626,7 +1639,7 @@ const AIAssistant = ({
     const aiText = await callGeminiAPI(
       systemPrompt,
       userPrompt,
-      setCurrentModel
+      setCurrentModel,
     );
     setResult(aiText);
     setLoading(false);
@@ -2124,7 +2137,7 @@ const DraftEditor = ({
 
   const handleSaveClick = (close = true) => {
     const validItems = data.items.filter(
-      (item) => item.question.trim() !== "" || item.answer.trim() !== ""
+      (item) => item.question.trim() !== "" || item.answer.trim() !== "",
     );
     const finalTitle = data.title.trim() || getTodayDateString();
 
@@ -2187,8 +2200,8 @@ const DraftEditor = ({
                         isActive
                           ? "bg-orange-400"
                           : isLast
-                          ? "bg-slate-200"
-                          : "bg-orange-200"
+                            ? "bg-slate-200"
+                            : "bg-orange-200"
                       }`}
                     />
                   </div>
@@ -2283,6 +2296,7 @@ export default function App() {
       "myPageUrl",
       "location",
       "selectionFlow",
+      "idNumber",
       "action",
     ];
   });
@@ -2404,7 +2418,7 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem(
       STORAGE_KEY_VIEW_SETTINGS,
-      JSON.stringify(visibleColumns)
+      JSON.stringify(visibleColumns),
     );
   }, [visibleColumns]);
 
@@ -2621,8 +2635,8 @@ export default function App() {
         prev.map((entry) =>
           entry.company === oldCompanyName
             ? { ...entry, company: newCompanyName }
-            : entry
-        )
+            : entry,
+        ),
       );
     }
   };
@@ -2655,7 +2669,7 @@ export default function App() {
 
       if (isDirty) {
         const isConfirmed = window.confirm(
-          "編集中のメモは保存されていません。\n一覧画面に戻るとデータは失われますが、よろしいですか?"
+          "編集中のメモは保存されていません。\n一覧画面に戻るとデータは失われますが、よろしいですか?",
         );
         if (!isConfirmed) return;
       }
@@ -2679,7 +2693,7 @@ export default function App() {
 
       if (isDirty) {
         const isConfirmed = window.confirm(
-          "編集中のデータは保存されていません。\n一覧画面に戻るとデータは失われますが、よろしいですか?"
+          "編集中のデータは保存されていません。\n一覧画面に戻るとデータは失われますが、よろしいですか?",
         );
         if (!isConfirmed) return;
       }
@@ -2747,7 +2761,7 @@ export default function App() {
           entries.some((e) => e.company === newCompany);
 
         const oldEntriesCount = entries.filter(
-          (e) => e.company === oldCompany
+          (e) => e.company === oldCompany,
         ).length;
 
         const isLastEntry = oldEntriesCount <= 1;
@@ -2839,7 +2853,7 @@ export default function App() {
     } else {
       if (
         !confirm(
-          "この企業のエントリーシートを削除しますか?\n(企業データは残ります)"
+          "この企業のエントリーシートを削除しますか?\n(企業データは残ります)",
         )
       )
         return;
@@ -2850,7 +2864,7 @@ export default function App() {
   const handleDeleteCompanyData = (companyName) => {
     if (
       confirm(
-        `${companyName}のデータを削除しますか?\n(この操作は取り消せません。)`
+        `${companyName}のデータを削除しますか?\n(この操作は取り消せません。)`,
       )
     ) {
       setCompanyData((prev) => {
@@ -3015,14 +3029,14 @@ export default function App() {
           }
         } else {
           alert(
-            "無効なファイル形式です。es-data形式のJSONファイルを選択してください。"
+            "無効なファイル形式です。es-data形式のJSONファイルを選択してください。",
           );
           return;
         }
 
         if (
           confirm(
-            "現在のデータを破棄して、ファイルを読み込みますか?\n(未保存のデータは失われます)"
+            "現在のデータを破棄して、ファイルを読み込みますか?\n(未保存のデータは失われます)",
           )
         ) {
           let migratedData = { ...dataToLoad };
@@ -3491,7 +3505,7 @@ export default function App() {
                             </div>
                           </div>
                         );
-                      }
+                      },
                     )}
                     {Object.keys(entriesByStatus)
                       .filter(
@@ -3502,7 +3516,7 @@ export default function App() {
                             "提出済",
                             "採用",
                             "不採用",
-                          ].includes(s)
+                          ].includes(s),
                       )
                       .map((status) => (
                         <div
@@ -3592,7 +3606,7 @@ export default function App() {
                               </div>
                               <div className="max-h-60 overflow-y-auto space-y-1">
                                 {COMPANY_DATA_COLUMNS.filter(
-                                  (col) => col.id !== "company"
+                                  (col) => col.id !== "company",
                                 ).map((col) => (
                                   <label
                                     key={col.id}
@@ -3762,7 +3776,7 @@ export default function App() {
                                     </button>
                                     {(() => {
                                       const hasEntries = entries.some(
-                                        (e) => e.company === company
+                                        (e) => e.company === company,
                                       );
                                       return (
                                         <button
@@ -3935,7 +3949,7 @@ export default function App() {
                               <option key={s} value={s}>
                                 {s}
                               </option>
-                            )
+                            ),
                           )}
                         </select>
                       </div>
@@ -4040,7 +4054,7 @@ export default function App() {
                                         updateQA(
                                           qa.id,
                                           "charLimit",
-                                          e.target.value
+                                          e.target.value,
                                         )
                                       }
                                     />
@@ -4102,7 +4116,7 @@ export default function App() {
                                       updateQA(
                                         qa.id,
                                         "question",
-                                        e.target.value
+                                        e.target.value,
                                       )
                                     }
                                   />
