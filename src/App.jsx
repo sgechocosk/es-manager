@@ -54,7 +54,7 @@ const HEADER_HEIGHT = "57px";
 const STYLE_PATTERNS = {
   keigo: {
     pattern:
-      /(?:だ|である|だった|であった|できた|(?<!て)いる|(?<!で)ある|ない)(?=[。\n]|$)/g,
+      /(?:だ|である|った|できた|(?<!て)いる|(?<!で)ある|ない)(?=[。\n]|$)/g,
     color: "bg-rose-200",
   },
   joutai: {
