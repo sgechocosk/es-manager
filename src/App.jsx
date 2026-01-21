@@ -1666,8 +1666,8 @@ const AIAssistant = ({
   return (
     <div className="mt-2 animate-in fade-in slide-in-from-top-1 duration-200">
       {!mode && (
-        <div className="flex gap-2 flex-wrap items-center">
-          <div className="flex-1 min-w-[200px]">
+        <div className="flex gap-2 flex-wrap items-center justify-end">
+          <div className="w-full sm:flex-1 sm:w-auto min-w-[200px]">
             <input
               type="text"
               placeholder="AIへの指示 (例: 具体的に、簡潔に...)"
@@ -1686,7 +1686,7 @@ const AIAssistant = ({
           <button
             onClick={() => handleAction("feedback")}
             disabled={!answer}
-            className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 px-3 py-1.5 rounded-lg border border-emerald-200 transition-colors disabled:opacity-50 ml-auto sm:ml-0"
+            className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 px-3 py-1.5 rounded-lg border border-emerald-200 transition-colors disabled:opacity-50"
           >
             <Bot size={14} /> FB
           </button>
