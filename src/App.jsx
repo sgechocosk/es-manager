@@ -2102,6 +2102,17 @@ const DraftEditor = ({
 }) => {
   const [activeItemId, setActiveItemId] = useState(null);
 
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+        e.preventDefault();
+        handleSaveClick(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [data]);
+
   const getTodayDateString = () => {
     const now = new Date();
     return `${now.getMonth() + 1}月${now.getDate()}日のメモ`;
@@ -2495,6 +2506,35 @@ export default function App() {
       return () => clearTimeout(timer);
     }
   }, [view, isMemoMode, activeQAId]);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (
+        view === "form" &&
+        !isMemoMode &&
+        !isSettingsOpen &&
+        !isCompanyDataEditOpen
+      ) {
+        if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+          e.preventDefault();
+          if (formData.company) {
+            handleSaveEntry(false);
+          }
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [
+    view,
+    isMemoMode,
+    isSettingsOpen,
+    isCompanyDataEditOpen,
+    formData,
+    entries,
+    companyData,
+  ]);
 
   // --- Helpers & Memos ---
   const scrollToTop = (behavior = "auto") => {
