@@ -3897,43 +3897,45 @@ export default function App() {
                         </div>
                       </div>
 
-                      <>
-                        <div>
-                          <label className="text-xs font-bold text-slate-500">
-                            マイページURL
-                          </label>
-                          <div className="relative mt-1">
+                      {!editingId && (
+                        <>
+                          <div>
+                            <label className="text-xs font-bold text-slate-500">
+                              マイページURL
+                            </label>
+                            <div className="relative mt-1">
+                              <input
+                                type="url"
+                                className="w-full pl-3 pr-8 py-2 border rounded-lg outline-none focus:border-indigo-500"
+                                value={formData.myPageUrl}
+                                onChange={(e) =>
+                                  setFormData({
+                                    ...formData,
+                                    myPageUrl: e.target.value,
+                                  })
+                                }
+                                placeholder="https://..."
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <label className="text-xs font-bold text-slate-500">
+                              業界・職種
+                            </label>
                             <input
-                              type="url"
-                              className="w-full pl-3 pr-8 py-2 border rounded-lg outline-none focus:border-indigo-500"
-                              value={formData.myPageUrl}
+                              className="w-full px-3 py-2 border rounded-lg mt-1 outline-none focus:border-indigo-500"
+                              value={formData.industry}
                               onChange={(e) =>
                                 setFormData({
                                   ...formData,
-                                  myPageUrl: e.target.value,
+                                  industry: e.target.value,
                                 })
                               }
-                              placeholder="https://..."
+                              placeholder="例: IT、エンジニア"
                             />
                           </div>
-                        </div>
-                        <div>
-                          <label className="text-xs font-bold text-slate-500">
-                            業界・職種
-                          </label>
-                          <input
-                            className="w-full px-3 py-2 border rounded-lg mt-1 outline-none focus:border-indigo-500"
-                            value={formData.industry}
-                            onChange={(e) =>
-                              setFormData({
-                                ...formData,
-                                industry: e.target.value,
-                              })
-                            }
-                            placeholder="例: IT、エンジニア"
-                          />
-                        </div>
-                      </>
+                        </>
+                      )}
 
                       <div>
                         <label className="text-xs font-bold text-slate-500">
