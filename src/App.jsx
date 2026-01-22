@@ -2647,12 +2647,18 @@ export default function App() {
               status: entry.status || "未設定",
               selectionType: entry.selectionType,
               entryId: entry.id,
+              updatedAt: entry.updatedAt,
             });
           }
         });
       }
     });
-    return allItems;
+
+    return allItems.sort((a, b) => {
+      const dateA = new Date(a.updatedAt || 0);
+      const dateB = new Date(b.updatedAt || 0);
+      return dateB - dateA;
+    });
   }, [entries, searchQuery]);
 
   const tagGroups = useMemo(() => {
