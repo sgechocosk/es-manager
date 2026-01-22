@@ -2593,6 +2593,21 @@ export default function App() {
     }
 
     return [...result].sort((a, b) => {
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        const aHit = (a.company || "").toLowerCase().includes(q);
+        const bHit = (b.company || "").toLowerCase().includes(q);
+        if (aHit && !bHit) return -1;
+        if (!aHit && bHit) return 1;
+
+        if (aHit && bHit) {
+          const aExact = (a.company || "").toLowerCase() === q;
+          const bExact = (b.company || "").toLowerCase() === q;
+          if (aExact && !bExact) return -1;
+          if (!aExact && bExact) return 1;
+        }
+      }
+
       if (a.updatedAt && b.updatedAt) {
         return new Date(b.updatedAt) - new Date(a.updatedAt);
       }
@@ -2656,6 +2671,19 @@ export default function App() {
     });
     return Object.keys(groups)
       .sort((a, b) => {
+        if (searchQuery) {
+          const q = searchQuery.toLowerCase();
+          const aHit = a.toLowerCase().includes(q);
+          const bHit = b.toLowerCase().includes(q);
+          if (aHit && !bHit) return -1;
+          if (!aHit && bHit) return 1;
+
+          if (aHit && bHit) {
+            if (a.toLowerCase() === q && b.toLowerCase() !== q) return -1;
+            if (b.toLowerCase() === q && a.toLowerCase() !== q) return 1;
+          }
+        }
+
         if (a === "タグなし") return 1;
         if (b === "タグなし") return -1;
         return a.localeCompare(b, "ja");
