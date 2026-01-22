@@ -929,7 +929,7 @@ const ReferenceSidebar = ({
         <button
           onClick={onClose}
           className="text-slate-400 hover:text-slate-600 p-1 rounded-md hover:bg-slate-200/50 transition-colors"
-          title="パネルを閉じる"
+          title="閉じる"
         >
           <PanelRightClose size={20} />
         </button>
@@ -1958,7 +1958,19 @@ const ESEntryDisplay = ({
                     )}
                   </h3>
                 </div>
-                <CopyButton text={qa.answer} />
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onEdit(entry, qa.id);
+                    }}
+                    title="編集"
+                    className="p-1.5 text-slate-400 hover:text-indigo-600 rounded-md transition-colors"
+                  >
+                    <Edit2 size={14} />
+                  </button>
+                  <CopyButton text={qa.answer} />
+                </div>
               </div>
 
               {qa.note && (
@@ -2472,6 +2484,18 @@ export default function App() {
     }
   }, [drafts, viewMode]);
 
+  useEffect(() => {
+    if (view === "form" && !isMemoMode && activeQAId) {
+      const timer = setTimeout(() => {
+        const element = document.getElementById(`qa-item-${activeQAId}`);
+        if (element) {
+          element.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [view, isMemoMode, activeQAId]);
+
   // --- Helpers & Memos ---
   const scrollToTop = (behavior = "auto") => {
     window.scrollTo({ top: 0, behavior: behavior });
@@ -2875,7 +2899,7 @@ export default function App() {
     }
   };
 
-  const startEdit = (entry) => {
+  const startEdit = (entry, qaId = null) => {
     const isDraft = entry.id.toString().startsWith("draft_");
     setEditingId(entry.id);
     setView("form");
@@ -2926,8 +2950,13 @@ export default function App() {
 
       setFormData(editState);
       setInitialFormState(JSON.parse(JSON.stringify(editState)));
-      if (editState.qas.length > 0) {
-        setActiveQAId(editState.qas[0].id);
+      if (qaId) {
+        setActiveQAId(qaId);
+      } else {
+        if (editState.qas.length > 0) {
+          setActiveQAId(editState.qas[0].id);
+        }
+        scrollToTop();
       }
     }
     scrollToTop();
@@ -4017,6 +4046,7 @@ export default function App() {
                           return (
                             <div
                               key={qa.id}
+                              id={`qa-item-${qa.id}`}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setActiveQAId(qa.id);
