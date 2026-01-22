@@ -1791,7 +1791,7 @@ const QAItemDisplay = ({
           <button
             onClick={(e) => {
               e.stopPropagation();
-              onEdit(qa.entryId);
+              onEdit(qa.entryId, qa.id);
             }}
             className="p-1.5 text-slate-400 hover:text-indigo-600 rounded-md transition-colors"
             title="編集"
@@ -3002,9 +3002,9 @@ export default function App() {
     scrollToTop();
   };
 
-  const handleEditById = (id) => {
-    const entry = entries.find((e) => e.id === id);
-    if (entry) startEdit(entry);
+  const handleEditById = (entryId, qaId = null) => {
+    const entry = entries.find((e) => e.id === entryId);
+    if (entry) startEdit(entry, qaId);
   };
 
   const startNewEntry = () => {
