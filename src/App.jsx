@@ -1304,11 +1304,17 @@ const ReferenceSelectorModal = ({
             selectionType: entry.selectionType || "",
             note: qa.note || "",
             tags: Array.isArray(qa.tags) ? qa.tags.join(" ") : qa.tags || "",
+            updatedAt: entry.updatedAt,
           });
         });
       }
     });
-    return items;
+
+    return items.sort((a, b) => {
+      const dateA = new Date(a.updatedAt || 0);
+      const dateB = new Date(b.updatedAt || 0);
+      return dateB - dateA;
+    });
   }, [entries]);
 
   const filteredQAs = useMemo(() => {
