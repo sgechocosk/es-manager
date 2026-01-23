@@ -1283,6 +1283,7 @@ const ReferenceSelectorModal = ({
   onSelect,
   currentQuestion,
   appSettings,
+  excludedUniqueId,
 }) => {
   const [search, setSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState(new Set());
@@ -1311,13 +1312,22 @@ const ReferenceSelectorModal = ({
   }, [entries]);
 
   const filteredQAs = useMemo(() => {
-    if (!search) return allQAs;
+    let targetList = allQAs;
+
+    if (excludedUniqueId) {
+      targetList = targetList.filter(
+        (item) => item.uniqueId !== excludedUniqueId,
+      );
+    }
+
+    if (!search) return targetList;
+
     const terms = search
       .toLowerCase()
       .split(/[\s\u3000]+/)
       .filter((t) => t.length > 0);
 
-    return allQAs.filter((item) => {
+    return targetList.filter((item) => {
       const text = [
         item.company,
         item.question,
@@ -1333,7 +1343,7 @@ const ReferenceSelectorModal = ({
 
       return terms.every((term) => text.includes(term));
     });
-  }, [allQAs, search]);
+  }, [allQAs, search, excludedUniqueId]);
 
   const toggleSelection = (id) => {
     const next = new Set(selectedIds);
@@ -1512,6 +1522,8 @@ const AIAssistant = ({
   selectionType,
   allEntries,
   note,
+  entryId,
+  qaId,
 }) => {
   const hasApiKey = localStorage.getItem("GEMINI_API_KEY");
   const [loading, setLoading] = useState(false);
@@ -1757,6 +1769,8 @@ const AIAssistant = ({
         entries={allEntries}
         onSelect={handleSelectReferences}
         currentQuestion={question}
+        appSettings={undefined}
+        excludedUniqueId={entryId && qaId ? `${entryId}_${qaId}` : null}
       />
     </div>
   );
@@ -4303,6 +4317,8 @@ export default function App() {
                                         updateQA(qa.id, "answer", text)
                                       }
                                       allEntries={entries}
+                                      entryId={editingId}
+                                      qaId={qa.id}
                                     />
                                   </div>
                                 </div>
