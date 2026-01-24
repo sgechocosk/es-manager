@@ -6,3 +6,7 @@
 ## 実行コマンド
 
 npm run dev
+
+## 公開リンク
+
+https://es-manager.pages.dev/
