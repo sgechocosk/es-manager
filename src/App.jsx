@@ -43,6 +43,7 @@ import {
   FileText,
   Columns,
   StickyNote,
+  MessageSquareCode,
 } from "lucide-react";
 
 // --- Constants ---
@@ -1540,8 +1541,20 @@ const AIAssistant = ({
   const [isRefModalOpen, setIsRefModalOpen] = useState(false);
   const [selectedRefs, setSelectedRefs] = useState([]);
   const [currentModel, setCurrentModel] = useState("");
+  const [isPromptMode, setIsPromptMode] = useState(false);
+  const [isCopied, setIsCopied] = useState(false);
 
   if (!hasApiKey) return null;
+
+  const handleCopyPrompt = async () => {
+    try {
+      await navigator.clipboard.writeText(result);
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy", err);
+    }
+  };
 
   const handleAction = async (actionType, directRefs = null) => {
     if ((actionType === "refine" || actionType === "feedback") && !answer)
@@ -1559,30 +1572,27 @@ const AIAssistant = ({
           ? "回答の文体は常体(だ・である調)で統一してください。"
           : "";
 
-    const contextInfo = `
-    【応募先情報】
-    ・企業名: ${company || "未定"}
-    ・業界: ${industry || "未定"}
-    ・選考種別: ${selectionType || "未定"}`;
+    const contextInfo = `【応募先情報】
+・企業名: ${company || "未定"}
+・業界: ${industry || "未定"}
+・選考種別: ${selectionType || "未定"}`;
 
-    const commonInputSection = `
-    【質問内容】
-    ${question}
+    const commonInputSection = `【質問内容】
+${question}
 
-    【補足事項/前提条件】
-    ${note || "なし"}
-    ${charLimit ? `(制限: ${charLimit}文字)` : ""}`;
+【補足事項/前提条件】
+${note || "なし"}
+${charLimit ? `(制限: ${charLimit}文字)` : ""}`;
 
-    const commonConstraints = `
-    【制約条件】
-    1. ${
+    const commonConstraints = `【制約条件】
+1. ${
       charLimit
         ? charLimit + "文字以内で作成すること。"
         : "元の文字数を大きく超えないこと。"
     }
-    2. 挨拶文不要。推敲後のテキストのみ出力。
-    3. マークダウンの装飾は使わず、プレーンテキストで出力。
-    4. 改行は使用せず、一続きの文章にすること。`;
+2. 挨拶文不要。推敲後のテキストのみ出力。
+3. マークダウンの装飾は使わず、プレーンテキストで出力。
+4. 改行は使用せず、一続きの文章にすること。`;
 
     let systemPrompt = "";
     let userPrompt = "";
@@ -1590,65 +1600,67 @@ const AIAssistant = ({
     // Refine Action
     if (actionType === "refine") {
       systemPrompt = `あなたはプロのキャリアアドバイザーです。
-      応募先企業(${
+応募先企業(${
         company || "指定なし"
       })の高評価を獲得できるよう、ES回答を推敲してください。
-      出力形式はプレーンテキストのみとし、挨拶文や改行は含めないでください。
-      ${styleInstruction}`;
+出力形式はプレーンテキストのみとし、挨拶文や改行は含めないでください。
+${styleInstruction}`;
 
       userPrompt = `${contextInfo}
-      ${commonInputSection}
 
-      【元の回答】
-      ${answer}
+${commonInputSection}
 
-      【ユーザー指示】
-      ${
-        instruction ||
-        "質問に対する適切な回答をすることを前提に、基本的には論理構成(結論→理由→具体例→結び)を整理し、STAR法を意識して具体的かつ熱意が伝わる文章にしてください。"
-      }
+【元の回答】
+${answer}
 
-      【思考プロセス】
-      1. 設問タイプの判定と適用:
-        質問が「志望動機・自己PR」などの論理重視型の場合 → PREP法(結論→理由→具体例→結論)で構成してください。
-        質問が「ガクチカ・困難を乗り越えた経験」などのプロセス重視型の場合 → STAR法(結論→状況→課題→行動→結果→結論)で構成してください。
-      2. 過剰な情報の抑制:
-        文脈上不自然な場合、企業名や職種名を無理に文中に挿入しないでください。あくまで「質問への回答」として自然な日本語にしてください。
-      3. 文章の洗練:
-        冗長な表現を削ぎ落とし、熱意と具体性が伝わる表現に書き換えてください。
+【ユーザー指示】
+${
+  instruction ||
+  "質問に対する適切な回答をすることを前提に、基本的には論理構成(結論→理由→具体例→結び)を整理し、STAR法を意識して具体的かつ熱意が伝わる文章にしてください。"
+}
 
-      ${commonConstraints}`;
+【思考プロセス】
+1. 設問タイプの判定と適用:
+  質問が「志望動機・自己PR」などの論理重視型の場合 → PREP法(結論→理由→具体例→結論)で構成してください。
+  質問が「ガクチカ・困難を乗り越えた経験」などのプロセス重視型の場合 → STAR法(結論→状況→課題→行動→結果→結論)で構成してください。
+2. 過剰な情報の抑制:
+  文脈上不自然な場合、企業名や職種名を無理に文中に挿入しないでください。あくまで「質問への回答」として自然な日本語にしてください。
+3. 文章の洗練:
+  冗長な表現を削ぎ落とし、熱意と具体性が伝わる表現に書き換えてください。
+
+${commonConstraints}`;
 
       // Feedback Action
     } else if (actionType === "feedback") {
       systemPrompt = `あなたは採用担当者です。
-      以下のES回答を「構成の適切さ」「企業とのマッチ度」「読みやすさ」の観点から厳しく評価し、改善点を指摘してください。
-      ${styleInstruction}`;
+以下のES回答を「構成の適切さ」「企業とのマッチ度」「読みやすさ」の観点から厳しく評価し、改善点を指摘してください。
+${styleInstruction}`;
 
       userPrompt = `${contextInfo}
-      ${commonInputSection}
 
-      【回答内容】
-      ${answer}
+${commonInputSection}
 
-      【ユーザー指示】
-      ${
-        instruction ||
-        "この回答の良い点と悪い点を具体的に指摘し、改善案を提案してください。"
-      }
+【回答内容】
+${answer}
 
-      【思考プロセス】
-      評価を出力する前に、内部的に以下のチェックを行ってください（出力には含めなくて良いですが、評価に反映させてください）:
-      1. 構成チェック: 設問タイプに対し、適切なフレームワーク(PREPまたはSTAR)が使われているか。論理の飛躍はないか。
-      2. マッチ度チェック: 応募先企業の業界や特性に適したアピールになっているか。
-      3. 可読性チェック: 結論ファーストになっているか。採用担当者が数秒で要旨を掴めるか。
-      また、出力にはマークダウンの装飾を一切含めないでください。
+【ユーザー指示】
+${
+  instruction ||
+  "この回答の良い点と悪い点を具体的に指摘し、改善案を提案してください。"
+}
 
-      【評価指示】
-      以下の項目についてフィードバックしてください。
-      【評価できる点】
-      【改善すべき点】
-      【具体的な修正案】`;
+【思考プロセス】
+評価を出力する前に、内部的に以下のチェックを行ってください（出力には含めなくて良いですが、評価に反映させてください）:
+1. 構成チェック: 設問タイプに対し、適切なフレームワーク(PREPまたはSTAR)が使われているか。論理の飛躍はないか。
+2. マッチ度チェック: 応募先企業の業界や特性に適したアピールになっているか。
+3. 可読性チェック: 結論ファーストになっているか。採用担当者が数秒で要旨を掴めるか。
+また、出力にはマークダウンの装飾を一切含めないでください。
+
+【評価指示】
+以下の項目についてフィードバックしてください。
+【評価できる点】
+【改善すべき点】
+【具体的な修正案】`;
 
       // Generate Action
     } else if (actionType === "generate") {
@@ -1663,60 +1675,74 @@ const AIAssistant = ({
       // With Existing Answer
       if (answer && answer.trim()) {
         systemPrompt = `あなたはプロのキャリアアドバイザーです。
-        以下の「現在の回答案」をベースにし、「参考にする過去の回答」の表現や要素（言葉遣い、強み、エピソードなど）をうまく取り入れて、質問内容に対する回答を作成してください。
-        挨拶文や改行は含めず、回答本文をプレーンテキストで出力してください。
-        ${styleInstruction}`;
+以下の「現在の回答案」をベースにし、「参考にする過去の回答」の表現や要素（言葉遣い、強み、エピソードなど）をうまく取り入れて、質問内容に対する回答を作成してください。
+挨拶文や改行は含めず、回答本文をプレーンテキストで出力してください。
+${styleInstruction}`;
 
         userPrompt = `${contextInfo}
-        ${commonInputSection}
 
-        【現在の回答案】
-        ${answer}
+${commonInputSection}
 
-        【参考にする過去の回答】
-        ${refsText}
+【現在の回答案】
+${answer}
 
-        【ユーザー指示】
-        ${
-          instruction ||
-          "現在の回答案の意図や文脈を維持しつつ、参考にする回答の良い言い回しや要素を反映させて質問内容に対する回答を新規に作成してください。"
-        }
+【参考にする過去の回答】
+${refsText}
 
-        【思考プロセス】
-        1. 入力情報の分析: 「現在の回答案」に含まれる具体的なエピソードや主張は変えずに、まず質問タイプを判定し、自己PR・志望動機ならPREP法、経験記述ならSTAR法で構成してください。
-        2. 参考回答の活用:
-          内容が現在の回答と共通する場合: 参考回答の「視点や詳細な情報」も適宜取り入れ、内容を拡充してください。
-          内容が現在の回答と異なる場合: 参考回答の「構成・トーン・言い回し」を参考にし、内容は現在の回答案をベースに整えてください。
-        3. 自然な文章化: 企業名や業界名は特別必要がない場合、文中に挿入することは避けてください。あくまで自然な回答に仕上げてください。
+【ユーザー指示】
+${
+  instruction ||
+  "現在の回答案の意図や文脈を維持しつつ、参考にする回答の良い言い回しや要素を反映させて質問内容に対する回答を新規に作成してください。"
+}
 
-        ${commonConstraints}`;
+【思考プロセス】
+1. 入力情報の分析: 「現在の回答案」に含まれる具体的なエピソードや主張は変えずに、まず質問タイプを判定し、自己PR・志望動機ならPREP法、経験記述ならSTAR法で構成してください。
+2. 参考回答の活用:
+  内容が現在の回答と共通する場合: 参考回答の「視点や詳細な情報」も適宜取り入れ、内容を拡充してください。
+  内容が現在の回答と異なる場合: 参考回答の「構成・トーン・言い回し」を参考にし、内容は現在の回答案をベースに整えてください。
+3. 自然な文章化: 企業名や業界名は特別必要がない場合、文中に挿入することは避けてください。あくまで自然な回答に仕上げてください。
+
+${commonConstraints}`;
 
         // Without Existing Answer
       } else {
         systemPrompt = `あなたはプロのキャリアアドバイザーです。
-        以下の「参考にする過去の回答」の強み、エピソードなどの要素をうまく活用・再構成して、質問内容に対する回答を新規に作成してください。
-        挨拶文や改行は含めず、回答本文をプレーンテキストで出力してください。
-        ${styleInstruction}`;
+以下の「参考にする過去の回答」の強み、エピソードなどの要素をうまく活用・再構成して、質問内容に対する回答を新規に作成してください。
+挨拶文や改行は含めず、回答本文をプレーンテキストで出力してください。
+${styleInstruction}`;
 
         userPrompt = `${contextInfo}
-        ${commonInputSection}
 
-        【参考にする過去の回答】
-        ${refsText}
+${commonInputSection}
 
-        【ユーザー指示】
-        ${
-          instruction ||
-          "過去の回答のエピソードを活かして、質問内容に整合するように回答を作成してください。"
-        }
+【参考にする過去の回答】
+${refsText}
 
-        【思考プロセス】
-        1. 構成の決定: まず質問タイプを判定し、自己PR・志望動機ならPREP法、経験記述ならSTAR法で構成してください。
-        2. 要素の統合: 複数の参考回答がある場合、質問内容に最も適した要素を組み合わせ、質問内容に最適で論理的な回答を作成してください。
-        3. 自然な文章化: 企業名や業界名は特別必要がない場合、文中に挿入することは避けてください。あくまで自然な回答に仕上げてください。
+【ユーザー指示】
+${
+  instruction ||
+  "過去の回答のエピソードを活かして、質問内容に整合するように回答を作成してください。"
+}
 
-        ${commonConstraints}`;
+【思考プロセス】
+1. 構成の決定: まず質問タイプを判定し、自己PR・志望動機ならPREP法、経験記述ならSTAR法で構成してください。
+2. 要素の統合: 複数の参考回答がある場合、質問内容に最も適した要素を組み合わせ、質問内容に最適で論理的な回答を作成してください。
+3. 自然な文章化: 企業名や業界名は特別必要がない場合、文中に挿入することは避けてください。あくまで自然な回答に仕上げてください。
+
+${commonConstraints}`;
       }
+    }
+
+    if (isPromptMode) {
+      const fullPrompt = `[systemPrompt]
+${systemPrompt.replace(/^[ \t]+/gm, "")}
+
+[userPrompt]
+${userPrompt.replace(/^[ \t]+/gm, "")}`;
+
+      setResult(fullPrompt);
+      setLoading(false);
+      return;
     }
 
     const aiText = await callGeminiAPI(
@@ -1739,12 +1765,43 @@ const AIAssistant = ({
     setMode(null);
     setInstruction("");
     setSelectedRefs([]);
+    setIsCopied(false);
   };
 
   const isError =
-    result.startsWith("エラー") ||
-    result.startsWith("APIキー") ||
-    result.startsWith("AIからの");
+    !isPromptMode &&
+    (result.startsWith("エラー") ||
+      result.startsWith("APIキー") ||
+      result.startsWith("AIからの"));
+
+  const themeColor = isPromptMode ? "emerald" : "indigo";
+  const ThemeIcon = isPromptMode
+    ? MessageSquareCode
+    : mode === "feedback"
+      ? Bot
+      : Sparkles;
+
+  const titleText = isPromptMode
+    ? "生成プロンプト (外部AI用)"
+    : mode === "feedback"
+      ? "AIフィードバック"
+      : "AI生成結果";
+
+  const containerClass = isPromptMode
+    ? "mt-3 bg-white rounded-xl border-2 shadow-sm overflow-hidden animate-in slide-in-from-top-2 border-emerald-100"
+    : "mt-3 bg-white rounded-xl border-2 shadow-sm overflow-hidden animate-in slide-in-from-top-2 border-indigo-100";
+
+  const headerClass = isPromptMode
+    ? "px-4 py-2 border-b flex justify-between items-center bg-emerald-50/50 border-emerald-100"
+    : "px-4 py-2 border-b flex justify-between items-center bg-indigo-50/50 border-indigo-100";
+
+  const titleColorClass = isPromptMode
+    ? "flex items-center gap-2 text-sm font-bold text-emerald-800"
+    : "flex items-center gap-2 text-sm font-bold text-indigo-800";
+
+  const footerClass = isPromptMode
+    ? "p-3 bg-slate-50 border-t flex justify-between items-center border-emerald-50"
+    : "p-3 bg-slate-50 border-t flex justify-between items-center border-indigo-50";
 
   return (
     <div className="mt-2 animate-in fade-in slide-in-from-top-1 duration-200">
@@ -1759,42 +1816,81 @@ const AIAssistant = ({
               onChange={(e) => setInstruction(e.target.value)}
             />
           </div>
-          <button
-            onClick={() => handleAction("refine")}
-            disabled={!answer}
-            className="flex items-center gap-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded-lg shadow-sm transition-colors disabled:opacity-50"
-          >
-            <Sparkles size={12} /> 推敲
-          </button>
-          <button
-            onClick={() => handleAction("feedback")}
-            disabled={!answer}
-            className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 px-3 py-1.5 rounded-lg border border-emerald-200 transition-colors disabled:opacity-50"
-          >
-            <Bot size={14} /> FB
-          </button>
-          <button
-            onClick={() => setIsRefModalOpen(true)}
-            className="flex items-center gap-1.5 text-xs font-bold text-indigo-700 bg-indigo-100 hover:bg-indigo-200 px-3 py-1.5 rounded-lg border border-indigo-200 transition-colors"
-          >
-            <BookOpen size={12} /> 統合
-          </button>
+          <div className="flex items-center gap-2 flex-nowrap shrink-0">
+            <button
+              onClick={() => handleAction("refine")}
+              disabled={!answer}
+              className="flex items-center gap-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded-lg shadow-sm transition-colors disabled:opacity-50 whitespace-nowrap"
+            >
+              <Sparkles size={12} /> 推敲
+            </button>
+            <button
+              onClick={() => handleAction("feedback")}
+              disabled={!answer}
+              className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 px-3 py-1.5 rounded-lg border border-emerald-200 transition-colors disabled:opacity-50 whitespace-nowrap"
+            >
+              <Bot size={14} /> FB
+            </button>
+            <button
+              onClick={() => setIsRefModalOpen(true)}
+              className="flex items-center gap-1.5 text-xs font-bold text-indigo-700 bg-indigo-100 hover:bg-indigo-200 px-3 py-1.5 rounded-lg border border-indigo-200 transition-colors whitespace-nowrap"
+            >
+              <BookOpen size={12} /> 統合
+            </button>
+
+            <label
+              className="flex items-center cursor-pointer select-none ml-1"
+              title="APIを呼ばずに外部AI用のプロンプトを生成・表示します"
+            >
+              <div className="relative">
+                <input
+                  type="checkbox"
+                  checked={isPromptMode}
+                  onChange={(e) => setIsPromptMode(e.target.checked)}
+                  className="sr-only"
+                />
+                <div
+                  className={`w-9 h-5 rounded-full shadow-inner transition-colors duration-200 ease-in-out ${
+                    isPromptMode ? "bg-emerald-500" : "bg-slate-300"
+                  }`}
+                ></div>
+                <div
+                  className={`absolute top-0.5 left-0.5 bg-white w-4 h-4 rounded-full shadow-sm transition-transform duration-200 ease-in-out flex items-center justify-center ${
+                    isPromptMode ? "translate-x-4" : "translate-x-0"
+                  }`}
+                >
+                  <MessageSquareCode
+                    size={10}
+                    className={`transition-opacity duration-200 ${
+                      isPromptMode
+                        ? "text-emerald-600 opacity-100"
+                        : "opacity-0"
+                    }`}
+                  />
+                </div>
+              </div>
+            </label>
+          </div>
         </div>
       )}
 
       {loading && (
         <div className="mt-3 p-4 bg-slate-50 rounded-xl border border-slate-200 flex items-center gap-3 text-sm text-slate-500 animate-pulse">
           <Loader2 size={18} className="animate-spin text-indigo-500" />
-          <span>AIが思考中... {currentModel && `(${currentModel})`}</span>
+          <span>
+            {isPromptMode
+              ? "プロンプトを生成中..."
+              : `AIが思考中... ${currentModel && `(${currentModel})`}`}
+          </span>
         </div>
       )}
 
       {result && !loading && (
-        <div className="mt-3 bg-white rounded-xl border-2 border-indigo-100 shadow-sm overflow-hidden animate-in slide-in-from-top-2">
-          <div className="bg-indigo-50/50 px-4 py-2 border-b border-indigo-100 flex justify-between items-center">
-            <div className="flex items-center gap-2 text-sm font-bold text-indigo-800">
-              {mode === "feedback" ? <Bot size={16} /> : <Sparkles size={16} />}
-              {mode === "feedback" ? "AIフィードバック" : "AI生成結果"}
+        <div className={containerClass}>
+          <div className={headerClass}>
+            <div className={titleColorClass}>
+              <ThemeIcon size={16} />
+              {titleText}
             </div>
             <button
               onClick={close}
@@ -1807,7 +1903,7 @@ const AIAssistant = ({
           <div className="p-4 text-sm text-slate-700 leading-relaxed whitespace-pre-wrap bg-white font-sans">
             {result}
           </div>
-          <div className="p-3 bg-slate-50 border-t border-indigo-50 flex justify-between items-center">
+          <div className={footerClass}>
             <div className="text-xs font-mono text-slate-500 pl-1">
               {mode !== "feedback" && !isError && `${result.length}文字`}
             </div>
@@ -1818,16 +1914,32 @@ const AIAssistant = ({
               >
                 閉じる
               </button>
-              {mode !== "feedback" && !isError && (
+
+              {isPromptMode ? (
                 <button
-                  onClick={() => {
-                    onApply(result);
-                    close();
-                  }}
-                  className="px-3 py-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-md shadow-sm flex items-center gap-1.5 transition-colors"
+                  onClick={handleCopyPrompt}
+                  className={`px-3 py-1.5 text-xs font-bold text-white rounded-md shadow-sm flex items-center gap-1.5 transition-colors ${
+                    isCopied
+                      ? "bg-emerald-700"
+                      : "bg-emerald-600 hover:bg-emerald-700"
+                  }`}
                 >
-                  <Check size={14} /> 反映する
+                  {isCopied ? <Check size={14} /> : <Copy size={14} />}
+                  {isCopied ? "コピー完了" : "コピー"}
                 </button>
+              ) : (
+                mode !== "feedback" &&
+                !isError && (
+                  <button
+                    onClick={() => {
+                      onApply(result);
+                      close();
+                    }}
+                    className="px-3 py-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-md shadow-sm flex items-center gap-1.5 transition-colors"
+                  >
+                    <Check size={14} /> 反映する
+                  </button>
+                )
               )}
             </div>
           </div>
@@ -4390,6 +4502,7 @@ export default function App() {
                                       allEntries={entries}
                                       entryId={editingId}
                                       qaId={qa.id}
+                                      writingStyle={appSettings.writingStyle}
                                     />
                                   </div>
                                 </div>
