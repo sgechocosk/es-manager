@@ -1033,6 +1033,7 @@ const SettingsModal = ({
   const [writingStyle, setWritingStyle] = useState("");
   const [checkNgWords, setCheckNgWords] = useState(true);
   const [showChecksInList, setShowChecksInList] = useState(false);
+  const [showPromptMode, setShowPromptMode] = useState(true);
 
   useEffect(() => {
     if (isOpen) {
@@ -1041,6 +1042,7 @@ const SettingsModal = ({
       setWritingStyle(initialSettings?.writingStyle || "");
       setCheckNgWords(initialSettings?.checkNgWords ?? true);
       setShowChecksInList(initialSettings?.showChecksInList ?? false);
+      setShowPromptMode(initialSettings?.showPromptMode ?? true);
     }
   }, [isOpen, initialSettings]);
 
@@ -1056,6 +1058,7 @@ const SettingsModal = ({
       writingStyle,
       checkNgWords,
       showChecksInList,
+      showPromptMode,
     };
     onSettingsSave(newSettings);
 
@@ -1215,6 +1218,32 @@ const SettingsModal = ({
               </div>
             </div>
           </div>
+
+          <hr className="border-slate-100" />
+
+          <div>
+            <h4 className="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+              <MessageSquareCode size={16} /> プロンプト出力設定
+            </h4>
+            <label className="flex items-start gap-3 p-3 border rounded-lg hover:bg-slate-50 cursor-pointer transition-colors">
+              <input
+                type="checkbox"
+                checked={showPromptMode}
+                onChange={(e) => setShowPromptMode(e.target.checked)}
+                className="mt-1 w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500 border-gray-300"
+              />
+              <div className="flex-1">
+                <span className="block text-sm font-bold text-slate-700">
+                  プロンプト出力モードを利用する
+                </span>
+                <span className="block text-xs text-slate-500 mt-1 leading-relaxed">
+                  有効にすると、生成AIへのプロンプトを送信せずに出力する機能が利用できるようになります。
+                </span>
+              </div>
+            </label>
+          </div>
+
+          <hr className="border-slate-100" />
 
           {/* Auto Save Section */}
           <div>
@@ -1532,6 +1561,7 @@ const AIAssistant = ({
   entryId,
   qaId,
   writingStyle,
+  showPromptMode = true,
 }) => {
   const hasApiKey = localStorage.getItem("GEMINI_API_KEY");
   const [loading, setLoading] = useState(false);
@@ -1650,7 +1680,7 @@ ${
 }
 
 【思考プロセス】
-評価を出力する前に、内部的に以下のチェックを行ってください（出力には含めなくて良いですが、評価に反映させてください）:
+評価を出力する前に、内部的に以下のチェックを行ってください(出力には含めなくて良いですが、評価に反映させてください):
 1. 構成チェック: 設問タイプに対し、適切なフレームワーク(PREPまたはSTAR)が使われているか。論理の飛躍はないか。
 2. マッチ度チェック: 応募先企業の業界や特性に適したアピールになっているか。
 3. 可読性チェック: 結論ファーストになっているか。採用担当者が数秒で要旨を掴めるか。
@@ -1675,7 +1705,7 @@ ${
       // With Existing Answer
       if (answer && answer.trim()) {
         systemPrompt = `あなたはプロのキャリアアドバイザーです。
-以下の「現在の回答案」をベースにし、「参考にする過去の回答」の表現や要素（言葉遣い、強み、エピソードなど）をうまく取り入れて、質問内容に対する回答を作成してください。
+以下の「現在の回答案」をベースにし、「参考にする過去の回答」の表現や要素(言葉遣い、強み、エピソードなど)をうまく取り入れて、質問内容に対する回答を作成してください。
 挨拶文や改行は含めず、回答本文をプレーンテキストで出力してください。
 ${styleInstruction}`;
 
@@ -1838,38 +1868,40 @@ ${userPrompt.replace(/^[ \t]+/gm, "")}`;
               <BookOpen size={12} /> 統合
             </button>
 
-            <label
-              className="flex items-center cursor-pointer select-none ml-1"
-              title="APIを呼ばずに外部AI用のプロンプトを生成・表示します"
-            >
-              <div className="relative">
-                <input
-                  type="checkbox"
-                  checked={isPromptMode}
-                  onChange={(e) => setIsPromptMode(e.target.checked)}
-                  className="sr-only"
-                />
-                <div
-                  className={`w-9 h-5 rounded-full shadow-inner transition-colors duration-200 ease-in-out ${
-                    isPromptMode ? "bg-emerald-500" : "bg-slate-300"
-                  }`}
-                ></div>
-                <div
-                  className={`absolute top-0.5 left-0.5 bg-white w-4 h-4 rounded-full shadow-sm transition-transform duration-200 ease-in-out flex items-center justify-center ${
-                    isPromptMode ? "translate-x-4" : "translate-x-0"
-                  }`}
-                >
-                  <MessageSquareCode
-                    size={10}
-                    className={`transition-opacity duration-200 ${
-                      isPromptMode
-                        ? "text-emerald-600 opacity-100"
-                        : "opacity-0"
-                    }`}
+            {showPromptMode && (
+              <label
+                className="flex items-center cursor-pointer select-none ml-1"
+                title="APIを呼ばずに外部AI用のプロンプトを生成・表示します"
+              >
+                <div className="relative">
+                  <input
+                    type="checkbox"
+                    checked={isPromptMode}
+                    onChange={(e) => setIsPromptMode(e.target.checked)}
+                    className="sr-only"
                   />
+                  <div
+                    className={`w-9 h-5 rounded-full shadow-inner transition-colors duration-200 ease-in-out ${
+                      isPromptMode ? "bg-emerald-500" : "bg-slate-300"
+                    }`}
+                  ></div>
+                  <div
+                    className={`absolute top-0.5 left-0.5 bg-white w-4 h-4 rounded-full shadow-sm transition-transform duration-200 ease-in-out flex items-center justify-center ${
+                      isPromptMode ? "translate-x-4" : "translate-x-0"
+                    }`}
+                  >
+                    <MessageSquareCode
+                      size={10}
+                      className={`transition-opacity duration-200 ${
+                        isPromptMode
+                          ? "text-emerald-600 opacity-100"
+                          : "opacity-0"
+                      }`}
+                    />
+                  </div>
                 </div>
-              </div>
-            </label>
+              </label>
+            )}
           </div>
         </div>
       )}
@@ -2535,6 +2567,7 @@ export default function App() {
     writingStyle: "",
     checkNgWords: true,
     showChecksInList: false,
+    showPromptMode: true,
   });
   const [isInitialized, setIsInitialized] = useState(false);
 
@@ -2550,6 +2583,7 @@ export default function App() {
       writingStyle: "",
       checkNgWords: true,
       showChecksInList: false,
+      showPromptMode: true,
     };
 
     if (savedSettingsJson) {
@@ -4503,6 +4537,9 @@ export default function App() {
                                       entryId={editingId}
                                       qaId={qa.id}
                                       writingStyle={appSettings.writingStyle}
+                                      showPromptMode={
+                                        appSettings.showPromptMode
+                                      }
                                     />
                                   </div>
                                 </div>
