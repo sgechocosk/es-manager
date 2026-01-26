@@ -1846,63 +1846,61 @@ ${userPrompt.replace(/^[ \t]+/gm, "")}`;
               onChange={(e) => setInstruction(e.target.value)}
             />
           </div>
-          <div className="flex items-center gap-2 flex-nowrap shrink-0">
-            <button
-              onClick={() => handleAction("refine")}
-              disabled={!answer}
-              className="flex items-center gap-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded-lg shadow-sm transition-colors disabled:opacity-50 whitespace-nowrap"
-            >
-              <Sparkles size={12} /> 推敲
-            </button>
-            <button
-              onClick={() => handleAction("feedback")}
-              disabled={!answer}
-              className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 px-3 py-1.5 rounded-lg border border-emerald-200 transition-colors disabled:opacity-50 whitespace-nowrap"
-            >
-              <Bot size={14} /> FB
-            </button>
-            <button
-              onClick={() => setIsRefModalOpen(true)}
-              className="flex items-center gap-1.5 text-xs font-bold text-indigo-700 bg-indigo-100 hover:bg-indigo-200 px-3 py-1.5 rounded-lg border border-indigo-200 transition-colors whitespace-nowrap"
-            >
-              <BookOpen size={12} /> 統合
-            </button>
+          <button
+            onClick={() => handleAction("refine")}
+            disabled={!answer}
+            className="flex items-center gap-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded-lg shadow-sm transition-colors disabled:opacity-50"
+          >
+            <Sparkles size={12} /> 推敲
+          </button>
+          <button
+            onClick={() => handleAction("feedback")}
+            disabled={!answer}
+            className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 px-3 py-1.5 rounded-lg border border-emerald-200 transition-colors disabled:opacity-50"
+          >
+            <Bot size={14} /> FB
+          </button>
+          <button
+            onClick={() => setIsRefModalOpen(true)}
+            className="flex items-center gap-1.5 text-xs font-bold text-indigo-700 bg-indigo-100 hover:bg-indigo-200 px-3 py-1.5 rounded-lg border border-indigo-200 transition-colors"
+          >
+            <BookOpen size={12} /> 統合
+          </button>
 
-            {showPromptMode && (
-              <label
-                className="flex items-center cursor-pointer select-none ml-1"
-                title="APIを呼ばずに外部AI用のプロンプトを生成・表示します"
-              >
-                <div className="relative">
-                  <input
-                    type="checkbox"
-                    checked={isPromptMode}
-                    onChange={(e) => setIsPromptMode(e.target.checked)}
-                    className="sr-only"
+          {showPromptMode && (
+            <label
+              className="flex items-center cursor-pointer select-none ml-1"
+              title="APIを呼ばずに外部AI用のプロンプトを生成・表示します"
+            >
+              <div className="relative">
+                <input
+                  type="checkbox"
+                  checked={isPromptMode}
+                  onChange={(e) => setIsPromptMode(e.target.checked)}
+                  className="sr-only"
+                />
+                <div
+                  className={`w-9 h-5 rounded-full shadow-inner transition-colors duration-200 ease-in-out ${
+                    isPromptMode ? "bg-emerald-500" : "bg-slate-300"
+                  }`}
+                ></div>
+                <div
+                  className={`absolute top-0.5 left-0.5 bg-white w-4 h-4 rounded-full shadow-sm transition-transform duration-200 ease-in-out flex items-center justify-center ${
+                    isPromptMode ? "translate-x-4" : "translate-x-0"
+                  }`}
+                >
+                  <MessageSquareCode
+                    size={10}
+                    className={`transition-opacity duration-200 ${
+                      isPromptMode
+                        ? "text-emerald-600 opacity-100"
+                        : "opacity-0"
+                    }`}
                   />
-                  <div
-                    className={`w-9 h-5 rounded-full shadow-inner transition-colors duration-200 ease-in-out ${
-                      isPromptMode ? "bg-emerald-500" : "bg-slate-300"
-                    }`}
-                  ></div>
-                  <div
-                    className={`absolute top-0.5 left-0.5 bg-white w-4 h-4 rounded-full shadow-sm transition-transform duration-200 ease-in-out flex items-center justify-center ${
-                      isPromptMode ? "translate-x-4" : "translate-x-0"
-                    }`}
-                  >
-                    <MessageSquareCode
-                      size={10}
-                      className={`transition-opacity duration-200 ${
-                        isPromptMode
-                          ? "text-emerald-600 opacity-100"
-                          : "opacity-0"
-                      }`}
-                    />
-                  </div>
                 </div>
-              </label>
-            )}
-          </div>
+              </div>
+            </label>
+          )}
         </div>
       )}
 
