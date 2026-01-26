@@ -1033,7 +1033,7 @@ const SettingsModal = ({
   const [writingStyle, setWritingStyle] = useState("");
   const [checkNgWords, setCheckNgWords] = useState(true);
   const [showChecksInList, setShowChecksInList] = useState(false);
-  const [showPromptMode, setShowPromptMode] = useState(true);
+  const [showPromptMode, setShowPromptMode] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -1042,7 +1042,7 @@ const SettingsModal = ({
       setWritingStyle(initialSettings?.writingStyle || "");
       setCheckNgWords(initialSettings?.checkNgWords ?? true);
       setShowChecksInList(initialSettings?.showChecksInList ?? false);
-      setShowPromptMode(initialSettings?.showPromptMode ?? true);
+      setShowPromptMode(initialSettings?.showPromptMode ?? false);
     }
   }, [isOpen, initialSettings]);
 
@@ -2565,7 +2565,7 @@ export default function App() {
     writingStyle: "",
     checkNgWords: true,
     showChecksInList: false,
-    showPromptMode: true,
+    showPromptMode: false,
   });
   const [isInitialized, setIsInitialized] = useState(false);
 
@@ -2581,7 +2581,7 @@ export default function App() {
       writingStyle: "",
       checkNgWords: true,
       showChecksInList: false,
-      showPromptMode: true,
+      showPromptMode: false,
     };
 
     if (savedSettingsJson) {
