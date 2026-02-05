@@ -3207,11 +3207,37 @@ export default function App() {
       const newHourKey = nowUpdatedAt.substring(0, 13);
       const newUpdatedAtDate = formatDateKey(new Date(nowUpdatedAt));
 
+      let shouldBumpTimestamp = true;
+      try {
+        if (initialFormState && formData) {
+          const normalizeForCompare = (fd) => ({
+            ...fd,
+            qas: Array.isArray(fd.qas)
+              ? fd.qas.map(({ id, tags, ...rest }) => ({ ...rest }))
+              : [],
+          });
+
+          const currentComparable = JSON.stringify(
+            normalizeForCompare(formData),
+          );
+          const initialComparable = JSON.stringify(
+            normalizeForCompare(initialFormState),
+          );
+          if (currentComparable === initialComparable) {
+            shouldBumpTimestamp = false;
+          }
+        }
+      } catch (e) {
+        console.warn("Comparison for tags-only change failed", e);
+      }
+
       const entryData = {
         ...formData,
         id: currentId,
         company: newCompany,
-        updatedAt: nowUpdatedAt,
+        updatedAt: shouldBumpTimestamp
+          ? nowUpdatedAt
+          : oldEntry?.updatedAt || formData.updatedAt || getCurrentJSTTime(),
       };
       const sanitized = sanitizeEntry(entryData);
 
@@ -3234,7 +3260,7 @@ export default function App() {
         return nextData;
       });
 
-      if (!oldEntry || oldHourKey !== newHourKey) {
+      if (shouldBumpTimestamp && (!oldEntry || oldHourKey !== newHourKey)) {
         setActivityLog((prev) => {
           const next = { ...prev };
           const day = newUpdatedAtDate;
