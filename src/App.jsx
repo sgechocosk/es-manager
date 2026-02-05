@@ -3210,12 +3210,23 @@ export default function App() {
       let shouldBumpTimestamp = true;
       try {
         if (initialFormState && formData) {
-          const normalizeForCompare = (fd) => ({
-            ...fd,
-            qas: Array.isArray(fd.qas)
-              ? fd.qas.map(({ id, tags, ...rest }) => ({ ...rest }))
-              : [],
-          });
+          const normalizeForCompare = (fd) => {
+            const {
+              company,
+              status,
+              selectionType,
+              deadline,
+              note,
+              qas,
+              ...rest
+            } = fd;
+            return {
+              ...rest,
+              qas: Array.isArray(qas)
+                ? qas.map(({ id, tags, ...qaRest }) => ({ ...qaRest }))
+                : [],
+            };
+          };
 
           const currentComparable = JSON.stringify(
             normalizeForCompare(formData),
@@ -3228,7 +3239,7 @@ export default function App() {
           }
         }
       } catch (e) {
-        console.warn("Comparison for tags-only change failed", e);
+        console.warn("Comparison for metadata-only change failed", e);
       }
 
       const entryData = {
@@ -3239,6 +3250,15 @@ export default function App() {
           ? nowUpdatedAt
           : oldEntry?.updatedAt || formData.updatedAt || getCurrentJSTTime(),
       };
+
+      const completedStatuses = new Set(["提出済", "採用", "不採用"]);
+      const oldStatusIsCompleted =
+        oldEntry && completedStatuses.has(oldEntry.status);
+      const newStatusIsCompleted = completedStatuses.has(entryData.status);
+      if (oldStatusIsCompleted && !newStatusIsCompleted) {
+        entryData.completedAt = null;
+      }
+
       const sanitized = sanitizeEntry(entryData);
 
       setEntries((prevEntries) => {
@@ -4424,9 +4444,27 @@ export default function App() {
                         <select
                           className="w-full px-3 py-2 border rounded-lg mt-1 outline-none focus:border-indigo-500 bg-white"
                           value={formData.status}
-                          onChange={(e) =>
-                            setFormData({ ...formData, status: e.target.value })
-                          }
+                          onChange={(e) => {
+                            const newStatus = e.target.value;
+                            const completedStatuses = new Set([
+                              "提出済",
+                              "採用",
+                              "不採用",
+                            ]);
+                            const currentIsCompleted = completedStatuses.has(
+                              formData.status,
+                            );
+                            const newIsCompleted =
+                              completedStatuses.has(newStatus);
+
+                            if (currentIsCompleted && !newIsCompleted) {
+                              if (window.confirm("提出を取り消しますか？")) {
+                                setFormData({ ...formData, status: newStatus });
+                              }
+                            } else {
+                              setFormData({ ...formData, status: newStatus });
+                            }
+                          }}
                         >
                           {["未提出", "作成中", "提出済", "採用", "不採用"].map(
                             (s) => (
