@@ -1280,7 +1280,7 @@ const SettingsModal = ({
                   プロンプト出力モードを利用する
                 </span>
                 <span className="block text-xs text-slate-500 mt-1 leading-relaxed">
-                  有効にすると、生成AIへのプロンプトを送信せずに出力する機能が利用できるようになります。
+                  有効にすると、APIキーが設定されている場合に、生成AIへのプロンプトを送信せずに出力する機能が利用できるようになります。
                 </span>
               </div>
             </label>
