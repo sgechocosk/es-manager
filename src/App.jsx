@@ -2749,6 +2749,9 @@ export default function App() {
           if (formData.company) {
             handleSaveEntry(false);
           }
+        } else if ((e.ctrlKey || e.metaKey) && e.key === "b") {
+          e.preventDefault();
+          setIsRefPanelOpen((prev) => !prev);
         }
       }
     };
@@ -3053,7 +3056,7 @@ export default function App() {
       }
     });
 
-    setToast("メモを保存しました");
+    setToast("保存しました");
     setTimeout(() => setToast(null), 3000);
 
     if (close) {
@@ -3506,6 +3509,7 @@ export default function App() {
                   e.stopPropagation();
                   setIsRefPanelOpen((prev) => !prev);
                 }}
+                title="参照パネルを切り替える (Ctrl+B)"
                 className={`sm:hidden p-2 rounded-lg transition-colors ${
                   isRefPanelOpen
                     ? "bg-indigo-100 text-indigo-600"
@@ -3591,6 +3595,7 @@ export default function App() {
                     e.stopPropagation();
                     setIsRefPanelOpen((prev) => !prev);
                   }}
+                  title="参照パネルを切り替える (Ctrl+B)"
                   className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm font-bold transition-colors ${
                     isRefPanelOpen
                       ? "bg-indigo-50 border-indigo-200 text-indigo-700"
