@@ -1978,7 +1978,10 @@ ${userPrompt.replace(/^[ \t]+/gm, "")}`;
           </div>
           <div className={footerClass}>
             <div className="text-xs font-mono text-slate-500 pl-1">
-              {mode !== "feedback" && !isError && `${result.length}文字`}
+              {mode !== "feedback" &&
+                !isError &&
+                !(isPromptMode && (mode === "refine" || mode === "generate")) &&
+                `${result.length}文字`}
             </div>
             <div className="flex gap-2">
               <button
