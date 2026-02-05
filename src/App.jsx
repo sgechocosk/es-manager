@@ -50,6 +50,7 @@ import {
 const STORAGE_KEY_SETTINGS = "ES_MANAGER_SETTINGS";
 const STORAGE_KEY_DATA = "ES_MANAGER_DATA";
 const STORAGE_KEY_VIEW_SETTINGS = "ES_MANAGER_VIEW_SETTINGS";
+const STORAGE_KEY_ACTIVITY_LOG = "ES_MANAGER_ACTIVITY_LOG";
 const HEADER_HEIGHT = "57px";
 
 const STYLE_PATTERNS = {
@@ -108,6 +109,41 @@ const getCurrentJSTTime = () => {
   return `${y}-${m}-${d}T${H}:${M}:${S}+09:00`;
 };
 
+const formatDateKey = (date) => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+};
+
+const migrateActivityLog = (raw) => {
+  if (!raw || typeof raw !== "object") return {};
+
+  const sampleVal = Object.values(raw)[0];
+  if (typeof sampleVal === "number") {
+    const next = {};
+    Object.entries(raw).forEach(([date, count]) => {
+      next[date] = { total: Number(count) || 0, hourly: {} };
+    });
+    return next;
+  }
+
+  const next = {};
+  Object.entries(raw).forEach(([date, value]) => {
+    if (!value || typeof value !== "object") {
+      next[date] = { total: Number(value) || 0, hourly: {} };
+      return;
+    }
+    const hourly = value.hourly || {};
+    const total =
+      typeof value.total === "number"
+        ? value.total
+        : Object.values(hourly).reduce((a, b) => a + Number(b || 0), 0) || 0;
+    next[date] = { total: Number(total) || 0, hourly: { ...hourly } };
+  });
+  return next;
+};
+
 const sanitizeEntry = (entry) => {
   const now = getCurrentJSTTime();
   const rawQas = Array.isArray(entry.qas) ? entry.qas : [];
@@ -119,6 +155,12 @@ const sanitizeEntry = (entry) => {
     note: qa.note || "",
     tags: splitTags(qa.tags),
   }));
+  const completedStatuses = new Set(["提出済", "採用", "不採用"]);
+  const completedAtValue = entry.completedAt
+    ? entry.completedAt
+    : completedStatuses.has(entry.status)
+      ? entry.updatedAt || now
+      : null;
 
   return {
     id:
@@ -131,6 +173,7 @@ const sanitizeEntry = (entry) => {
     note: entry.note || "",
     createdAt: entry.createdAt || now,
     updatedAt: entry.updatedAt || now,
+    completedAt: completedAtValue,
     qas: sanitizedQas,
   };
 };
@@ -2571,6 +2614,8 @@ export default function App() {
 
   const [activeQAId, setActiveQAId] = useState(null);
 
+  const [activityLog, setActivityLog] = useState({});
+
   const [toast, setToast] = useState(null);
 
   // --- Effects: Initialization & Auto Save ---
@@ -2599,6 +2644,7 @@ export default function App() {
 
     if (initialSettings.autoSave) {
       const savedDataJson = localStorage.getItem(STORAGE_KEY_DATA);
+      const savedActivityLog = localStorage.getItem(STORAGE_KEY_ACTIVITY_LOG);
       if (savedDataJson) {
         try {
           const parsed = JSON.parse(savedDataJson);
@@ -2643,8 +2689,21 @@ export default function App() {
           if (hasMigration) {
             console.log("Migrated industry data to companyData");
           }
+
+          if (parsed.activityLog) {
+            setActivityLog(migrateActivityLog(parsed.activityLog));
+          }
         } catch (e) {
           console.error("Failed to parse auto-saved data", e);
+        }
+      }
+
+      if (savedActivityLog) {
+        try {
+          const parsedLog = JSON.parse(savedActivityLog);
+          setActivityLog(migrateActivityLog(parsedLog));
+        } catch (e) {
+          console.error("Failed to parse activity log", e);
         }
       }
     }
@@ -2659,13 +2718,26 @@ export default function App() {
         entries: entries,
         drafts: drafts,
         companyData: companyData,
+        activityLog: activityLog,
         updatedAt: getCurrentJSTTime(),
       };
       localStorage.setItem(STORAGE_KEY_DATA, JSON.stringify(dataToSave));
+      localStorage.setItem(
+        STORAGE_KEY_ACTIVITY_LOG,
+        JSON.stringify(activityLog),
+      );
     } else {
       localStorage.removeItem(STORAGE_KEY_DATA);
+      localStorage.removeItem(STORAGE_KEY_ACTIVITY_LOG);
     }
-  }, [entries, drafts, companyData, appSettings.autoSave, isInitialized]);
+  }, [
+    entries,
+    drafts,
+    companyData,
+    activityLog,
+    appSettings.autoSave,
+    isInitialized,
+  ]);
 
   useEffect(() => {
     localStorage.setItem(
@@ -3129,11 +3201,17 @@ export default function App() {
           ? formData.id
           : `entry_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
 
+      const nowUpdatedAt = getCurrentJSTTime();
+      const oldEntry = entries.find((e) => e.id === currentId);
+      const oldHourKey = oldEntry?.updatedAt?.substring(0, 13) || null;
+      const newHourKey = nowUpdatedAt.substring(0, 13);
+      const newUpdatedAtDate = formatDateKey(new Date(nowUpdatedAt));
+
       const entryData = {
         ...formData,
         id: currentId,
         company: newCompany,
-        updatedAt: getCurrentJSTTime(),
+        updatedAt: nowUpdatedAt,
       };
       const sanitized = sanitizeEntry(entryData);
 
@@ -3155,6 +3233,27 @@ export default function App() {
         }
         return nextData;
       });
+
+      if (!oldEntry || oldHourKey !== newHourKey) {
+        setActivityLog((prev) => {
+          const next = { ...prev };
+          const day = newUpdatedAtDate;
+          const dObj = next[day] ? { ...next[day] } : { total: 0, hourly: {} };
+
+          dObj.total = (dObj.total || 0) + 1;
+
+          try {
+            const h = nowUpdatedAt.split("T")[1].split(":")[0];
+            dObj.hourly = { ...(dObj.hourly || {}) };
+            dObj.hourly[h] = (dObj.hourly[h] || 0) + 1;
+          } catch (e) {
+            console.warn("Time parsing failed", e);
+          }
+
+          next[day] = dObj;
+          return next;
+        });
+      }
 
       if (closeAfterSave) {
         resetForm();
@@ -3245,6 +3344,7 @@ export default function App() {
         myPageUrl: cData.myPageUrl || "",
         recruitmentUrl: cData.recruitmentUrl || "",
         createdAt: fullEntry.createdAt,
+        completedAt: fullEntry.completedAt || null,
         qas: fullEntry.qas
           ? fullEntry.qas.map((q) => ({
               ...q,
@@ -3319,6 +3419,7 @@ export default function App() {
       entries: entries,
       drafts: drafts,
       companyData: companyData,
+      activityLog: activityLog,
       exportedAt: getCurrentJSTTime(),
     };
     const dataStr = JSON.stringify(exportData, null, 2);
@@ -3398,6 +3499,22 @@ export default function App() {
           setEntries(normalizedData);
           setDrafts(draftsToLoad);
           setCompanyData((prev) => ({ ...prev, ...migratedData }));
+
+          if (
+            importedJson &&
+            importedJson.activityLog &&
+            typeof importedJson.activityLog === "object"
+          ) {
+            try {
+              setActivityLog(
+                migrateActivityLog(importedJson.activityLog || {}),
+              );
+            } catch (e) {
+              console.error("Failed to load activityLog from import", e);
+            }
+          } else {
+            setActivityLog({});
+          }
         }
       } catch (error) {
         console.error(error);
