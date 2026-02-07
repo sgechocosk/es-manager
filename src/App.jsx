@@ -3396,7 +3396,7 @@ export default function App() {
             qa.question,
             qa.answer,
             qa.note,
-            tags.join(" "),
+            tags.join(" ")
           ]
             .join(" ")
             .toLowerCase();
@@ -4813,23 +4813,11 @@ export default function App() {
 
                 {/* View: Statistics */}
                 {viewMode === "statistics" && (
-                  <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
-                    <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 text-center">
-                      <div className="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <BarChart3 size={32} />
-                      </div>
-                      <h2 className="text-xl font-bold text-slate-800 mb-2">
-                        統計・分析ダッシュボード
-                      </h2>
-                      <p className="text-slate-500 text-sm mb-6 max-w-md mx-auto leading-relaxed">
-                        エントリーシートの作成履歴、通過率、作業時間などを可視化して、
-                        就職活動のモチベーション向上に繋げます。
-                      </p>
-                      <div className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-500 rounded-lg text-xs font-mono border border-slate-200">
-                        Work in Progress...
-                      </div>
-                    </div>
-                  </div>
+                  <StatisticsView
+                    entries={entries}
+                    companyData={companyData}
+                    activityLog={activityLog}
+                  />
                 )}
               </div>
             ) : // --- Edit Form ---
