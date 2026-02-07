@@ -45,7 +45,34 @@ import {
   StickyNote,
   MessageSquareCode,
   BarChart3,
+  Target,
+  PenTool,
+  Zap,
+  CheckCircle2,
+  Activity,
 } from "lucide-react";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Sector,
+  Radar,
+  RadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+  ScatterChart,
+  Scatter,
+  ZAxis,
+} from "recharts";
 
 // --- Constants ---
 const STORAGE_KEY_SETTINGS = "ES_MANAGER_SETTINGS";
@@ -53,6 +80,8 @@ const STORAGE_KEY_DATA = "ES_MANAGER_DATA";
 const STORAGE_KEY_VIEW_SETTINGS = "ES_MANAGER_VIEW_SETTINGS";
 const STORAGE_KEY_ACTIVITY_LOG = "ES_MANAGER_ACTIVITY_LOG";
 const HEADER_HEIGHT = "57px";
+
+const COMPLETED_STATUSES = ["提出済", "採用", "不採用"];
 
 const STYLE_PATTERNS = {
   keigo: {
@@ -88,6 +117,62 @@ const COMPANY_DATA_COLUMNS = [
   { id: "idNumber", label: "ID番号", minWidth: "100px" },
   { id: "note", label: "備考", minWidth: "200px" },
 ];
+
+// --- Statistics Constants & Utils ---
+const CHART_COLORS = {
+  primary: "#6366f1",
+  secondary: "#8b5cf6",
+  success: "#10b981",
+  warning: "#f59e0b",
+  danger: "#ef4444",
+  info: "#3b82f6",
+  neutral: "#64748b",
+  text: "#1e293b",
+  grid: "#f1f5f9",
+};
+
+const ANALYTICS_STATUS_GROUPS = {
+  success: ["採用"],
+  failure: ["不採用"],
+  pending: ["未提出", "作成中"],
+  completed: ["提出済", "採用", "不採用"],
+};
+
+const parseSalary = (value) => {
+  if (!value) return null;
+  let normalized = value.replace(/[０-９]/g, (s) =>
+    String.fromCharCode(s.charCodeAt(0) - 0xfee0),
+  );
+
+  if (normalized.includes("~") || normalized.includes("〜")) {
+    const parts = normalized
+      .split(/[~〜]/)
+      .map((s) => parseFloat(s.replace(/[^0-9.]/g, "")))
+      .filter((n) => !isNaN(n));
+    if (parts.length === 2) return (parts[0] + parts[1]) / 2;
+  }
+
+  const match = normalized.match(/[0-9.]+/);
+  if (!match) return null;
+
+  let num = parseFloat(match[0]);
+  return num;
+};
+
+const getDeadlineStatus = (deadline, completedAt) => {
+  if (!deadline) return "safe";
+  const targetDate = completedAt ? new Date(completedAt) : new Date();
+  const deadlineDate = new Date(deadline);
+
+  const diffTime = deadlineDate - targetDate;
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+  if (diffDays < 0) return "overdue";
+  if (diffDays <= 1) return "danger";
+  if (diffDays <= 3) return "warning";
+  if (diffDays < 7) return "normal";
+  return "safe";
+};
 
 // --- Utilities ---
 const splitTags = (tagInput) => {
@@ -156,7 +241,8 @@ const sanitizeEntry = (entry) => {
     note: qa.note || "",
     tags: splitTags(qa.tags),
   }));
-  const completedStatuses = new Set(["提出済", "採用", "不採用"]);
+
+  const completedStatuses = new Set(COMPLETED_STATUSES);
   const completedAtValue = entry.completedAt
     ? entry.completedAt
     : completedStatuses.has(entry.status)
@@ -363,6 +449,365 @@ const HighlightText = ({ text, highlight, writingStyle, checkNgWords }) => {
           return <span key={i}>{part}</span>;
         })}
     </>
+  );
+};
+
+// --- Statistics Components ---
+const StatCard = ({ icon: Icon, label, value, subValue, colorClass }) => (
+  <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4 transition-all hover:shadow-md">
+    <div
+      className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${colorClass.bg} ${colorClass.text}`}
+    >
+      <Icon size={24} />
+    </div>
+    <div>
+      <p className="text-xs font-bold text-slate-400 mb-0.5">{label}</p>
+      <div className="flex items-baseline gap-2">
+        <h3 className="text-2xl font-black text-slate-700">{value}</h3>
+        {subValue && (
+          <span className="text-xs font-bold text-slate-400">{subValue}</span>
+        )}
+      </div>
+    </div>
+  </div>
+);
+
+const StatisticsView = ({ entries, companyData, activityLog }) => {
+  const stats = useMemo(() => {
+    let totalEntries = 0;
+    let completedCount = 0;
+    let totalCharacters = 0;
+    let totalQA = 0;
+    let uniqueCompanies = new Set();
+
+    const monthlyStats = {};
+    const hourlyCounts = Array(24).fill(0);
+    const charDist = Array(11).fill(0);
+    const tagCounts = {};
+    const deadlineCounts = {
+      safe: 0,
+      normal: 0,
+      warning: 0,
+      danger: 0,
+      overdue: 0,
+    };
+
+    const industryCounts = {};
+    const selectionTypeCounts = {};
+
+    const deadlineCorrelation = [];
+
+    let maxCharEntry = { company: "-", chars: 0 };
+    let minCharEntry = { company: "-", chars: 999999 };
+    let maxCharQA = { question: "-", chars: 0 };
+    let minCharQA = { question: "-", chars: 999999 };
+
+    const now = new Date();
+    let firstDate = now;
+
+    entries.forEach((entry) => {
+      totalEntries++;
+      if (entry.company) uniqueCompanies.add(entry.company);
+
+      const isCompleted = ANALYTICS_STATUS_GROUPS.completed.includes(
+        entry.status,
+      );
+      const isPending = ANALYTICS_STATUS_GROUPS.pending.includes(entry.status);
+      const isSuccess = ANALYTICS_STATUS_GROUPS.success.includes(entry.status);
+
+      if (isCompleted) {
+        completedCount++;
+      }
+
+      const industry =
+        companyData[entry.company]?.industry || entry.industry || "未分類";
+      industryCounts[industry] = (industryCounts[industry] || 0) + 1;
+
+      const selectionType = entry.selectionType || "未設定";
+      selectionTypeCounts[selectionType] =
+        (selectionTypeCounts[selectionType] || 0) + 1;
+
+      if (entry.createdAt) {
+        const created = new Date(entry.createdAt);
+        if (created < firstDate) firstDate = created;
+
+        const monthKey = `${created.getFullYear()}/${String(created.getMonth() + 1).padStart(2, "0")}`;
+        if (!monthlyStats[monthKey])
+          monthlyStats[monthKey] = { name: monthKey, created: 0, completed: 0 };
+        monthlyStats[monthKey].created++;
+
+        if (entry.updatedAt) {
+          const updated = new Date(entry.updatedAt);
+          hourlyCounts[updated.getHours()]++;
+
+          if (isCompleted) {
+            const completeMonthKey = `${updated.getFullYear()}/${String(updated.getMonth() + 1).padStart(2, "0")}`;
+            if (!monthlyStats[completeMonthKey])
+              monthlyStats[completeMonthKey] = {
+                name: completeMonthKey,
+                created: 0,
+                completed: 0,
+              };
+            monthlyStats[completeMonthKey].completed++;
+          }
+        }
+      }
+
+      let marginDays = null;
+      if (entry.deadline) {
+        const status = getDeadlineStatus(entry.deadline);
+        if (isPending) {
+          deadlineCounts[status]++;
+        }
+
+        const deadlineDate = new Date(entry.deadline);
+        const targetDate = entry.completedAt
+          ? new Date(entry.completedAt)
+          : now;
+        marginDays = Math.ceil(
+          (deadlineDate - targetDate) / (1000 * 60 * 60 * 24),
+        );
+
+        if (
+          ANALYTICS_STATUS_GROUPS.success.includes(entry.status) ||
+          ANALYTICS_STATUS_GROUPS.failure.includes(entry.status)
+        ) {
+          deadlineCorrelation.push({
+            margin: marginDays,
+            isPassed: isSuccess ? 1 : 0,
+            status: entry.status,
+          });
+        }
+      }
+
+      let entryTotalChars = 0;
+      if (entry.qas && Array.isArray(entry.qas)) {
+        entry.qas.forEach((qa) => {
+          if (qa.answer) {
+            totalQA++;
+            const len = qa.answer.length;
+            entryTotalChars += len;
+            totalCharacters += len;
+
+            const distIndex = Math.min(Math.floor(len / 100), 10);
+            charDist[distIndex]++;
+
+            const tags = splitTags(qa.tags);
+            tags.forEach((tag) => {
+              tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+            });
+
+            if (len > maxCharQA.chars)
+              maxCharQA = {
+                question: qa.question,
+                chars: len,
+                company: entry.company,
+              };
+            if (len > 10 && len < minCharQA.chars)
+              minCharQA = {
+                question: qa.question,
+                chars: len,
+                company: entry.company,
+              };
+          }
+        });
+      }
+
+      if (isCompleted) {
+        if (entryTotalChars > maxCharEntry.chars)
+          maxCharEntry = { company: entry.company, chars: entryTotalChars };
+        if (entryTotalChars > 0 && entryTotalChars < minCharEntry.chars)
+          minCharEntry = { company: entry.company, chars: entryTotalChars };
+      }
+    });
+
+    let salarySum = 0;
+    let salaryCount = 0;
+    let holidaySum = 0;
+    let holidayCount = 0;
+
+    Object.values(companyData).forEach((data) => {
+      const salary = parseSalary(data.avgSalary);
+      if (salary) {
+        salarySum += salary;
+        salaryCount++;
+      }
+      const holiday = parseInt(data.annualHoliday);
+      if (!isNaN(holiday) && holiday > 0) {
+        holidaySum += holiday;
+        holidayCount++;
+      }
+    });
+
+    const heatmapData = Object.entries(activityLog)
+      .map(([date, val]) => ({ date, count: val.total || 0 }))
+      .filter((d) => d.count > 0);
+
+    const recentLog = heatmapData
+      .sort((a, b) => new Date(a.date) - new Date(b.date))
+      .slice(-14)
+      .map((d) => ({
+        date: d.date.slice(5).replace("-", "/"),
+        count: d.count,
+      }));
+
+    const monthlyData = Object.values(monthlyStats).sort((a, b) =>
+      a.name.localeCompare(b.name),
+    );
+    const hourlyData = hourlyCounts.map((count, hour) => ({
+      hour: `${hour}時`,
+      count,
+    }));
+
+    const charDistData = charDist.map((count, i) => ({
+      name: i === 10 ? "1000+" : `${i * 100}-${(i + 1) * 100 - 1}`,
+      count,
+    }));
+
+    const sortedTags = Object.entries(tagCounts).sort(
+      (a, b) => b.count - a.count,
+    );
+    const tagRanking = sortedTags
+      .slice(0, 10)
+      .map(([name, count]) => ({ name, count }));
+
+    const radarData = sortedTags.slice(0, 6).map(([name, count]) => ({
+      subject: name,
+      A: count,
+      fullMark: sortedTags[0]?.count || 10,
+    }));
+
+    const deadlineData = [
+      {
+        name: "余裕 (7日以上)",
+        value: deadlineCounts.safe,
+        color: CHART_COLORS.success,
+      },
+      {
+        name: "通常 (3-6日)",
+        value: deadlineCounts.normal,
+        color: CHART_COLORS.info,
+      },
+      {
+        name: "注意 (1-2日)",
+        value: deadlineCounts.warning,
+        color: CHART_COLORS.warning,
+      },
+      {
+        name: "危険/超過",
+        value: deadlineCounts.danger + deadlineCounts.overdue,
+        color: CHART_COLORS.danger,
+      },
+    ].filter((d) => d.value > 0);
+
+    const industryData = Object.entries(industryCounts)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 5);
+
+    const selectionData = Object.entries(selectionTypeCounts)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+
+    const daysSinceStart =
+      totalEntries > 0
+        ? Math.max(1, Math.floor((now - firstDate) / (1000 * 60 * 60 * 24)))
+        : 0;
+
+    return {
+      overview: {
+        totalEntries,
+        completedCount,
+        companyCount: uniqueCompanies.size,
+        totalQA,
+        totalCharacters,
+        avgCharsPerQA: totalQA > 0 ? Math.round(totalCharacters / totalQA) : 0,
+        daysSinceStart,
+        manuscriptPages: (totalCharacters / 400).toFixed(1),
+      },
+      charts: {
+        heatmapData,
+        recentLog,
+        monthlyData,
+        hourlyData,
+        charDistData,
+        tagRanking,
+        radarData,
+        deadlineData,
+        deadlineCorrelation,
+        industryData,
+        selectionData,
+      },
+      market: {
+        avgSalary: salaryCount > 0 ? Math.round(salarySum / salaryCount) : "-",
+        avgHoliday:
+          holidayCount > 0 ? Math.round(holidaySum / holidayCount) : "-",
+      },
+      awards: {
+        maxCharEntry: maxCharEntry.chars > 0 ? maxCharEntry : null,
+        minCharEntry: minCharEntry.chars < 999999 ? minCharEntry : null,
+        maxCharQA: maxCharQA.chars > 0 ? maxCharQA : null,
+        minCharQA: minCharQA.chars < 999999 ? minCharQA : null,
+      },
+    };
+  }, [entries, companyData, activityLog]);
+
+  return (
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 pb-20">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+        <StatCard
+          icon={Calendar}
+          label="活動日数"
+          value={stats.overview.daysSinceStart}
+          subValue="Days"
+          colorClass={{ bg: "bg-blue-50", text: "text-blue-500" }}
+        />
+        <StatCard
+          icon={Zap}
+          label="現在の勢い"
+          value={
+            stats.charts.recentLog.length > 0
+              ? stats.charts.recentLog[stats.charts.recentLog.length - 1].count
+              : 0
+          }
+          subValue="Today"
+          colorClass={{ bg: "bg-amber-50", text: "text-amber-500" }}
+        />
+        <StatCard
+          icon={CheckCircle2}
+          label="完了数"
+          value={stats.overview.completedCount}
+          subValue={`/ ${stats.overview.companyCount}社`}
+          colorClass={{ bg: "bg-emerald-50", text: "text-emerald-500" }}
+        />
+        <StatCard
+          icon={Target}
+          label="総回答数"
+          value={stats.overview.totalQA}
+          subValue={`Avg ${stats.overview.avgCharsPerQA}`}
+          colorClass={{ bg: "bg-violet-50", text: "text-violet-500" }}
+        />
+        <StatCard
+          icon={PenTool}
+          label="総執筆量"
+          value={stats.overview.totalCharacters.toLocaleString()}
+          subValue={`原稿${stats.overview.manuscriptPages}枚`}
+          colorClass={{ bg: "bg-rose-50", text: "text-rose-500" }}
+        />
+      </div>
+
+      <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 text-center mt-6">
+        <div className="w-12 h-12 bg-slate-50 text-slate-400 rounded-full flex items-center justify-center mx-auto mb-3">
+          <Activity size={24} />
+        </div>
+        <p className="text-slate-400 text-sm font-bold">
+          分析データの集計が完了しました。
+        </p>
+        <p className="text-slate-400 text-xs mt-1">
+          次のステップでグラフ(UI)を描画します。
+        </p>
+      </div>
+    </div>
   );
 };
 
