@@ -44,6 +44,7 @@ import {
   Columns,
   StickyNote,
   MessageSquareCode,
+  BarChart3,
 } from "lucide-react";
 
 // --- Constants ---
@@ -3879,6 +3880,21 @@ export default function App() {
               <Database size={14} />
               企業データ
             </button>
+
+            <button
+              onClick={() => {
+                setViewMode("statistics");
+                scrollToTop("smooth");
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap border ${
+                viewMode === "statistics"
+                  ? "bg-indigo-600 text-white shadow-sm"
+                  : "bg-white text-slate-500 border border-slate-200 hover:bg-slate-50"
+              }`}
+            >
+              <BarChart3 size={14} />
+              統計・分析
+            </button>
           </div>
         )}
       </header>
@@ -3893,7 +3909,7 @@ export default function App() {
           <div className="max-w-5xl mx-auto pb-20">
             {view === "list" ? (
               <div className="space-y-8">
-                {/* View: Drafts List */}
+                {/* View: Drafts */}
                 {viewMode === "drafts" && drafts.length > 0 && (
                   <div className="space-y-6">
                     {drafts.map((draft) => (
@@ -3909,7 +3925,7 @@ export default function App() {
                   </div>
                 )}
 
-                {/* View: Company List */}
+                {/* View: Company Group */}
                 {viewMode === "company" && (
                   <div className="grid gap-6">
                     {processedCompanyEntries.length === 0 && (
@@ -3936,72 +3952,7 @@ export default function App() {
                   </div>
                 )}
 
-                {/* View: Question List */}
-                {viewMode === "question" && (
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    {flattenedQAs.length === 0 && (
-                      <div className="col-span-2 text-center text-slate-400 py-10">
-                        該当する質問はありません
-                      </div>
-                    )}
-                    {flattenedQAs.map((item, idx) => (
-                      <QAItemDisplay
-                        key={`${item.entryId}-${idx}`}
-                        qa={item}
-                        tags={item.tagsArray}
-                        companyName={item.companyName}
-                        status={item.status}
-                        selectionType={item.selectionType}
-                        showCompanyInfo={true}
-                        onEdit={handleEditById}
-                        highlight={searchQuery}
-                        appSettings={appSettings}
-                      />
-                    ))}
-                  </div>
-                )}
-
-                {/* View: Tag Group */}
-                {viewMode === "tag" && (
-                  <div className="space-y-8">
-                    {Object.keys(tagGroups).length === 0 && (
-                      <div className="text-center text-slate-400 py-10">
-                        タグ付けされた質問はありません
-                      </div>
-                    )}
-                    {Object.entries(tagGroups).map(([tagName, items]) => (
-                      <div
-                        key={tagName}
-                        className="bg-slate-50/50 rounded-xl border border-slate-200 p-4"
-                      >
-                        <h3 className="text-sm font-bold text-indigo-700 mb-4 flex items-center gap-2">
-                          <Tags size={16} /> #{tagName}
-                          <span className="bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full text-xs">
-                            {items.length}
-                          </span>
-                        </h3>
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                          {items.map((item, idx) => (
-                            <QAItemDisplay
-                              key={`${item.entryId}-${idx}`}
-                              qa={item}
-                              tags={item.tagsArray}
-                              companyName={item.companyName}
-                              status={item.status}
-                              selectionType={item.selectionType}
-                              showCompanyInfo={true}
-                              onEdit={handleEditById}
-                              highlight={searchQuery}
-                              appSettings={appSettings}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* View: Status List */}
+                {/* View: Status Group */}
                 {viewMode === "status" && (
                   <div className="space-y-8">
                     {Object.keys(entriesByStatus).length === 0 && (
@@ -4083,6 +4034,71 @@ export default function App() {
                           </div>
                         </div>
                       ))}
+                  </div>
+                )}
+
+                {/* View: Question Group */}
+                {viewMode === "question" && (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    {flattenedQAs.length === 0 && (
+                      <div className="col-span-2 text-center text-slate-400 py-10">
+                        該当する質問はありません
+                      </div>
+                    )}
+                    {flattenedQAs.map((item, idx) => (
+                      <QAItemDisplay
+                        key={`${item.entryId}-${idx}`}
+                        qa={item}
+                        tags={item.tagsArray}
+                        companyName={item.companyName}
+                        status={item.status}
+                        selectionType={item.selectionType}
+                        showCompanyInfo={true}
+                        onEdit={handleEditById}
+                        highlight={searchQuery}
+                        appSettings={appSettings}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {/* View: Tag Group */}
+                {viewMode === "tag" && (
+                  <div className="space-y-8">
+                    {Object.keys(tagGroups).length === 0 && (
+                      <div className="text-center text-slate-400 py-10">
+                        タグ付けされた質問はありません
+                      </div>
+                    )}
+                    {Object.entries(tagGroups).map(([tagName, items]) => (
+                      <div
+                        key={tagName}
+                        className="bg-slate-50/50 rounded-xl border border-slate-200 p-4"
+                      >
+                        <h3 className="text-sm font-bold text-indigo-700 mb-4 flex items-center gap-2">
+                          <Tags size={16} /> #{tagName}
+                          <span className="bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full text-xs">
+                            {items.length}
+                          </span>
+                        </h3>
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                          {items.map((item, idx) => (
+                            <QAItemDisplay
+                              key={`${item.entryId}-${idx}`}
+                              qa={item}
+                              tags={item.tagsArray}
+                              companyName={item.companyName}
+                              status={item.status}
+                              selectionType={item.selectionType}
+                              showCompanyInfo={true}
+                              onEdit={handleEditById}
+                              highlight={searchQuery}
+                              appSettings={appSettings}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
 
@@ -4346,6 +4362,27 @@ export default function App() {
                           })}
                         </tbody>
                       </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* View: Statistics */}
+                {viewMode === "statistics" && (
+                  <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+                    <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 text-center">
+                      <div className="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <BarChart3 size={32} />
+                      </div>
+                      <h2 className="text-xl font-bold text-slate-800 mb-2">
+                        統計・分析ダッシュボード
+                      </h2>
+                      <p className="text-slate-500 text-sm mb-6 max-w-md mx-auto leading-relaxed">
+                        エントリーシートの作成履歴、通過率、作業時間などを可視化して、
+                        就職活動のモチベーション向上に繋げます。
+                      </p>
+                      <div className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-500 rounded-lg text-xs font-mono border border-slate-200">
+                        Work in Progress...
+                      </div>
                     </div>
                   </div>
                 )}
