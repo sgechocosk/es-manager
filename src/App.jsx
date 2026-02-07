@@ -472,7 +472,45 @@ const StatCard = ({ icon: Icon, label, value, subValue, colorClass }) => (
   </div>
 );
 
+const ChartCard = ({ title, children, height = "h-64" }) => (
+  <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+    <h3 className="text-sm font-bold text-slate-700 mb-6">{title}</h3>
+    <div className={`w-full ${height}`}>{children}</div>
+  </div>
+);
+
+const EmptyState = ({ message = "データ不足" }) => (
+  <div className="h-full flex flex-col items-center justify-center text-slate-400">
+    <Database size={24} className="mb-2 opacity-50" />
+    <span className="text-xs font-bold">{message}</span>
+  </div>
+);
+
+const AwardCard = ({ icon: Icon, title, company, value, colorClass }) => (
+  <div
+    className={`p-6 rounded-2xl border flex items-center gap-4 relative overflow-hidden bg-gradient-to-br ${colorClass.bg}`}
+  >
+    <div
+      className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 shadow-sm bg-white ${colorClass.text}`}
+    >
+      <Icon size={28} />
+    </div>
+    <div className="relative z-10">
+      <p className={`text-xs font-bold mb-1 ${colorClass.text}`}>{title}</p>
+      <h3 className="text-lg font-black text-slate-800 line-clamp-1">
+        {company || "---"}
+      </h3>
+      <p className="text-sm font-bold text-slate-500">{value || "-"}</p>
+    </div>
+    <Icon
+      className={`absolute -right-4 -bottom-4 opacity-10 ${colorClass.text}`}
+      size={100}
+    />
+  </div>
+);
+
 const StatisticsView = ({ entries, companyData, activityLog }) => {
+  // 仕様書の全セクションに対応する集計ロジック
   const stats = useMemo(() => {
     let totalEntries = 0;
     let completedCount = 0;
@@ -480,6 +518,7 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
     let totalQA = 0;
     let uniqueCompanies = new Set();
 
+    // 時系列・分布
     const monthlyStats = {};
     const hourlyCounts = Array(24).fill(0);
     const charDist = Array(11).fill(0);
@@ -492,11 +531,14 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
       overdue: 0,
     };
 
+    // 市場分析
     const industryCounts = {};
     const selectionTypeCounts = {};
 
+    // 相関分析用
     const deadlineCorrelation = [];
 
+    // アワード用
     let maxCharEntry = { company: "-", chars: 0 };
     let minCharEntry = { company: "-", chars: 999999 };
     let maxCharQA = { question: "-", chars: 0 };
@@ -515,10 +557,9 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
       const isPending = ANALYTICS_STATUS_GROUPS.pending.includes(entry.status);
       const isSuccess = ANALYTICS_STATUS_GROUPS.success.includes(entry.status);
 
-      if (isCompleted) {
-        completedCount++;
-      }
+      if (isCompleted) completedCount++;
 
+      // 属性集計
       const industry =
         companyData[entry.company]?.industry || entry.industry || "未分類";
       industryCounts[industry] = (industryCounts[industry] || 0) + 1;
@@ -527,6 +568,7 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
       selectionTypeCounts[selectionType] =
         (selectionTypeCounts[selectionType] || 0) + 1;
 
+      // 日付・時系列
       if (entry.createdAt) {
         const created = new Date(entry.createdAt);
         if (created < firstDate) firstDate = created;
@@ -553,12 +595,11 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
         }
       }
 
+      // 締め切り分析
       let marginDays = null;
       if (entry.deadline) {
         const status = getDeadlineStatus(entry.deadline);
-        if (isPending) {
-          deadlineCounts[status]++;
-        }
+        if (isPending) deadlineCounts[status]++;
 
         const deadlineDate = new Date(entry.deadline);
         const targetDate = entry.completedAt
@@ -569,17 +610,18 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
         );
 
         if (
-          ANALYTICS_STATUS_GROUPS.success.includes(entry.status) ||
+          isSuccess ||
           ANALYTICS_STATUS_GROUPS.failure.includes(entry.status)
         ) {
           deadlineCorrelation.push({
             margin: marginDays,
-            isPassed: isSuccess ? 1 : 0,
+            isPassed: isSuccess ? 1 : 0, // 1:通過, 0:不通過
             status: entry.status,
           });
         }
       }
 
+      // 文字数・QA
       let entryTotalChars = 0;
       if (entry.qas && Array.isArray(entry.qas)) {
         entry.qas.forEach((qa) => {
@@ -621,6 +663,7 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
       }
     });
 
+    // 市場データ平均
     let salarySum = 0;
     let salaryCount = 0;
     let holidaySum = 0;
@@ -639,13 +682,14 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
       }
     });
 
+    // 配列化
     const heatmapData = Object.entries(activityLog)
       .map(([date, val]) => ({ date, count: val.total || 0 }))
       .filter((d) => d.count > 0);
 
     const recentLog = heatmapData
       .sort((a, b) => new Date(a.date) - new Date(b.date))
-      .slice(-14)
+      .slice(-10)
       .map((d) => ({
         date: d.date.slice(5).replace("-", "/"),
         count: d.count,
@@ -660,7 +704,8 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
     }));
 
     const charDistData = charDist.map((count, i) => ({
-      name: i === 10 ? "1000+" : `${i * 100}-${(i + 1) * 100 - 1}`,
+      name: i === 10 ? "1000+" : `${i * 100}`,
+      range: i === 10 ? "1000文字以上" : `${i * 100} - ${i * 100 + 99}`,
       count,
     }));
 
@@ -679,22 +724,22 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
 
     const deadlineData = [
       {
-        name: "余裕 (7日以上)",
+        name: "余裕",
         value: deadlineCounts.safe,
         color: CHART_COLORS.success,
       },
       {
-        name: "通常 (3-6日)",
+        name: "通常",
         value: deadlineCounts.normal,
         color: CHART_COLORS.info,
       },
       {
-        name: "注意 (1-2日)",
+        name: "注意",
         value: deadlineCounts.warning,
         color: CHART_COLORS.warning,
       },
       {
-        name: "危険/超過",
+        name: "危険",
         value: deadlineCounts.danger + deadlineCounts.overdue,
         color: CHART_COLORS.danger,
       },
@@ -752,8 +797,25 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
     };
   }, [entries, companyData, activityLog]);
 
+  const CustomTooltip = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-white p-2 border border-slate-100 shadow-lg rounded-lg text-xs">
+          <p className="font-bold text-slate-700 mb-1">{label}</p>
+          {payload.map((entry, index) => (
+            <p key={index} style={{ color: entry.color || entry.fill }}>
+              {entry.name}: {entry.value}
+            </p>
+          ))}
+        </div>
+      );
+    }
+    return null;
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 pb-20">
+      {/* Section 1: Hero Metrics */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <StatCard
           icon={Calendar}
@@ -796,17 +858,400 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
         />
       </div>
 
-      <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 text-center mt-6">
-        <div className="w-12 h-12 bg-slate-50 text-slate-400 rounded-full flex items-center justify-center mx-auto mb-3">
-          <Activity size={24} />
-        </div>
-        <p className="text-slate-400 text-sm font-bold">
-          分析データの集計が完了しました。
-        </p>
-        <p className="text-slate-400 text-xs mt-1">
-          次のステップでグラフ(UI)を描画します。
-        </p>
+      {/* Section 2: Activity Analysis */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <ChartCard title="活動リズム (時間帯別)">
+          {stats.charts.hourlyData.length > 0 ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={stats.charts.hourlyData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis
+                  dataKey="hour"
+                  fontSize={10}
+                  tickLine={false}
+                  interval={3}
+                />
+                <Tooltip content={<CustomTooltip />} />
+                <Bar
+                  dataKey="count"
+                  name="活動量"
+                  fill={CHART_COLORS.secondary}
+                  radius={[2, 2, 0, 0]}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <EmptyState />
+          )}
+        </ChartCard>
+
+        <ChartCard title="直近の活動推移">
+          {stats.charts.recentLog.length > 0 ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                layout="vertical"
+                data={stats.charts.recentLog}
+                margin={{ left: 0, right: 20 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                <XAxis type="number" hide />
+                <YAxis
+                  dataKey="date"
+                  type="category"
+                  width={40}
+                  fontSize={10}
+                  tickLine={false}
+                />
+                <Tooltip content={<CustomTooltip />} />
+                <Bar
+                  dataKey="count"
+                  name="編集数"
+                  fill={CHART_COLORS.primary}
+                  radius={[0, 4, 4, 0]}
+                  barSize={15}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <EmptyState />
+          )}
+        </ChartCard>
+
+        <ChartCard title="月次トレンド">
+          {stats.charts.monthlyData.length > 0 ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={stats.charts.monthlyData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="name" fontSize={10} tickLine={false} />
+                <Tooltip content={<CustomTooltip />} />
+                <Legend iconSize={8} fontSize={10} />
+                <Bar
+                  dataKey="created"
+                  name="作成"
+                  stackId="a"
+                  fill="#cbd5e1"
+                  radius={[0, 0, 4, 4]}
+                />
+                <Bar
+                  dataKey="completed"
+                  name="完了"
+                  stackId="a"
+                  fill={CHART_COLORS.info}
+                  radius={[4, 4, 0, 0]}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <EmptyState />
+          )}
+        </ChartCard>
       </div>
+
+      {/* Section 3: Content Quality */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <ChartCard title="文字数分布">
+          {stats.charts.charDistData.some((d) => d.count > 0) ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                layout="vertical"
+                data={stats.charts.charDistData}
+                margin={{ left: 10 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                <XAxis type="number" hide />
+                <YAxis
+                  dataKey="name"
+                  type="category"
+                  width={30}
+                  fontSize={10}
+                  tickLine={false}
+                />
+                <Tooltip
+                  content={({ active, payload }) => {
+                    if (active && payload && payload.length) {
+                      const d = payload[0].payload;
+                      return (
+                        <div className="bg-white p-2 border shadow-sm text-xs rounded">
+                          <p className="font-bold">{d.range}</p>
+                          <p>{d.count}件</p>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
+                <Bar
+                  dataKey="count"
+                  name="件数"
+                  fill="#f43f5e"
+                  radius={[0, 4, 4, 0]}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <EmptyState />
+          )}
+        </ChartCard>
+
+        <ChartCard title="タグバランス">
+          {stats.charts.radarData.length >= 3 ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <RadarChart
+                cx="50%"
+                cy="50%"
+                outerRadius="70%"
+                data={stats.charts.radarData}
+              >
+                <PolarGrid />
+                <PolarAngleAxis dataKey="subject" fontSize={10} />
+                <PolarRadiusAxis angle={30} domain={[0, "auto"]} hide />
+                <Radar
+                  name="使用数"
+                  dataKey="A"
+                  stroke={CHART_COLORS.success}
+                  fill={CHART_COLORS.success}
+                  fillOpacity={0.4}
+                />
+                <Tooltip />
+              </RadarChart>
+            </ResponsiveContainer>
+          ) : (
+            <EmptyState message="タグデータ不足(3つ以上)" />
+          )}
+        </ChartCard>
+
+        <ChartCard title="Top Tags">
+          {stats.charts.tagRanking.length > 0 ? (
+            <div className="flex flex-wrap gap-2 content-start h-full overflow-y-auto">
+              {stats.charts.tagRanking.map((tag, i) => (
+                <div
+                  key={i}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 rounded-lg border border-slate-100 text-xs"
+                >
+                  <span className="font-bold text-slate-700">#{tag.name}</span>
+                  <span className="bg-indigo-100 text-indigo-600 px-1.5 py-0.5 rounded text-[10px] font-mono">
+                    {tag.count}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <EmptyState />
+          )}
+        </ChartCard>
+      </div>
+
+      {/* Section 4 & 5: Strategy & Market */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <ChartCard title="締め切り余裕度 (残タスク)">
+          {stats.charts.deadlineData.length > 0 ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={stats.charts.deadlineData}
+                  innerRadius={60}
+                  outerRadius={80}
+                  paddingAngle={5}
+                  dataKey="value"
+                >
+                  {stats.charts.deadlineData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip />
+                <Legend
+                  verticalAlign="bottom"
+                  height={36}
+                  iconSize={8}
+                  fontSize={10}
+                />
+                <text
+                  x="50%"
+                  y="48%"
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  className="text-slate-400 text-xs font-bold"
+                >
+                  Margin
+                </text>
+              </PieChart>
+            </ResponsiveContainer>
+          ) : (
+            <EmptyState message="進行中のタスクなし" />
+          )}
+        </ChartCard>
+
+        <ChartCard title="余裕度と通過率の相関">
+          {stats.charts.deadlineCorrelation.length > 0 ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <ScatterChart
+                margin={{ top: 20, right: 20, bottom: 20, left: 0 }}
+              >
+                <CartesianGrid />
+                <XAxis
+                  type="number"
+                  dataKey="margin"
+                  name="余裕日数"
+                  unit="日"
+                  fontSize={10}
+                />
+                <YAxis
+                  type="number"
+                  dataKey="isPassed"
+                  name="結果"
+                  tickFormatter={(v) => (v === 1 ? "通過" : "不通過")}
+                  fontSize={10}
+                  domain={[-0.2, 1.2]}
+                  ticks={[0, 1]}
+                />
+                <Tooltip cursor={{ strokeDasharray: "3 3" }} />
+                <Scatter name="履歴" data={stats.charts.deadlineCorrelation}>
+                  {stats.charts.deadlineCorrelation.map((entry, index) => (
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={
+                        entry.isPassed
+                          ? CHART_COLORS.success
+                          : CHART_COLORS.danger
+                      }
+                    />
+                  ))}
+                </Scatter>
+              </ScatterChart>
+            </ResponsiveContainer>
+          ) : (
+            <EmptyState message="合否データ不足" />
+          )}
+        </ChartCard>
+
+        <ChartCard title="選考種別シェア">
+          {stats.charts.selectionData.length > 0 ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={stats.charts.selectionData}
+                  innerRadius={40}
+                  outerRadius={80}
+                  paddingAngle={2}
+                  dataKey="value"
+                >
+                  {stats.charts.selectionData.map((entry, index) => (
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={
+                        [
+                          CHART_COLORS.primary,
+                          CHART_COLORS.info,
+                          CHART_COLORS.secondary,
+                          CHART_COLORS.warning,
+                        ][index % 4]
+                      }
+                    />
+                  ))}
+                </Pie>
+                <Tooltip />
+                <Legend
+                  layout="vertical"
+                  verticalAlign="middle"
+                  align="right"
+                  iconSize={8}
+                  fontSize={10}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          ) : (
+            <EmptyState />
+          )}
+        </ChartCard>
+      </div>
+
+      {/* Market Averages Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-white p-4 rounded-xl border border-slate-100 flex items-center gap-3">
+          <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg">
+            <DollarSign size={20} />
+          </div>
+          <div>
+            <p className="text-xs text-slate-400 font-bold">平均年収</p>
+            <p className="text-lg font-black text-slate-700">
+              {stats.market.avgSalary}{" "}
+              <span className="text-xs font-normal">万円</span>
+            </p>
+          </div>
+        </div>
+        <div className="bg-white p-4 rounded-xl border border-slate-100 flex items-center gap-3">
+          <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
+            <CalendarCheck size={20} />
+          </div>
+          <div>
+            <p className="text-xs text-slate-400 font-bold">平均年間休日</p>
+            <p className="text-lg font-black text-slate-700">
+              {stats.market.avgHoliday}{" "}
+              <span className="text-xs font-normal">日</span>
+            </p>
+          </div>
+        </div>
+        <div className="bg-white p-4 rounded-xl border border-slate-100 flex items-center gap-3">
+          <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
+            <Building2 size={20} />
+          </div>
+          <div>
+            <p className="text-xs text-slate-400 font-bold">Top 業界</p>
+            <p className="text-sm font-bold text-slate-700 line-clamp-1">
+              {stats.charts.industryData[0]?.name || "-"}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Section 6: Awards */}
+      {stats.awards.maxCharEntry && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <AwardCard
+            icon={Target}
+            title="難関突破 (最大文字数)"
+            company={stats.awards.maxCharEntry.company}
+            value={`${stats.awards.maxCharEntry.chars.toLocaleString()} 文字`}
+            colorClass={{
+              bg: "from-amber-50 to-white border-amber-200",
+              text: "text-amber-500",
+            }}
+          />
+          {stats.awards.minCharEntry && (
+            <AwardCard
+              icon={Zap}
+              title="コスパ重視 (最小文字数)"
+              company={stats.awards.minCharEntry.company}
+              value={`${stats.awards.minCharEntry.chars.toLocaleString()} 文字`}
+              colorClass={{
+                bg: "from-slate-50 to-white border-slate-200",
+                text: "text-slate-500",
+              }}
+            />
+          )}
+          {stats.awards.maxCharQA && (
+            <div className="col-span-1 md:col-span-2 bg-gradient-to-r from-indigo-50 to-white p-6 rounded-2xl border border-indigo-100 relative overflow-hidden">
+              <div className="relative z-10">
+                <div className="flex items-center gap-2 mb-2">
+                  <Sparkles size={16} className="text-indigo-500" />
+                  <span className="text-xs font-bold text-indigo-600">
+                    傑作回答 (最長QA)
+                  </span>
+                </div>
+                <h3 className="text-sm font-bold text-slate-800 mb-1">
+                  {stats.awards.maxCharQA.company}
+                </h3>
+                <p className="text-xs text-slate-500 mb-3 line-clamp-1">
+                  Q. {stats.awards.maxCharQA.question}
+                </p>
+                <div className="inline-block bg-white px-3 py-1 rounded border border-indigo-100 text-xs font-mono text-indigo-600">
+                  {stats.awards.maxCharQA.chars.toLocaleString()} 文字
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
@@ -3396,7 +3841,7 @@ export default function App() {
             qa.question,
             qa.answer,
             qa.note,
-            tags.join(" ")
+            tags.join(" "),
           ]
             .join(" ")
             .toLowerCase();
