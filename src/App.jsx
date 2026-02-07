@@ -2813,18 +2813,29 @@ export default function App() {
 
   useEffect(() => {
     const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+        e.preventDefault();
+
+        if (
+          view === "form" &&
+          !isMemoMode &&
+          !isSettingsOpen &&
+          !isCompanyDataEditOpen
+        ) {
+          if (formData.company) {
+            handleSaveEntry(false);
+          }
+        }
+        return;
+      }
+
       if (
         view === "form" &&
         !isMemoMode &&
         !isSettingsOpen &&
         !isCompanyDataEditOpen
       ) {
-        if ((e.ctrlKey || e.metaKey) && e.key === "s") {
-          e.preventDefault();
-          if (formData.company) {
-            handleSaveEntry(false);
-          }
-        } else if ((e.ctrlKey || e.metaKey) && e.key === "b") {
+        if ((e.ctrlKey || e.metaKey) && e.key === "b") {
           e.preventDefault();
           setIsRefPanelOpen((prev) => !prev);
         }
@@ -3463,7 +3474,7 @@ export default function App() {
   };
 
   // --- Handlers: File IO ---
-  const handleExport = () => {
+  const handleExport = async (e) => {
     const exportData = {
       entries: entries,
       drafts: drafts,
@@ -3472,15 +3483,39 @@ export default function App() {
       exportedAt: getCurrentJSTTime(),
     };
     const dataStr = JSON.stringify(exportData, null, 2);
+
+    if ((e?.ctrlKey || e?.metaKey) && window.showSaveFilePicker) {
+      try {
+        const handle = await window.showSaveFilePicker({
+          suggestedName: "es-data.json",
+          types: [
+            {
+              description: "JSON File",
+              accept: { "application/json": [".json"] },
+            },
+          ],
+        });
+        const writable = await handle.createWritable();
+        await writable.write(dataStr);
+        await writable.close();
+
+        return;
+      } catch (err) {
+        if (err.name !== "AbortError") console.error(err);
+        return;
+      }
+    }
+
     const blob = new Blob([dataStr], { type: "application/json" });
     const url = URL.createObjectURL(blob);
 
     const jstNowStr = getCurrentJSTTime();
     const fileNameTime = jstNowStr.split("+")[0].replace(/[:T]/g, "-");
+    const fileName = `es-data-${fileNameTime}.json`;
 
     const link = document.createElement("a");
     link.href = url;
-    link.download = `es-data-${fileNameTime}.json`;
+    link.download = fileName;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
