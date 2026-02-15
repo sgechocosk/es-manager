@@ -673,11 +673,12 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
 
     const entryCharList = [];
     const companyCharCounts = {};
+    const completionList = [];
 
     let maxCharEntry = { company: "-", chars: 0 };
     let minCharEntry = { company: "-", chars: 999999 };
-    let maxCharQA = { question: "-", chars: 0 };
-    let minCharQA = { question: "-", chars: 999999 };
+    let maxCharQA = { question: "-", chars: 0, answer: "", company: "-" };
+    let minCharQA = { question: "-", chars: 999999, answer: "", company: "-" };
 
     const now = new Date();
     let firstDate = now;
@@ -731,6 +732,17 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
         }
       }
 
+      if (isCompleted && entry.completedAt && entry.createdAt) {
+        const diff = new Date(entry.completedAt) - new Date(entry.createdAt);
+        if (diff > 0) {
+          completionList.push({
+            company: entry.company,
+            diff,
+            selectionType: entry.selectionType,
+          });
+        }
+      }
+
       let entryTotalChars = 0;
       if (entry.qas && Array.isArray(entry.qas)) {
         entry.qas.forEach((qa) => {
@@ -769,12 +781,16 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
               question: qa.question,
               chars: len,
               company: entry.company,
+              answer: qa.answer,
+              selectionType: entry.selectionType,
             };
           if (len > 10 && len < minCharQA.chars)
             minCharQA = {
               question: qa.question,
               chars: len,
               company: entry.company,
+              answer: qa.answer,
+              selectionType: entry.selectionType,
             };
         });
       }
@@ -965,6 +981,24 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
         value: d.chars,
       }));
 
+    const completionRanking = completionList
+      .sort((a, b) => a.diff - b.diff)
+      .slice(0, 5)
+      .map((d) => {
+        const diffMin = Math.floor(d.diff / (1000 * 60));
+        const diffHour = Math.floor(diffMin / 60);
+        const diffDay = Math.floor(diffHour / 24);
+        let timeStr = "";
+        if (diffDay > 0) timeStr = `${diffDay}日`;
+        else if (diffHour > 0) timeStr = `${diffHour}時間`;
+        else timeStr = `${diffMin}分`;
+        return {
+          company: d.company,
+          selectionType: d.selectionType,
+          value: timeStr,
+        };
+      });
+
     return {
       overview: {
         totalEntries,
@@ -994,6 +1028,7 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
         tagWeaponRanking,
         effortRanking,
         cospaRanking,
+        completionRanking,
       },
       market: {
         avgSalary: salaryCount > 0 ? Math.round(salarySum / salaryCount) : "-",
@@ -1643,57 +1678,160 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
         </div>
       </div>
 
-      {/* Section 6: Awards */}
-      {stats.awards.maxCharEntry && (
+      {/* Section 6: Awards & Speed Ranking */}
+      {stats.awards.maxCharQA && (
         <>
           <div className="flex items-center gap-2 text-slate-500 mb-2 mt-8 px-1">
             <Sparkles size={18} />
             <h3 className="text-sm font-bold">アワード・ハイライト</h3>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <AwardCard
-              icon={Target}
-              title="難関突破 (最大文字数)"
-              company={stats.awards.maxCharEntry.company}
-              value={`${stats.awards.maxCharEntry.chars.toLocaleString()} 文字`}
-              colorClass={{
-                bg: "from-amber-50 to-white border-amber-200",
-                text: "text-amber-500",
-              }}
-            />
-            {stats.awards.minCharEntry && (
-              <AwardCard
-                icon={Zap}
-                title="コスパ重視 (最小文字数)"
-                company={stats.awards.minCharEntry.company}
-                value={`${stats.awards.minCharEntry.chars.toLocaleString()} 文字`}
-                colorClass={{
-                  bg: "from-slate-50 to-white border-slate-200",
-                  text: "text-slate-500",
-                }}
-              />
-            )}
-            {stats.awards.maxCharQA && (
-              <div className="col-span-1 md:col-span-2 bg-gradient-to-r from-indigo-50 to-white p-6 rounded-2xl border border-indigo-100 relative overflow-hidden">
-                <div className="relative z-10">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Sparkles size={16} className="text-indigo-500" />
-                    <span className="text-xs font-bold text-indigo-600">
-                      傑作回答 (最長QA)
-                    </span>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 relative">
+            <div className="relative w-full">
+              <div className="w-full h-full lg:absolute lg:inset-0">
+                <div className="relative p-6 rounded-2xl border-2 border-amber-300 bg-gradient-to-br from-amber-100 via-amber-50 to-white shadow-md flex flex-col h-full overflow-hidden group">
+                  <div className="flex items-center gap-3 mb-4 shrink-0 relative z-10">
+                    <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 bg-gradient-to-br from-amber-400 to-amber-600 text-white shadow-sm ring-2 ring-amber-100">
+                      <Sparkles size={24} />
+                    </div>
+                    <div>
+                      <span className="text-sm font-bold text-amber-800 block">
+                        過去最高の傑作回答
+                      </span>
+                      <p className="text-[10px] font-bold text-slate-400 mt-0.5">
+                        {stats.awards.maxCharQA.company}
+                        {stats.awards.maxCharQA.selectionType &&
+                          ` - ${stats.awards.maxCharQA.selectionType}`}
+                      </p>
+                    </div>
                   </div>
-                  <h3 className="text-sm font-bold text-slate-800 mb-1">
-                    {stats.awards.maxCharQA.company}
-                  </h3>
-                  <p className="text-xs text-slate-500 mb-3 line-clamp-1">
+
+                  <h3 className="text-sm font-bold text-slate-800 mb-3 shrink-0 leading-relaxed relative z-10 border-b border-amber-200/50 pb-2">
                     Q. {stats.awards.maxCharQA.question}
-                  </p>
-                  <div className="inline-block bg-white px-3 py-1 rounded border border-indigo-100 text-xs font-mono text-indigo-600">
+                  </h3>
+
+                  <div className="flex-1 relative z-10 overflow-hidden min-h-[100px]">
+                    <div
+                      className="absolute inset-0 overflow-hidden"
+                      style={{
+                        maskImage:
+                          "linear-gradient(to bottom, black 60%, transparent 100%)",
+                        WebkitMaskImage:
+                          "linear-gradient(to bottom, black 60%, transparent 100%)",
+                      }}
+                    >
+                      <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
+                        <span className="font-bold text-amber-600 mr-2">
+                          A.
+                        </span>
+                        {stats.awards.maxCharQA.answer}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end items-center gap-1 text-amber-500 font-mono text-xs font-bold shrink-0 mt-2 relative z-10">
+                    <PenTool size={12} />
                     {stats.awards.maxCharQA.chars.toLocaleString()} 文字
                   </div>
+
+                  <Sparkles
+                    className="absolute -right-6 -bottom-6 text-amber-400 opacity-20 z-0 rotate-12"
+                    size={180}
+                  />
                 </div>
               </div>
-            )}
+            </div>
+
+            <div className="flex flex-col gap-6">
+              {stats.awards.minCharQA && (
+                <div className="relative p-5 rounded-2xl border-2 border-slate-300 bg-gradient-to-br from-slate-200 via-slate-50 to-white shadow-sm h-auto shrink-0 overflow-hidden">
+                  <div className="flex items-center gap-3 mb-3 relative z-10">
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-gradient-to-br from-slate-400 to-slate-600 text-white shadow-sm ring-2 ring-slate-100">
+                      <Zap size={20} />
+                    </div>
+                    <div>
+                      <span className="text-xs font-bold text-slate-700 block">
+                        無駄を削ぎ落とした核心の回答
+                      </span>
+                      <p className="text-[10px] font-bold text-slate-400 mt-0.5">
+                        {stats.awards.minCharQA.company}
+                        {stats.awards.minCharQA.selectionType &&
+                          ` - ${stats.awards.minCharQA.selectionType}`}
+                      </p>
+                    </div>
+                  </div>
+
+                  <h3 className="text-xs font-bold text-slate-800 mb-2 leading-relaxed relative z-10">
+                    Q. {stats.awards.minCharQA.question}
+                  </h3>
+
+                  <div className="bg-white/60 p-3 rounded-lg border border-slate-200 mb-2 relative z-10">
+                    <p className="text-xs text-slate-700 leading-relaxed">
+                      <span className="font-bold text-slate-500 mr-2">A.</span>
+                      {stats.awards.minCharQA.answer}
+                    </p>
+                  </div>
+
+                  <div className="flex justify-end text-[10px] font-bold text-slate-400 font-mono relative z-10">
+                    {stats.awards.minCharQA.chars} 文字
+                  </div>
+
+                  <Zap
+                    className="absolute -right-4 -bottom-4 text-slate-400 opacity-10 z-0 -rotate-12"
+                    size={120}
+                  />
+                </div>
+              )}
+
+              <div className="flex-1">
+                <ChartCard
+                  title="ES完成スピードランキング (作成〜完了)"
+                  height="h-auto"
+                  padding="p-4"
+                >
+                  {stats.charts.completionRanking.length > 0 ? (
+                    <div className="flex flex-col space-y-2 px-1">
+                      {stats.charts.completionRanking.map((item, i) => (
+                        <div
+                          key={i}
+                          className="flex items-center justify-between text-sm border-b border-slate-50 last:border-0 pb-1.5 last:pb-0"
+                        >
+                          <div className="flex items-center gap-3 truncate pr-4 min-w-0 flex-1">
+                            <span
+                              className={`font-black font-mono text-lg flex-shrink-0 ${
+                                i < 3 ? "text-blue-500" : "text-slate-300"
+                              }`}
+                            >
+                              {i + 1}.
+                            </span>
+                            <div className="flex flex-col truncate min-w-0">
+                              <span
+                                className={`font-bold text-slate-700 truncate ${
+                                  item.company.length > 12
+                                    ? "text-xs"
+                                    : "text-sm"
+                                }`}
+                                title={item.company}
+                              >
+                                {item.company}
+                              </span>
+                              <span className="text-[10px] font-bold text-slate-400 truncate">
+                                {item.selectionType || "未設定"}
+                              </span>
+                            </div>
+                          </div>
+                          <span className="font-mono font-bold text-slate-500 text-xs whitespace-nowrap flex-shrink-0 bg-slate-100 px-2 py-0.5 rounded">
+                            {item.value}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <EmptyState message="完了データ不足" />
+                  )}
+                </ChartCard>
+              </div>
+            </div>
           </div>
         </>
       )}
