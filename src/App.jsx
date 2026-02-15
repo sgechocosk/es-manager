@@ -454,18 +454,22 @@ const HighlightText = ({ text, highlight, writingStyle, checkNgWords }) => {
 
 // --- Statistics Components ---
 const StatCard = ({ icon: Icon, label, value, subValue, colorClass }) => (
-  <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4 transition-all hover:shadow-md">
+  <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-3 transition-all hover:shadow-md h-full">
     <div
       className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${colorClass.bg} ${colorClass.text}`}
     >
       <Icon size={24} />
     </div>
-    <div>
-      <p className="text-xs font-bold text-slate-400 mb-0.5">{label}</p>
-      <div className="flex items-baseline gap-2">
-        <h3 className="text-2xl font-black text-slate-700">{value}</h3>
+    <div className="min-w-0 flex-1 flex flex-col justify-center">
+      <p className="text-xs font-bold text-slate-400 mb-0.5 truncate">
+        {label}
+      </p>
+      <div className="flex flex-col items-start leading-none">
+        <h3 className="text-2xl font-black text-slate-700 mb-1">{value}</h3>
         {subValue && (
-          <span className="text-xs font-bold text-slate-400">{subValue}</span>
+          <span className="text-xs font-bold text-slate-400 truncate w-full block">
+            {subValue}
+          </span>
         )}
       </div>
     </div>
@@ -509,8 +513,133 @@ const AwardCard = ({ icon: Icon, title, company, value, colorClass }) => (
   </div>
 );
 
+const ActivityHeatmap = ({ activityLog }) => {
+  const { weeks, totalContributions } = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const dayOfWeek = today.getDay();
+    const endDate = new Date(today);
+    endDate.setDate(today.getDate() + (6 - dayOfWeek));
+
+    const numWeeks = 53;
+    const startDate = new Date(endDate);
+    startDate.setDate(endDate.getDate() - (numWeeks * 7 - 1));
+
+    const weekData = [];
+    let current = new Date(startDate);
+    let lastMonth = -1;
+    let total = 0;
+
+    for (let w = 0; w < numWeeks; w++) {
+      const days = [];
+      const weekStartDate = new Date(current);
+      const currentMonth = weekStartDate.getMonth();
+
+      let monthLabel = null;
+      if (w === 0 || currentMonth !== lastMonth) {
+        monthLabel = `${currentMonth + 1}月`;
+        lastMonth = currentMonth;
+      }
+
+      for (let d = 0; d < 7; d++) {
+        const dateKey = formatDateKey(current);
+        const count = activityLog[dateKey]?.total || 0;
+        const isFuture = current > today;
+
+        if (!isFuture) {
+          total += count;
+        }
+
+        let intensity = "bg-slate-100";
+        if (isFuture) {
+          intensity = "bg-transparent opacity-0";
+        } else if (count > 0) {
+          if (count > 10) intensity = "bg-emerald-600";
+          else if (count > 7) intensity = "bg-emerald-500";
+          else if (count > 4) intensity = "bg-emerald-400";
+          else if (count > 2) intensity = "bg-emerald-300";
+          else intensity = "bg-emerald-200";
+        }
+
+        days.push({ date: dateKey, count, intensity, isFuture });
+        current.setDate(current.getDate() + 1);
+      }
+      weekData.push({ monthLabel, days });
+    }
+    return { weeks: weekData, totalContributions: total };
+  }, [activityLog]);
+
+  return (
+    <div className="flex flex-col w-full h-full">
+      <div className="text-xs text-slate-500 mb-2">
+        過去1年間の累計活動量:{" "}
+        <span className="font-bold text-slate-800">{totalContributions}</span>
+      </div>
+
+      <div className="flex gap-[3px] flex-1 ml-6 min-h-0">
+        {weeks.map((week, w) => (
+          <div key={w} className="flex flex-col gap-[3px] flex-1 min-w-0">
+            <div className="h-3 relative">
+              {week.monthLabel && (
+                <span className="absolute left-0 bottom-0 text-[9px] text-slate-400 font-bold whitespace-nowrap leading-none">
+                  {week.monthLabel}
+                </span>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-[3px]">
+              {week.days.map((day, d) => (
+                <div
+                  key={d}
+                  className={`w-full aspect-square rounded-[2px] ${day.intensity} group relative`}
+                >
+                  {w === 0 && [1, 3, 5].includes(d) && (
+                    <span className="absolute right-full mr-2 top-1/2 -translate-y-1/2 text-[9px] text-slate-400 leading-none">
+                      {d === 1 && "Mon"}
+                      {d === 3 && "Wed"}
+                      {d === 5 && "Fri"}
+                    </span>
+                  )}
+
+                  {!day.isFuture && (
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-50 pointer-events-none">
+                      <div className="bg-white p-2 border border-slate-100 shadow-lg rounded-lg text-xs whitespace-nowrap">
+                        <p className="font-bold text-slate-700 mb-1">
+                          {day.date}
+                        </p>
+                        <p className="text-slate-500">
+                          <span className="font-bold text-emerald-600">
+                            {day.count}
+                          </span>{" "}
+                          updates
+                        </p>
+                      </div>
+                      <div className="w-2 h-2 bg-white border-r border-b border-slate-100 transform rotate-45 absolute left-1/2 -translate-x-1/2 -bottom-1 shadow-sm"></div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex justify-end items-center gap-2 mt-1 text-[9px] text-slate-400 shrink-0">
+        <span>Less</span>
+        <div className="flex gap-[3px]">
+          <div className="w-2.5 h-2.5 bg-slate-100 rounded-[2px]" />
+          <div className="w-2.5 h-2.5 bg-emerald-200 rounded-[2px]" />
+          <div className="w-2.5 h-2.5 bg-emerald-400 rounded-[2px]" />
+          <div className="w-2.5 h-2.5 bg-emerald-600 rounded-[2px]" />
+        </div>
+        <span>More</span>
+      </div>
+    </div>
+  );
+};
+
 const StatisticsView = ({ entries, companyData, activityLog }) => {
-  // 仕様書の全セクションに対応する集計ロジック
   const stats = useMemo(() => {
     let totalEntries = 0;
     let completedCount = 0;
@@ -518,7 +647,6 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
     let totalQA = 0;
     let uniqueCompanies = new Set();
 
-    // 時系列・分布
     const monthlyStats = {};
     const hourlyCounts = Array(24).fill(0);
     const charDist = Array(11).fill(0);
@@ -531,14 +659,11 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
       overdue: 0,
     };
 
-    // 市場分析
     const industryCounts = {};
     const selectionTypeCounts = {};
 
-    // 相関分析用
     const deadlineCorrelation = [];
 
-    // アワード用
     let maxCharEntry = { company: "-", chars: 0 };
     let minCharEntry = { company: "-", chars: 999999 };
     let maxCharQA = { question: "-", chars: 0 };
@@ -559,7 +684,6 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
 
       if (isCompleted) completedCount++;
 
-      // 属性集計
       const industry =
         companyData[entry.company]?.industry || entry.industry || "未分類";
       industryCounts[industry] = (industryCounts[industry] || 0) + 1;
@@ -568,7 +692,6 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
       selectionTypeCounts[selectionType] =
         (selectionTypeCounts[selectionType] || 0) + 1;
 
-      // 日付・時系列
       if (entry.createdAt) {
         const created = new Date(entry.createdAt);
         if (created < firstDate) firstDate = created;
@@ -595,7 +718,6 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
         }
       }
 
-      // 締め切り分析
       let marginDays = null;
       if (entry.deadline) {
         const status = getDeadlineStatus(entry.deadline);
@@ -615,13 +737,12 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
         ) {
           deadlineCorrelation.push({
             margin: marginDays,
-            isPassed: isSuccess ? 1 : 0, // 1:通過, 0:不通過
+            isPassed: isSuccess ? 1 : 0,
             status: entry.status,
           });
         }
       }
 
-      // 文字数・QA
       let entryTotalChars = 0;
       if (entry.qas && Array.isArray(entry.qas)) {
         entry.qas.forEach((qa) => {
@@ -663,7 +784,6 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
       }
     });
 
-    // 市場データ平均
     let salarySum = 0;
     let salaryCount = 0;
     let holidaySum = 0;
@@ -682,7 +802,6 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
       }
     });
 
-    // 配列化
     const heatmapData = Object.entries(activityLog)
       .map(([date, val]) => ({ date, count: val.total || 0 }))
       .filter((d) => d.count > 0);
@@ -695,9 +814,9 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
         count: d.count,
       }));
 
-    const monthlyData = Object.values(monthlyStats).sort((a, b) =>
-      a.name.localeCompare(b.name),
-    );
+    const monthlyData = Object.values(monthlyStats)
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .slice(-6);
     const hourlyData = hourlyCounts.map((count, hour) => ({
       hour: `${hour}時`,
       count,
@@ -759,6 +878,62 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
         ? Math.max(1, Math.floor((now - firstDate) / (1000 * 60 * 60 * 24)))
         : 0;
 
+    const sortedActivityDates = Object.entries(activityLog)
+      .filter(([_, val]) => (val.total || 0) > 0)
+      .map(([date]) => date)
+      .sort();
+
+    let maxStreak = 0;
+    let currentStreak = 0;
+
+    if (sortedActivityDates.length > 0) {
+      let tempStreak = 1;
+      let prevTime = new Date(sortedActivityDates[0]).setHours(0, 0, 0, 0);
+      maxStreak = 1;
+
+      for (let i = 1; i < sortedActivityDates.length; i++) {
+        const currTime = new Date(sortedActivityDates[i]).setHours(0, 0, 0, 0);
+        const diffDays = Math.round((currTime - prevTime) / 86400000);
+
+        if (diffDays === 1) {
+          tempStreak++;
+        } else {
+          tempStreak = 1;
+        }
+        if (tempStreak > maxStreak) maxStreak = tempStreak;
+        prevTime = currTime;
+      }
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const lastEntryDate = new Date(
+        sortedActivityDates[sortedActivityDates.length - 1],
+      );
+      lastEntryDate.setHours(0, 0, 0, 0);
+
+      const diffToLast = Math.round((today - lastEntryDate) / 86400000);
+
+      if (diffToLast <= 1) {
+        currentStreak = 1;
+        let checkTime = lastEntryDate.getTime();
+
+        for (let i = sortedActivityDates.length - 2; i >= 0; i--) {
+          const prevEntryTime = new Date(sortedActivityDates[i]).setHours(
+            0,
+            0,
+            0,
+            0,
+          );
+          if (Math.round((checkTime - prevEntryTime) / 86400000) === 1) {
+            currentStreak++;
+            checkTime = prevEntryTime;
+          } else {
+            break;
+          }
+        }
+      }
+    }
+
     return {
       overview: {
         totalEntries,
@@ -769,6 +944,8 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
         avgCharsPerQA: totalQA > 0 ? Math.round(totalCharacters / totalQA) : 0,
         daysSinceStart,
         manuscriptPages: (totalCharacters / 400).toFixed(1),
+        currentStreak,
+        maxStreak,
       },
       charts: {
         heatmapData,
@@ -815,61 +992,109 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 pb-20">
+      {/* Section 0: Header */}
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-2">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 bg-indigo-600 text-white rounded-xl shadow-sm shadow-indigo-200">
+            <BarChart3 size={24} strokeWidth={2.5} />
+          </div>
+          <div>
+            <h2 className="text-2xl font-black text-slate-800 tracking-tight leading-none">
+              ダッシュボード
+            </h2>
+            <p className="text-xs font-bold text-slate-400 mt-1">
+              活動状況の分析概要
+            </p>
+          </div>
+        </div>
+
+        <div className="inline-flex items-center gap-2 bg-white px-4 py-2 rounded-full border border-slate-200 shadow-sm transition-shadow hover:shadow-md self-end">
+          <div className="p-1.5 bg-blue-50 text-blue-500 rounded-full">
+            <Calendar size={14} />
+          </div>
+          <span className="text-xs font-bold text-slate-500">活動開始から</span>
+          <div className="flex items-baseline gap-1">
+            <span className="text-xl font-black text-slate-700 font-mono">
+              {stats.overview.daysSinceStart}
+            </span>
+            <span className="text-xs font-bold text-slate-400">日目</span>
+          </div>
+        </div>
+      </div>
+
       {/* Section 1: Hero Metrics */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-        <StatCard
-          icon={Calendar}
-          label="活動日数"
-          value={stats.overview.daysSinceStart}
-          subValue="Days"
-          colorClass={{ bg: "bg-blue-50", text: "text-blue-500" }}
-        />
+      <div className="flex items-center gap-2 text-slate-500 mb-2 mt-4 px-1">
+        <Activity size={18} />
+        <h3 className="text-sm font-bold">活動サマリー</h3>
+      </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           icon={Zap}
-          label="現在の勢い"
-          value={
-            stats.charts.recentLog.length > 0
-              ? stats.charts.recentLog[stats.charts.recentLog.length - 1].count
-              : 0
-          }
-          subValue="Today"
+          label="継続ストリーク"
+          value={`${stats.overview.currentStreak} Days`}
+          subValue={`Best: ${stats.overview.maxStreak} Days`}
           colorClass={{ bg: "bg-amber-50", text: "text-amber-500" }}
         />
         <StatCard
           icon={CheckCircle2}
-          label="完了数"
+          label="ESの完了数"
           value={stats.overview.completedCount}
-          subValue={`/ ${stats.overview.companyCount}社`}
+          subValue={`エントリー: ${stats.overview.companyCount}社`}
           colorClass={{ bg: "bg-emerald-50", text: "text-emerald-500" }}
         />
         <StatCard
           icon={Target}
-          label="総回答数"
+          label="回答の完了数"
           value={stats.overview.totalQA}
-          subValue={`Avg ${stats.overview.avgCharsPerQA}`}
+          subValue={`平均 ${stats.overview.avgCharsPerQA}文字 / 回答`}
           colorClass={{ bg: "bg-violet-50", text: "text-violet-500" }}
         />
         <StatCard
           icon={PenTool}
-          label="総執筆量"
+          label="総執筆文字数"
           value={stats.overview.totalCharacters.toLocaleString()}
-          subValue={`原稿${stats.overview.manuscriptPages}枚`}
+          subValue={`原稿用紙 ${stats.overview.manuscriptPages}枚分`}
           colorClass={{ bg: "bg-rose-50", text: "text-rose-500" }}
         />
       </div>
 
       {/* Section 2: Activity Analysis */}
+      <div className="flex items-center gap-2 text-slate-500 mb-2 mt-8 px-1">
+        <BarChart3 size={18} />
+        <h3 className="text-sm font-bold">活動量分析</h3>
+      </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <ChartCard title="活動リズム (時間帯別)">
+        <div className="lg:col-span-2">
+          <ChartCard title="年間活動ヒートマップ" height="h-40">
+            <div className="w-full h-full overflow-x-auto overflow-y-hidden">
+              <div className="min-w-[600px] h-full">
+                <ActivityHeatmap activityLog={activityLog} />
+              </div>
+            </div>
+          </ChartCard>
+        </div>
+
+        <ChartCard title="活動リズム" height="h-40">
           {stats.charts.hourlyData.length > 0 ? (
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={stats.charts.hourlyData}>
+              <BarChart
+                data={stats.charts.hourlyData}
+                margin={{ top: 10, right: 10, left: 10, bottom: 0 }}
+              >
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis
                   dataKey="hour"
                   fontSize={10}
                   tickLine={false}
                   interval={3}
+                  tick={{ fontSize: 9 }}
+                  dy={5}
+                />
+                <YAxis
+                  hide
+                  domain={[0, "auto"]}
+                  tickCount={4}
+                  allowDecimals={false}
                 />
                 <Tooltip content={<CustomTooltip />} />
                 <Bar
@@ -905,7 +1130,7 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
                 <Tooltip content={<CustomTooltip />} />
                 <Bar
                   dataKey="count"
-                  name="編集数"
+                  name="活動数"
                   fill={CHART_COLORS.primary}
                   radius={[0, 4, 4, 0]}
                   barSize={15}
@@ -917,37 +1142,48 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
           )}
         </ChartCard>
 
-        <ChartCard title="月次トレンド">
-          {stats.charts.monthlyData.length > 0 ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={stats.charts.monthlyData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="name" fontSize={10} tickLine={false} />
-                <Tooltip content={<CustomTooltip />} />
-                <Legend iconSize={8} fontSize={10} />
-                <Bar
-                  dataKey="created"
-                  name="作成"
-                  stackId="a"
-                  fill="#cbd5e1"
-                  radius={[0, 0, 4, 4]}
-                />
-                <Bar
-                  dataKey="completed"
-                  name="完了"
-                  stackId="a"
-                  fill={CHART_COLORS.info}
-                  radius={[4, 4, 0, 0]}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          ) : (
-            <EmptyState />
-          )}
-        </ChartCard>
+        <div className="lg:col-span-2">
+          <ChartCard title="月次活動トレンド">
+            {stats.charts.monthlyData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={stats.charts.monthlyData} barSize={40}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="name" fontSize={12} tickLine={false} />
+                  <YAxis fontSize={10} tickLine={false} />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Legend
+                    iconSize={10}
+                    fontSize={12}
+                    wrapperStyle={{ paddingTop: "10px" }}
+                  />
+                  <Bar
+                    dataKey="created"
+                    name="作成エントリー数"
+                    stackId="a"
+                    fill="#cbd5e1"
+                    radius={[0, 0, 4, 4]}
+                  />
+                  <Bar
+                    dataKey="completed"
+                    name="完了数"
+                    stackId="a"
+                    fill={CHART_COLORS.info}
+                    radius={[4, 4, 0, 0]}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <EmptyState />
+            )}
+          </ChartCard>
+        </div>
       </div>
 
       {/* Section 3: Content Quality */}
+      <div className="flex items-center gap-2 text-slate-500 mb-2 mt-8 px-1">
+        <FileText size={18} />
+        <h3 className="text-sm font-bold">クオリティ分析</h3>
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <ChartCard title="文字数分布">
           {stats.charts.charDistData.some((d) => d.count > 0) ? (
@@ -1042,6 +1278,10 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
       </div>
 
       {/* Section 4 & 5: Strategy & Market */}
+      <div className="flex items-center gap-2 text-slate-500 mb-2 mt-8 px-1">
+        <Target size={18} />
+        <h3 className="text-sm font-bold">戦略・市場分析</h3>
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <ChartCard title="締め切り余裕度 (残タスク)">
           {stats.charts.deadlineData.length > 0 ? (
@@ -1166,6 +1406,10 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
       </div>
 
       {/* Market Averages Cards */}
+      <div className="flex items-center gap-2 text-slate-500 mb-2 mt-8 px-1">
+        <Building2 size={18} />
+        <h3 className="text-sm font-bold">市場データ</h3>
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white p-4 rounded-xl border border-slate-100 flex items-center gap-3">
           <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg">
@@ -1206,51 +1450,57 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
 
       {/* Section 6: Awards */}
       {stats.awards.maxCharEntry && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <AwardCard
-            icon={Target}
-            title="難関突破 (最大文字数)"
-            company={stats.awards.maxCharEntry.company}
-            value={`${stats.awards.maxCharEntry.chars.toLocaleString()} 文字`}
-            colorClass={{
-              bg: "from-amber-50 to-white border-amber-200",
-              text: "text-amber-500",
-            }}
-          />
-          {stats.awards.minCharEntry && (
+        <>
+          <div className="flex items-center gap-2 text-slate-500 mb-2 mt-8 px-1">
+            <Sparkles size={18} />
+            <h3 className="text-sm font-bold">アワード・ハイライト</h3>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <AwardCard
-              icon={Zap}
-              title="コスパ重視 (最小文字数)"
-              company={stats.awards.minCharEntry.company}
-              value={`${stats.awards.minCharEntry.chars.toLocaleString()} 文字`}
+              icon={Target}
+              title="難関突破 (最大文字数)"
+              company={stats.awards.maxCharEntry.company}
+              value={`${stats.awards.maxCharEntry.chars.toLocaleString()} 文字`}
               colorClass={{
-                bg: "from-slate-50 to-white border-slate-200",
-                text: "text-slate-500",
+                bg: "from-amber-50 to-white border-amber-200",
+                text: "text-amber-500",
               }}
             />
-          )}
-          {stats.awards.maxCharQA && (
-            <div className="col-span-1 md:col-span-2 bg-gradient-to-r from-indigo-50 to-white p-6 rounded-2xl border border-indigo-100 relative overflow-hidden">
-              <div className="relative z-10">
-                <div className="flex items-center gap-2 mb-2">
-                  <Sparkles size={16} className="text-indigo-500" />
-                  <span className="text-xs font-bold text-indigo-600">
-                    傑作回答 (最長QA)
-                  </span>
-                </div>
-                <h3 className="text-sm font-bold text-slate-800 mb-1">
-                  {stats.awards.maxCharQA.company}
-                </h3>
-                <p className="text-xs text-slate-500 mb-3 line-clamp-1">
-                  Q. {stats.awards.maxCharQA.question}
-                </p>
-                <div className="inline-block bg-white px-3 py-1 rounded border border-indigo-100 text-xs font-mono text-indigo-600">
-                  {stats.awards.maxCharQA.chars.toLocaleString()} 文字
+            {stats.awards.minCharEntry && (
+              <AwardCard
+                icon={Zap}
+                title="コスパ重視 (最小文字数)"
+                company={stats.awards.minCharEntry.company}
+                value={`${stats.awards.minCharEntry.chars.toLocaleString()} 文字`}
+                colorClass={{
+                  bg: "from-slate-50 to-white border-slate-200",
+                  text: "text-slate-500",
+                }}
+              />
+            )}
+            {stats.awards.maxCharQA && (
+              <div className="col-span-1 md:col-span-2 bg-gradient-to-r from-indigo-50 to-white p-6 rounded-2xl border border-indigo-100 relative overflow-hidden">
+                <div className="relative z-10">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Sparkles size={16} className="text-indigo-500" />
+                    <span className="text-xs font-bold text-indigo-600">
+                      傑作回答 (最長QA)
+                    </span>
+                  </div>
+                  <h3 className="text-sm font-bold text-slate-800 mb-1">
+                    {stats.awards.maxCharQA.company}
+                  </h3>
+                  <p className="text-xs text-slate-500 mb-3 line-clamp-1">
+                    Q. {stats.awards.maxCharQA.question}
+                  </p>
+                  <div className="inline-block bg-white px-3 py-1 rounded border border-indigo-100 text-xs font-mono text-indigo-600">
+                    {stats.awards.maxCharQA.chars.toLocaleString()} 文字
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        </>
       )}
     </div>
   );
