@@ -476,10 +476,16 @@ const StatCard = ({ icon: Icon, label, value, subValue, colorClass }) => (
   </div>
 );
 
-const ChartCard = ({ title, children, height = "h-64" }) => (
-  <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
-    <h3 className="text-sm font-bold text-slate-700 mb-6">{title}</h3>
-    <div className={`w-full ${height}`}>{children}</div>
+const ChartCard = ({ title, children, height = "h-64", padding = "p-6" }) => (
+  <div
+    className={`bg-white ${padding} rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow h-full flex flex-col`}
+  >
+    <h3
+      className={`text-sm font-bold text-slate-700 shrink-0 ${padding === "p-6" ? "mb-6" : "mb-3"}`}
+    >
+      {title}
+    </h3>
+    <div className={`w-full ${height} flex-auto min-h-0`}>{children}</div>
   </div>
 );
 
@@ -665,6 +671,9 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
     );
     const industryCounts = {};
 
+    const entryCharList = [];
+    const companyCharCounts = {};
+
     let maxCharEntry = { company: "-", chars: 0 };
     let minCharEntry = { company: "-", chars: 999999 };
     let maxCharQA = { question: "-", chars: 0 };
@@ -770,6 +779,20 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
         });
       }
 
+      if (isCompleted && entryTotalChars > 0) {
+        entryCharList.push({
+          company: entry.company,
+          selectionType: entry.selectionType,
+          chars: entryTotalChars,
+        });
+
+        if (!companyCharCounts[entry.company]) {
+          companyCharCounts[entry.company] = { sum: 0, count: 0 };
+        }
+        companyCharCounts[entry.company].sum += entryTotalChars;
+        companyCharCounts[entry.company].count++;
+      }
+
       if (isCompleted) {
         if (entryTotalChars > maxCharEntry.chars)
           maxCharEntry = { company: entry.company, chars: entryTotalChars };
@@ -852,7 +875,7 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
     const industryData = Object.entries(industryCounts)
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value)
-      .slice(0, 7);
+      .slice(0, 5);
     const daysSinceStart =
       totalEntries > 0
         ? Math.max(1, Math.floor((now - firstDate) / (1000 * 60 * 60 * 24)))
@@ -916,6 +939,32 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
       }
     });
 
+    const cospaRanking = Object.entries(companyCharCounts)
+      .map(([name, d]) => ({
+        name,
+        value: Math.round(d.sum / d.count),
+      }))
+      .sort((a, b) => a.value - b.value)
+      .slice(0, 5);
+
+    const tagWeaponRanking = Object.entries(tagStats)
+      .filter(([_, d]) => d.count >= 2)
+      .map(([name, d]) => ({
+        name,
+        value: Math.round(d.totalChars / d.count),
+      }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 5);
+
+    const effortRanking = entryCharList
+      .sort((a, b) => b.chars - a.chars)
+      .slice(0, 5)
+      .map((d) => ({
+        company: d.company,
+        selectionType: d.selectionType,
+        value: d.chars,
+      }));
+
     return {
       overview: {
         totalEntries,
@@ -942,6 +991,9 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
         statusAvgCharData,
         tagAvgCharData,
         industryData,
+        tagWeaponRanking,
+        effortRanking,
+        cospaRanking,
       },
       market: {
         avgSalary: salaryCount > 0 ? Math.round(salarySum / salaryCount) : "-",
@@ -1463,6 +1515,132 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
             <EmptyState />
           )}
         </ChartCard>
+      </div>
+
+      {/* Section 5: Detailed Rankings */}
+      <div className="flex items-center gap-2 text-slate-500 mb-2 mt-8 px-1">
+        <ListOrdered size={18} />
+        <h3 className="text-sm font-bold">詳細ランキング分析</h3>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-8 gap-6">
+        <div className="lg:col-span-3">
+          <ChartCard
+            title="コスパ重視の狙い目ランキング"
+            height="h-full"
+            padding="p-4"
+          >
+            {stats.charts.cospaRanking.length > 0 ? (
+              <div className="flex flex-col justify-center h-full space-y-2 px-1">
+                {stats.charts.cospaRanking.map((item, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center justify-between text-sm border-b border-slate-50 last:border-0 pb-1.5 last:pb-0"
+                  >
+                    <div className="flex items-center gap-3 truncate pr-4 min-w-0 flex-1">
+                      <span
+                        className={`font-black font-mono text-base flex-shrink-0 ${i < 3 ? "text-emerald-500" : "text-slate-300"}`}
+                      >
+                        {i + 1}.
+                      </span>
+                      <span
+                        className={`font-bold text-slate-700 truncate ${item.name.length > 10 ? "text-xs" : "text-sm"}`}
+                        title={item.name}
+                      >
+                        {item.name}
+                      </span>
+                    </div>
+                    <span className="font-mono font-bold text-slate-400 text-xs whitespace-nowrap flex-shrink-0">
+                      {item.value.toLocaleString()}文字
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <EmptyState message="データ不足" />
+            )}
+          </ChartCard>
+        </div>
+
+        <div className="lg:col-span-2">
+          <ChartCard
+            title="あなたの語れる武器ランキング"
+            height="h-full"
+            padding="p-4"
+          >
+            {stats.charts.tagWeaponRanking.length > 0 ? (
+              <div className="flex flex-col justify-center h-full space-y-2 px-1">
+                {stats.charts.tagWeaponRanking.map((item, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center justify-between text-sm border-b border-slate-50 last:border-0 pb-1.5 last:pb-0"
+                  >
+                    <div className="flex items-center gap-3 truncate pr-4 min-w-0 flex-1">
+                      <span
+                        className={`font-black font-mono text-base flex-shrink-0 ${i < 3 ? "text-indigo-500" : "text-slate-300"}`}
+                      >
+                        {i + 1}.
+                      </span>
+                      <span
+                        className={`font-bold text-slate-700 truncate ${item.name.length > 8 ? "text-xs" : "text-sm"}`}
+                        title={item.name}
+                      >
+                        {item.name}
+                      </span>
+                    </div>
+                    <span className="font-mono font-bold text-slate-400 text-xs whitespace-nowrap flex-shrink-0">
+                      {item.value.toLocaleString()}文字
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <EmptyState message="データ不足" />
+            )}
+          </ChartCard>
+        </div>
+
+        <div className="md:col-span-2 lg:col-span-3">
+          <ChartCard
+            title="難関突破の努力賞ランキング"
+            height="h-full"
+            padding="p-4"
+          >
+            {stats.charts.effortRanking.length > 0 ? (
+              <div className="flex flex-col justify-center h-full space-y-2 px-1">
+                {stats.charts.effortRanking.map((item, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center justify-between text-sm border-b border-slate-50 last:border-0 pb-1.5 last:pb-0"
+                  >
+                    <div className="flex items-center gap-3 truncate pr-4 min-w-0 flex-1">
+                      <span
+                        className={`font-black font-mono text-lg flex-shrink-0 ${i < 3 ? "text-amber-500" : "text-slate-300"}`}
+                      >
+                        {i + 1}.
+                      </span>
+                      <div className="flex flex-col truncate min-w-0">
+                        <span
+                          className={`font-bold text-slate-700 truncate ${item.company.length > 12 ? "text-xs" : "text-sm"}`}
+                          title={item.company}
+                        >
+                          {item.company}
+                        </span>
+                        <span className="text-[10px] font-bold text-slate-400 truncate">
+                          {item.selectionType || "未設定"}
+                        </span>
+                      </div>
+                    </div>
+                    <span className="font-mono font-bold text-slate-400 text-xs whitespace-nowrap flex-shrink-0">
+                      {item.value.toLocaleString()}文字
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <EmptyState message="データ不足" />
+            )}
+          </ChartCard>
+        </div>
       </div>
 
       {/* Section 6: Awards */}
@@ -2869,7 +3047,7 @@ ${styleInstruction}`;
 
       userPrompt = `${contextInfo}
 
-${commonInputSection}
+${commonInput}
 
 【回答内容】
 ${answer}
