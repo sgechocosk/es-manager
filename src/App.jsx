@@ -646,23 +646,24 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
     let totalCharacters = 0;
     let totalQA = 0;
     let uniqueCompanies = new Set();
-
     const monthlyStats = {};
     const hourlyCounts = Array(24).fill(0);
-    const charDist = Array(11).fill(0);
-    const tagCounts = {};
-    const deadlineCounts = {
-      safe: 0,
-      normal: 0,
-      warning: 0,
-      danger: 0,
-      overdue: 0,
+
+    const marginCounts = {
+      "余裕(7日以上)": 0,
+      "通常(3-7日)": 0,
+      "注意(1-3日)": 0,
+      当日: 0,
+      期限切れ: 0,
     };
-
+    const tagStats = {};
+    const selectionCounts = {};
+    const charBins = Array(9).fill(0);
+    const statusCharStats = {};
+    ["未提出", "作成中", "提出済", "採用", "不採用"].forEach(
+      (s) => (statusCharStats[s] = { sum: 0, count: 0 }),
+    );
     const industryCounts = {};
-    const selectionTypeCounts = {};
-
-    const deadlineCorrelation = [];
 
     let maxCharEntry = { company: "-", chars: 0 };
     let minCharEntry = { company: "-", chars: 999999 };
@@ -679,8 +680,7 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
       const isCompleted = ANALYTICS_STATUS_GROUPS.completed.includes(
         entry.status,
       );
-      const isPending = ANALYTICS_STATUS_GROUPS.pending.includes(entry.status);
-      const isSuccess = ANALYTICS_STATUS_GROUPS.success.includes(entry.status);
+      const isSuccess = entry.status === "採用";
 
       if (isCompleted) completedCount++;
 
@@ -688,91 +688,85 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
         companyData[entry.company]?.industry || entry.industry || "未分類";
       industryCounts[industry] = (industryCounts[industry] || 0) + 1;
 
-      const selectionType = entry.selectionType || "未設定";
-      selectionTypeCounts[selectionType] =
-        (selectionTypeCounts[selectionType] || 0) + 1;
+      if (entry.deadline && (isCompleted || entry.status === "作成中")) {
+        const targetDate = entry.completedAt
+          ? new Date(entry.completedAt)
+          : new Date();
+        const dead = new Date(entry.deadline);
+        const diffDays = (dead - targetDate) / (1000 * 60 * 60 * 24);
+
+        if (diffDays < 0) marginCounts["期限切れ"]++;
+        else if (diffDays < 1) marginCounts["当日"]++;
+        else if (diffDays <= 3) marginCounts["注意(1-3日)"]++;
+        else if (diffDays <= 7) marginCounts["通常(3-7日)"]++;
+        else marginCounts["余裕(7日以上)"]++;
+      }
+
+      const selType = entry.selectionType || "未設定";
+      selectionCounts[selType] = (selectionCounts[selType] || 0) + 1;
 
       if (entry.createdAt) {
         const created = new Date(entry.createdAt);
         if (created < firstDate) firstDate = created;
-
         const monthKey = `${created.getFullYear()}/${String(created.getMonth() + 1).padStart(2, "0")}`;
         if (!monthlyStats[monthKey])
           monthlyStats[monthKey] = { name: monthKey, created: 0, completed: 0 };
         monthlyStats[monthKey].created++;
-
-        if (entry.updatedAt) {
-          const updated = new Date(entry.updatedAt);
-          hourlyCounts[updated.getHours()]++;
-
-          if (isCompleted) {
-            const completeMonthKey = `${updated.getFullYear()}/${String(updated.getMonth() + 1).padStart(2, "0")}`;
-            if (!monthlyStats[completeMonthKey])
-              monthlyStats[completeMonthKey] = {
-                name: completeMonthKey,
-                created: 0,
-                completed: 0,
-              };
-            monthlyStats[completeMonthKey].completed++;
-          }
-        }
       }
-
-      let marginDays = null;
-      if (entry.deadline) {
-        const status = getDeadlineStatus(entry.deadline);
-        if (isPending) deadlineCounts[status]++;
-
-        const deadlineDate = new Date(entry.deadline);
-        const targetDate = entry.completedAt
-          ? new Date(entry.completedAt)
-          : now;
-        marginDays = Math.ceil(
-          (deadlineDate - targetDate) / (1000 * 60 * 60 * 24),
-        );
-
-        if (
-          isSuccess ||
-          ANALYTICS_STATUS_GROUPS.failure.includes(entry.status)
-        ) {
-          deadlineCorrelation.push({
-            margin: marginDays,
-            isPassed: isSuccess ? 1 : 0,
-            status: entry.status,
-          });
+      if (entry.updatedAt) {
+        const updated = new Date(entry.updatedAt);
+        hourlyCounts[updated.getHours()]++;
+        if (isCompleted) {
+          const compKey = `${updated.getFullYear()}/${String(updated.getMonth() + 1).padStart(2, "0")}`;
+          if (monthlyStats[compKey]) monthlyStats[compKey].completed++;
         }
       }
 
       let entryTotalChars = 0;
       if (entry.qas && Array.isArray(entry.qas)) {
         entry.qas.forEach((qa) => {
-          if (qa.answer) {
-            totalQA++;
-            const len = qa.answer.length;
-            entryTotalChars += len;
-            totalCharacters += len;
+          if (!qa.answer) return;
+          const len = qa.answer.length;
+          entryTotalChars += len;
+          totalCharacters += len;
+          totalQA++;
 
-            const distIndex = Math.min(Math.floor(len / 100), 10);
-            charDist[distIndex]++;
+          const binIdx = Math.min(Math.floor(len / 100), 8);
+          charBins[binIdx]++;
 
-            const tags = splitTags(qa.tags);
-            tags.forEach((tag) => {
-              tagCounts[tag] = (tagCounts[tag] || 0) + 1;
-            });
+          const stat = entry.status || "未提出";
+          if (!statusCharStats[stat])
+            statusCharStats[stat] = { sum: 0, count: 0 };
+          statusCharStats[stat].sum += len;
+          statusCharStats[stat].count++;
 
-            if (len > maxCharQA.chars)
-              maxCharQA = {
-                question: qa.question,
-                chars: len,
-                company: entry.company,
+          const tags = splitTags(qa.tags);
+          tags.forEach((t) => {
+            if (!tagStats[t])
+              tagStats[t] = {
+                total: 0,
+                success: 0,
+                totalChars: 0,
+                count: 0,
               };
-            if (len > 10 && len < minCharQA.chars)
-              minCharQA = {
-                question: qa.question,
-                chars: len,
-                company: entry.company,
-              };
-          }
+            tagStats[t].total++;
+            tagStats[t].count++;
+            tagStats[t].totalChars += len;
+            if (isSuccess) tagStats[t].success++;
+          });
+
+          if (len > maxCharQA.chars)
+            maxCharQA = {
+              question: qa.question,
+              chars: len,
+              company: entry.company,
+            };
+          if (len > 10 && len < minCharQA.chars)
+            minCharQA = {
+              question: qa.question,
+              chars: len,
+              company: entry.company,
+            };
         });
       }
 
@@ -784,11 +778,131 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
       }
     });
 
-    let salarySum = 0;
-    let salaryCount = 0;
-    let holidaySum = 0;
-    let holidayCount = 0;
+    const marginData = Object.entries(marginCounts)
+      .map(([name, value]) => ({ name, value }))
+      .filter((d) => d.value > 0);
+    const MARGIN_COLORS = [
+      CHART_COLORS.success,
+      CHART_COLORS.info,
+      CHART_COLORS.warning,
+      CHART_COLORS.danger,
+      "#94a3b8",
+    ];
 
+    const tagPassRateData = Object.entries(tagStats)
+      .filter(([_, d]) => d.total >= 3)
+      .map(([name, d]) => ({
+        name,
+        rate: Math.round((d.success / d.total) * 100),
+        count: d.total,
+      }))
+      .sort((a, b) => b.rate - a.rate)
+      .slice(0, 10);
+
+    let selectionShareData = Object.entries(selectionCounts)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+    if (selectionShareData.length > 5) {
+      const others = selectionShareData
+        .slice(4)
+        .reduce((sum, d) => sum + d.value, 0);
+      selectionShareData = selectionShareData.slice(0, 4);
+      selectionShareData.push({ name: "その他", value: others });
+    }
+
+    const charDistData = charBins.map((count, i) => ({
+      name: i === 8 ? "800+" : `${i * 100}`,
+      range: i === 8 ? "800文字以上" : `${i * 100}〜${i * 100 + 99}文字`,
+      count,
+    }));
+
+    const statusAvgCharData = Object.entries(statusCharStats)
+      .map(([name, d]) => ({
+        name,
+        avg: d.count > 0 ? Math.round(d.sum / d.count) : 0,
+      }))
+      .filter((d) => d.avg > 0);
+
+    const tagAvgCharData = Object.entries(tagStats)
+      .filter(([_, d]) => d.count >= 2)
+      .sort((a, b) => b[1].count - a[1].count)
+      .slice(0, 10)
+      .map(([name, d]) => ({
+        name,
+        avg: Math.round(d.totalChars / d.count),
+      }));
+
+    const heatmapData = Object.entries(activityLog)
+      .map(([date, val]) => ({ date, count: val.total || 0 }))
+      .filter((d) => d.count > 0);
+    const recentLog = heatmapData
+      .sort((a, b) => new Date(a.date) - new Date(b.date))
+      .slice(-10)
+      .map((d) => ({
+        date: d.date.slice(5).replace("-", "/"),
+        count: d.count,
+      }));
+    const monthlyData = Object.values(monthlyStats)
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .slice(-6);
+    const hourlyData = hourlyCounts.map((count, hour) => ({
+      hour: `${hour}時`,
+      count,
+    }));
+    const industryData = Object.entries(industryCounts)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 7);
+    const daysSinceStart =
+      totalEntries > 0
+        ? Math.max(1, Math.floor((now - firstDate) / (1000 * 60 * 60 * 24)))
+        : 0;
+
+    const sortedActivityDates = Object.entries(activityLog)
+      .filter(([_, val]) => (val.total || 0) > 0)
+      .map(([date]) => date)
+      .sort();
+    let maxStreak = 0;
+    let currentStreak = 0;
+    if (sortedActivityDates.length > 0) {
+      let tempStreak = 1;
+      let prevTime = new Date(sortedActivityDates[0]).setHours(0, 0, 0, 0);
+      maxStreak = 1;
+      for (let i = 1; i < sortedActivityDates.length; i++) {
+        const currTime = new Date(sortedActivityDates[i]).setHours(0, 0, 0, 0);
+        if (Math.round((currTime - prevTime) / 86400000) === 1) tempStreak++;
+        else tempStreak = 1;
+        if (tempStreak > maxStreak) maxStreak = tempStreak;
+        prevTime = currTime;
+      }
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const lastEntryDate = new Date(
+        sortedActivityDates[sortedActivityDates.length - 1],
+      );
+      lastEntryDate.setHours(0, 0, 0, 0);
+      if (Math.round((today - lastEntryDate) / 86400000) <= 1) {
+        currentStreak = 1;
+        let checkTime = lastEntryDate.getTime();
+        for (let i = sortedActivityDates.length - 2; i >= 0; i--) {
+          const prevEntryTime = new Date(sortedActivityDates[i]).setHours(
+            0,
+            0,
+            0,
+            0,
+          );
+          if (Math.round((checkTime - prevEntryTime) / 86400000) === 1) {
+            currentStreak++;
+            checkTime = prevEntryTime;
+          } else break;
+        }
+      }
+    }
+
+    let salarySum = 0,
+      salaryCount = 0,
+      holidaySum = 0,
+      holidayCount = 0;
     Object.values(companyData).forEach((data) => {
       const salary = parseSalary(data.avgSalary);
       if (salary) {
@@ -801,138 +915,6 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
         holidayCount++;
       }
     });
-
-    const heatmapData = Object.entries(activityLog)
-      .map(([date, val]) => ({ date, count: val.total || 0 }))
-      .filter((d) => d.count > 0);
-
-    const recentLog = heatmapData
-      .sort((a, b) => new Date(a.date) - new Date(b.date))
-      .slice(-10)
-      .map((d) => ({
-        date: d.date.slice(5).replace("-", "/"),
-        count: d.count,
-      }));
-
-    const monthlyData = Object.values(monthlyStats)
-      .sort((a, b) => a.name.localeCompare(b.name))
-      .slice(-6);
-    const hourlyData = hourlyCounts.map((count, hour) => ({
-      hour: `${hour}時`,
-      count,
-    }));
-
-    const charDistData = charDist.map((count, i) => ({
-      name: i === 10 ? "1000+" : `${i * 100}`,
-      range: i === 10 ? "1000文字以上" : `${i * 100} - ${i * 100 + 99}`,
-      count,
-    }));
-
-    const sortedTags = Object.entries(tagCounts).sort(
-      (a, b) => b.count - a.count,
-    );
-    const tagRanking = sortedTags
-      .slice(0, 10)
-      .map(([name, count]) => ({ name, count }));
-
-    const radarData = sortedTags.slice(0, 6).map(([name, count]) => ({
-      subject: name,
-      A: count,
-      fullMark: sortedTags[0]?.count || 10,
-    }));
-
-    const deadlineData = [
-      {
-        name: "余裕",
-        value: deadlineCounts.safe,
-        color: CHART_COLORS.success,
-      },
-      {
-        name: "通常",
-        value: deadlineCounts.normal,
-        color: CHART_COLORS.info,
-      },
-      {
-        name: "注意",
-        value: deadlineCounts.warning,
-        color: CHART_COLORS.warning,
-      },
-      {
-        name: "危険",
-        value: deadlineCounts.danger + deadlineCounts.overdue,
-        color: CHART_COLORS.danger,
-      },
-    ].filter((d) => d.value > 0);
-
-    const industryData = Object.entries(industryCounts)
-      .map(([name, value]) => ({ name, value }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 5);
-
-    const selectionData = Object.entries(selectionTypeCounts)
-      .map(([name, value]) => ({ name, value }))
-      .sort((a, b) => b.value - a.value);
-
-    const daysSinceStart =
-      totalEntries > 0
-        ? Math.max(1, Math.floor((now - firstDate) / (1000 * 60 * 60 * 24)))
-        : 0;
-
-    const sortedActivityDates = Object.entries(activityLog)
-      .filter(([_, val]) => (val.total || 0) > 0)
-      .map(([date]) => date)
-      .sort();
-
-    let maxStreak = 0;
-    let currentStreak = 0;
-
-    if (sortedActivityDates.length > 0) {
-      let tempStreak = 1;
-      let prevTime = new Date(sortedActivityDates[0]).setHours(0, 0, 0, 0);
-      maxStreak = 1;
-
-      for (let i = 1; i < sortedActivityDates.length; i++) {
-        const currTime = new Date(sortedActivityDates[i]).setHours(0, 0, 0, 0);
-        const diffDays = Math.round((currTime - prevTime) / 86400000);
-
-        if (diffDays === 1) {
-          tempStreak++;
-        } else {
-          tempStreak = 1;
-        }
-        if (tempStreak > maxStreak) maxStreak = tempStreak;
-        prevTime = currTime;
-      }
-
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const lastEntryDate = new Date(
-        sortedActivityDates[sortedActivityDates.length - 1],
-      );
-      lastEntryDate.setHours(0, 0, 0, 0);
-
-      const diffToLast = Math.round((today - lastEntryDate) / 86400000);
-
-      if (diffToLast <= 1) {
-        currentStreak = 1;
-        let checkTime = lastEntryDate.getTime();
-
-        for (let i = sortedActivityDates.length - 2; i >= 0; i--) {
-          const prevEntryTime = new Date(sortedActivityDates[i]).setHours(
-            0,
-            0,
-            0,
-            0,
-          );
-          if (Math.round((checkTime - prevEntryTime) / 86400000) === 1) {
-            currentStreak++;
-            checkTime = prevEntryTime;
-          } else {
-            break;
-          }
-        }
-      }
-    }
 
     return {
       overview: {
@@ -952,13 +934,14 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
         recentLog,
         monthlyData,
         hourlyData,
+        marginData,
+        MARGIN_COLORS,
+        tagPassRateData,
+        selectionShareData,
         charDistData,
-        tagRanking,
-        radarData,
-        deadlineData,
-        deadlineCorrelation,
+        statusAvgCharData,
+        tagAvgCharData,
         industryData,
-        selectionData,
       },
       market: {
         avgSalary: salaryCount > 0 ? Math.round(salarySum / salaryCount) : "-",
@@ -1179,30 +1162,218 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
         </div>
       </div>
 
-      {/* Section 3: Content Quality */}
+      {/* Section 3: Strategy & Selection Analysis */}
+      <div className="flex items-center gap-2 text-slate-500 mb-2 mt-8 px-1">
+        <Target size={18} />
+        <h3 className="text-sm font-bold">戦略・選考分析</h3>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-4">
+        <ChartCard title="提出締め切り余裕度">
+          {stats.charts.marginData.length > 0 ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={stats.charts.marginData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius="60%"
+                  outerRadius="80%"
+                  paddingAngle={2}
+                  dataKey="value"
+                >
+                  {stats.charts.marginData.map((entry, index) => (
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={
+                        stats.charts.MARGIN_COLORS[
+                          index % stats.charts.MARGIN_COLORS.length
+                        ]
+                      }
+                    />
+                  ))}
+                </Pie>
+                <Tooltip />
+                <Legend
+                  verticalAlign="bottom"
+                  height={24}
+                  iconSize={8}
+                  wrapperStyle={{ fontSize: "10px" }}
+                />
+                <text
+                  x="50%"
+                  y="45%"
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  className="text-slate-400 text-xs font-bold"
+                >
+                  Margin
+                </text>
+              </PieChart>
+            </ResponsiveContainer>
+          ) : (
+            <EmptyState message="期限データなし" />
+          )}
+        </ChartCard>
+
+        <ChartCard title="タグ別通過率">
+          {stats.charts.tagPassRateData.length > 0 ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                layout="vertical"
+                data={stats.charts.tagPassRateData}
+                margin={{ left: 0, right: 10, top: 0, bottom: 0 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                <XAxis
+                  type="number"
+                  unit="%"
+                  fontSize={10}
+                  domain={[0, 100]}
+                  hide
+                />
+                <YAxis
+                  dataKey="name"
+                  type="category"
+                  width={65}
+                  fontSize={10}
+                  tickLine={false}
+                  interval={0}
+                />
+                <Tooltip
+                  cursor={{ fill: "transparent" }}
+                  content={({ active, payload }) => {
+                    if (active && payload && payload.length) {
+                      const d = payload[0].payload;
+                      return (
+                        <div className="bg-white p-2 border border-slate-100 shadow-sm text-xs rounded">
+                          <p className="font-bold">{d.name}</p>
+                          <p className="text-emerald-600">
+                            通過率: {d.rate}% ({d.count}件中)
+                          </p>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
+                <Bar
+                  dataKey="rate"
+                  name="通過率"
+                  fill={CHART_COLORS.success}
+                  radius={[0, 4, 4, 0]}
+                  barSize={12}
+                  background={{ fill: "#f8fafc", radius: [0, 4, 4, 0] }}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <EmptyState message="データ不足 (3件以上)" />
+          )}
+        </ChartCard>
+
+        <ChartCard title="選考種別シェア">
+          {stats.charts.selectionShareData.length > 0 ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={stats.charts.selectionShareData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius="40%"
+                  outerRadius="70%"
+                  paddingAngle={2}
+                  dataKey="value"
+                >
+                  {stats.charts.selectionShareData.map((entry, index) => (
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={
+                        [
+                          CHART_COLORS.primary,
+                          CHART_COLORS.info,
+                          CHART_COLORS.secondary,
+                          CHART_COLORS.warning,
+                          "#94a3b8",
+                        ][index % 5]
+                      }
+                    />
+                  ))}
+                </Pie>
+                <Tooltip />
+                <Legend
+                  layout="horizontal"
+                  verticalAlign="bottom"
+                  align="center"
+                  iconSize={8}
+                  wrapperStyle={{ fontSize: "10px" }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          ) : (
+            <EmptyState />
+          )}
+        </ChartCard>
+
+        <ChartCard title="業界別エントリー数">
+          {stats.charts.industryData.length > 0 ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                layout="vertical"
+                data={stats.charts.industryData}
+                margin={{ left: 0, right: 10, top: 0, bottom: 0 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                <XAxis type="number" fontSize={10} allowDecimals={false} hide />
+                <YAxis
+                  dataKey="name"
+                  type="category"
+                  width={75}
+                  fontSize={10}
+                  tickLine={false}
+                  interval={0}
+                />
+                <Tooltip cursor={{ fill: "transparent" }} />
+                <Bar
+                  dataKey="value"
+                  name="件数"
+                  fill={CHART_COLORS.secondary}
+                  radius={[0, 4, 4, 0]}
+                  barSize={16}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <EmptyState />
+          )}
+        </ChartCard>
+      </div>
+
+      {/* Section 4: Content Analysis */}
       <div className="flex items-center gap-2 text-slate-500 mb-2 mt-8 px-1">
         <FileText size={18} />
-        <h3 className="text-sm font-bold">クオリティ分析</h3>
+        <h3 className="text-sm font-bold">コンテンツ傾向分析</h3>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <ChartCard title="文字数分布">
+        <ChartCard title="回答文字数の分析">
           {stats.charts.charDistData.some((d) => d.count > 0) ? (
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 layout="vertical"
                 data={stats.charts.charDistData}
-                margin={{ left: 10 }}
+                margin={{ top: 0, right: 20, left: 10, bottom: 0 }}
               >
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                <XAxis type="number" hide />
+                <XAxis type="number" fontSize={10} allowDecimals={false} />
                 <YAxis
                   dataKey="name"
                   type="category"
                   width={30}
                   fontSize={10}
                   tickLine={false}
+                  interval={0}
                 />
                 <Tooltip
+                  cursor={{ fill: "transparent" }}
                   content={({ active, payload }) => {
                     if (active && payload && payload.length) {
                       const d = payload[0].payload;
@@ -1219,8 +1390,9 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
                 <Bar
                   dataKey="count"
                   name="件数"
-                  fill="#f43f5e"
+                  fill={CHART_COLORS.info}
                   radius={[0, 4, 4, 0]}
+                  barSize={20}
                 />
               </BarChart>
             </ResponsiveContainer>
@@ -1229,223 +1401,68 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
           )}
         </ChartCard>
 
-        <ChartCard title="タグバランス">
-          {stats.charts.radarData.length >= 3 ? (
+        <ChartCard title="ステータス別平均文字数">
+          {stats.charts.statusAvgCharData.length > 0 ? (
             <ResponsiveContainer width="100%" height="100%">
-              <RadarChart
-                cx="50%"
-                cy="50%"
-                outerRadius="70%"
-                data={stats.charts.radarData}
+              <BarChart
+                data={stats.charts.statusAvgCharData}
+                margin={{ top: 10, right: 10, left: -10, bottom: 0 }}
               >
-                <PolarGrid />
-                <PolarAngleAxis dataKey="subject" fontSize={10} />
-                <PolarRadiusAxis angle={30} domain={[0, "auto"]} hide />
-                <Radar
-                  name="使用数"
-                  dataKey="A"
-                  stroke={CHART_COLORS.success}
-                  fill={CHART_COLORS.success}
-                  fillOpacity={0.4}
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="name" fontSize={10} tickLine={false} />
+                <YAxis fontSize={10} tickLine={false} />
+                <Tooltip
+                  cursor={{ fill: "transparent" }}
+                  content={<CustomTooltip />}
                 />
-                <Tooltip />
-              </RadarChart>
+                <Bar
+                  dataKey="avg"
+                  name="平均文字数"
+                  fill={CHART_COLORS.secondary}
+                  radius={[4, 4, 0, 0]}
+                  barSize={30}
+                />
+              </BarChart>
             </ResponsiveContainer>
-          ) : (
-            <EmptyState message="タグデータ不足(3つ以上)" />
-          )}
-        </ChartCard>
-
-        <ChartCard title="Top Tags">
-          {stats.charts.tagRanking.length > 0 ? (
-            <div className="flex flex-wrap gap-2 content-start h-full overflow-y-auto">
-              {stats.charts.tagRanking.map((tag, i) => (
-                <div
-                  key={i}
-                  className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 rounded-lg border border-slate-100 text-xs"
-                >
-                  <span className="font-bold text-slate-700">#{tag.name}</span>
-                  <span className="bg-indigo-100 text-indigo-600 px-1.5 py-0.5 rounded text-[10px] font-mono">
-                    {tag.count}
-                  </span>
-                </div>
-              ))}
-            </div>
           ) : (
             <EmptyState />
           )}
         </ChartCard>
-      </div>
 
-      {/* Section 4 & 5: Strategy & Market */}
-      <div className="flex items-center gap-2 text-slate-500 mb-2 mt-8 px-1">
-        <Target size={18} />
-        <h3 className="text-sm font-bold">戦略・市場分析</h3>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <ChartCard title="締め切り余裕度 (残タスク)">
-          {stats.charts.deadlineData.length > 0 ? (
+        <ChartCard title="タグ別平均文字数">
+          {stats.charts.tagAvgCharData.length > 0 ? (
             <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={stats.charts.deadlineData}
-                  innerRadius={60}
-                  outerRadius={80}
-                  paddingAngle={5}
-                  dataKey="value"
-                >
-                  {stats.charts.deadlineData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip />
-                <Legend
-                  verticalAlign="bottom"
-                  height={36}
-                  iconSize={8}
-                  fontSize={10}
-                />
-                <text
-                  x="50%"
-                  y="48%"
-                  textAnchor="middle"
-                  dominantBaseline="middle"
-                  className="text-slate-400 text-xs font-bold"
-                >
-                  Margin
-                </text>
-              </PieChart>
-            </ResponsiveContainer>
-          ) : (
-            <EmptyState message="進行中のタスクなし" />
-          )}
-        </ChartCard>
-
-        <ChartCard title="余裕度と通過率の相関">
-          {stats.charts.deadlineCorrelation.length > 0 ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <ScatterChart
-                margin={{ top: 20, right: 20, bottom: 20, left: 0 }}
+              <BarChart
+                layout="vertical"
+                data={stats.charts.tagAvgCharData}
+                margin={{ left: 30, right: 20 }}
               >
-                <CartesianGrid />
-                <XAxis
-                  type="number"
-                  dataKey="margin"
-                  name="余裕日数"
-                  unit="日"
-                  fontSize={10}
-                />
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                <XAxis type="number" fontSize={10} />
                 <YAxis
-                  type="number"
-                  dataKey="isPassed"
-                  name="結果"
-                  tickFormatter={(v) => (v === 1 ? "通過" : "不通過")}
+                  dataKey="name"
+                  type="category"
+                  width={60}
                   fontSize={10}
-                  domain={[-0.2, 1.2]}
-                  ticks={[0, 1]}
+                  tickLine={false}
                 />
-                <Tooltip cursor={{ strokeDasharray: "3 3" }} />
-                <Scatter name="履歴" data={stats.charts.deadlineCorrelation}>
-                  {stats.charts.deadlineCorrelation.map((entry, index) => (
-                    <Cell
-                      key={`cell-${index}`}
-                      fill={
-                        entry.isPassed
-                          ? CHART_COLORS.success
-                          : CHART_COLORS.danger
-                      }
-                    />
-                  ))}
-                </Scatter>
-              </ScatterChart>
-            </ResponsiveContainer>
-          ) : (
-            <EmptyState message="合否データ不足" />
-          )}
-        </ChartCard>
-
-        <ChartCard title="選考種別シェア">
-          {stats.charts.selectionData.length > 0 ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={stats.charts.selectionData}
-                  innerRadius={40}
-                  outerRadius={80}
-                  paddingAngle={2}
-                  dataKey="value"
-                >
-                  {stats.charts.selectionData.map((entry, index) => (
-                    <Cell
-                      key={`cell-${index}`}
-                      fill={
-                        [
-                          CHART_COLORS.primary,
-                          CHART_COLORS.info,
-                          CHART_COLORS.secondary,
-                          CHART_COLORS.warning,
-                        ][index % 4]
-                      }
-                    />
-                  ))}
-                </Pie>
-                <Tooltip />
-                <Legend
-                  layout="vertical"
-                  verticalAlign="middle"
-                  align="right"
-                  iconSize={8}
-                  fontSize={10}
+                <Tooltip
+                  cursor={{ fill: "transparent" }}
+                  content={<CustomTooltip />}
                 />
-              </PieChart>
+                <Bar
+                  dataKey="avg"
+                  name="平均文字数"
+                  fill={CHART_COLORS.primary}
+                  radius={[0, 4, 4, 0]}
+                  barSize={15}
+                />
+              </BarChart>
             </ResponsiveContainer>
           ) : (
             <EmptyState />
           )}
         </ChartCard>
-      </div>
-
-      {/* Market Averages Cards */}
-      <div className="flex items-center gap-2 text-slate-500 mb-2 mt-8 px-1">
-        <Building2 size={18} />
-        <h3 className="text-sm font-bold">市場データ</h3>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white p-4 rounded-xl border border-slate-100 flex items-center gap-3">
-          <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg">
-            <DollarSign size={20} />
-          </div>
-          <div>
-            <p className="text-xs text-slate-400 font-bold">平均年収</p>
-            <p className="text-lg font-black text-slate-700">
-              {stats.market.avgSalary}{" "}
-              <span className="text-xs font-normal">万円</span>
-            </p>
-          </div>
-        </div>
-        <div className="bg-white p-4 rounded-xl border border-slate-100 flex items-center gap-3">
-          <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
-            <CalendarCheck size={20} />
-          </div>
-          <div>
-            <p className="text-xs text-slate-400 font-bold">平均年間休日</p>
-            <p className="text-lg font-black text-slate-700">
-              {stats.market.avgHoliday}{" "}
-              <span className="text-xs font-normal">日</span>
-            </p>
-          </div>
-        </div>
-        <div className="bg-white p-4 rounded-xl border border-slate-100 flex items-center gap-3">
-          <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
-            <Building2 size={20} />
-          </div>
-          <div>
-            <p className="text-xs text-slate-400 font-bold">Top 業界</p>
-            <p className="text-sm font-bold text-slate-700 line-clamp-1">
-              {stats.charts.industryData[0]?.name || "-"}
-            </p>
-          </div>
-        </div>
       </div>
 
       {/* Section 6: Awards */}
