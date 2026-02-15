@@ -144,19 +144,25 @@ const parseSalary = (value) => {
     String.fromCharCode(s.charCodeAt(0) - 0xfee0),
   );
 
+  normalized = normalized.replace(/,/g, "");
+  const isMan = normalized.includes("万");
+
   if (normalized.includes("~") || normalized.includes("〜")) {
     const parts = normalized
       .split(/[~〜]/)
       .map((s) => parseFloat(s.replace(/[^0-9.]/g, "")))
       .filter((n) => !isNaN(n));
-    if (parts.length === 2) return (parts[0] + parts[1]) / 2;
+    if (parts.length === 2) {
+      const avg = (parts[0] + parts[1]) / 2;
+      return isMan ? avg * 10000 : avg;
+    }
   }
 
   const match = normalized.match(/[0-9.]+/);
   if (!match) return null;
 
   let num = parseFloat(match[0]);
-  return num;
+  return isMan ? num * 10000 : num;
 };
 
 const getDeadlineStatus = (deadline, completedAt) => {
@@ -680,8 +686,25 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
     let maxCharQA = { question: "-", chars: 0, answer: "", company: "-" };
     let minCharQA = { question: "-", chars: 999999, answer: "", company: "-" };
 
+    const prodTimeStats = { 採用: [], 不採用: [], 提出済: [] };
+    const marginStats = { 採用: [], 不採用: [], 提出済: [] };
+    const charRateStats = { 採用: [], 不採用: [], 提出済: [] };
+    const scatterData = [];
+    let yearlyMarginSum = 0;
+    let yearlyMarginCount = 0;
+
     const now = new Date();
     let firstDate = now;
+    Object.values(activityLog).forEach((log) => {
+      if (log.hourly) {
+        Object.entries(log.hourly).forEach(([hour, count]) => {
+          const h = parseInt(hour, 10);
+          if (!isNaN(h) && h >= 0 && h < 24) {
+            hourlyCounts[h] += count;
+          }
+        });
+      }
+    });
 
     entries.forEach((entry) => {
       totalEntries++;
@@ -698,10 +721,8 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
         companyData[entry.company]?.industry || entry.industry || "未分類";
       industryCounts[industry] = (industryCounts[industry] || 0) + 1;
 
-      if (entry.deadline && (isCompleted || entry.status === "作成中")) {
-        const targetDate = entry.completedAt
-          ? new Date(entry.completedAt)
-          : new Date();
+      if (entry.deadline && isCompleted && entry.completedAt) {
+        const targetDate = new Date(entry.completedAt);
         const dead = new Date(entry.deadline);
         const diffDays = (dead - targetDate) / (1000 * 60 * 60 * 24);
 
@@ -710,6 +731,37 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
         else if (diffDays <= 3) marginCounts["注意(1-3日)"]++;
         else if (diffDays <= 7) marginCounts["通常(3-7日)"]++;
         else marginCounts["余裕(7日以上)"]++;
+      }
+      if (isCompleted && entry.createdAt && entry.completedAt) {
+        const start = new Date(entry.createdAt);
+        const end = new Date(entry.completedAt);
+        const hours = Math.max(0, (end - start) / (1000 * 60 * 60));
+
+        if (prodTimeStats[entry.status]) {
+          prodTimeStats[entry.status].push(hours);
+        }
+
+        if (entry.deadline) {
+          const dead = new Date(entry.deadline);
+          const startMargin = (dead - start) / (1000 * 60 * 60 * 24);
+          const submitMargin = (dead - end) / (1000 * 60 * 60 * 24);
+
+          if (marginStats[entry.status]) {
+            marginStats[entry.status].push(submitMargin);
+          }
+
+          yearlyMarginSum += submitMargin;
+          yearlyMarginCount++;
+
+          if (hours < 300 && startMargin > -10 && startMargin < 200) {
+            scatterData.push({
+              x: parseFloat(startMargin.toFixed(1)),
+              y: parseFloat(hours.toFixed(1)),
+              status: entry.status,
+              company: entry.company,
+            });
+          }
+        }
       }
 
       const selType = entry.selectionType || "未設定";
@@ -724,9 +776,8 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
         monthlyStats[monthKey].created++;
       }
       if (entry.updatedAt) {
-        const updated = new Date(entry.updatedAt);
-        hourlyCounts[updated.getHours()]++;
         if (isCompleted) {
+          const updated = new Date(entry.updatedAt);
           const compKey = `${updated.getFullYear()}/${String(updated.getMonth() + 1).padStart(2, "0")}`;
           if (monthlyStats[compKey]) monthlyStats[compKey].completed++;
         }
@@ -744,6 +795,7 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
       }
 
       let entryTotalChars = 0;
+      let entryCharRates = [];
       if (entry.qas && Array.isArray(entry.qas)) {
         entry.qas.forEach((qa) => {
           if (!qa.answer) return;
@@ -751,6 +803,11 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
           entryTotalChars += len;
           totalCharacters += len;
           totalQA++;
+          if (qa.charLimit && Number(qa.charLimit) > 0) {
+            entryCharRates.push(
+              Math.min(100, (len / Number(qa.charLimit)) * 100),
+            );
+          }
 
           const binIdx = Math.min(Math.floor(len / 100), 8);
           charBins[binIdx]++;
@@ -793,6 +850,15 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
               selectionType: entry.selectionType,
             };
         });
+      }
+      if (
+        isCompleted &&
+        charRateStats[entry.status] &&
+        entryCharRates.length > 0
+      ) {
+        const avgRate =
+          entryCharRates.reduce((a, b) => a + b, 0) / entryCharRates.length;
+        charRateStats[entry.status].push(avgRate);
       }
 
       if (isCompleted && entryTotalChars > 0) {
@@ -883,7 +949,7 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
       }));
     const monthlyData = Object.values(monthlyStats)
       .sort((a, b) => a.name.localeCompare(b.name))
-      .slice(-6);
+      .slice(-12);
     const hourlyData = hourlyCounts.map((count, hour) => ({
       hour: `${hour}時`,
       count,
@@ -941,12 +1007,19 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
     let salarySum = 0,
       salaryCount = 0,
       holidaySum = 0,
-      holidayCount = 0;
+      holidayCount = 0,
+      startingSalarySum = 0,
+      startingSalaryCount = 0;
     Object.values(companyData).forEach((data) => {
       const salary = parseSalary(data.avgSalary);
       if (salary) {
         salarySum += salary;
         salaryCount++;
+      }
+      const startSalary = parseSalary(data.startingSalary);
+      if (startSalary) {
+        startingSalarySum += startSalary;
+        startingSalaryCount++;
       }
       const holiday = parseInt(data.annualHoliday);
       if (!isNaN(holiday) && holiday > 0) {
@@ -999,6 +1072,30 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
         };
       });
 
+    const calcAvg = (arr) =>
+      arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+
+    const prodTimeChartData = Object.keys(prodTimeStats)
+      .map((s) => ({
+        name: s,
+        value: parseFloat(calcAvg(prodTimeStats[s]).toFixed(1)),
+      }))
+      .filter((d) => d.value > 0);
+
+    const marginChartData = Object.keys(marginStats)
+      .map((s) => ({
+        name: s,
+        value: parseFloat(calcAvg(marginStats[s]).toFixed(1)),
+      }))
+      .filter((d) => d.name && marginStats[d.name].length > 0);
+
+    const charRateChartData = Object.keys(charRateStats)
+      .map((s) => ({
+        name: s,
+        value: Math.round(calcAvg(charRateStats[s])),
+      }))
+      .filter((d) => d.value > 0);
+
     return {
       overview: {
         totalEntries,
@@ -1029,11 +1126,23 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
         effortRanking,
         cospaRanking,
         completionRanking,
+        prodTimeChartData,
+        marginChartData,
+        charRateChartData,
+        scatterChartData: scatterData,
       },
       market: {
         avgSalary: salaryCount > 0 ? Math.round(salarySum / salaryCount) : "-",
+        avgStartingSalary:
+          startingSalaryCount > 0
+            ? Math.round(startingSalarySum / startingSalaryCount)
+            : "-",
         avgHoliday:
           holidayCount > 0 ? Math.round(holidaySum / holidayCount) : "-",
+        avgYearlyMargin:
+          yearlyMarginCount > 0
+            ? (yearlyMarginSum / yearlyMarginCount).toFixed(1)
+            : "-",
       },
       awards: {
         maxCharEntry: maxCharEntry.chars > 0 ? maxCharEntry : null,
@@ -1785,7 +1894,7 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
 
               <div className="flex-1">
                 <ChartCard
-                  title="ES完成スピードランキング (作成〜完了)"
+                  title="ES完成スピードランキング"
                   height="h-auto"
                   padding="p-4"
                 >
@@ -1835,6 +1944,186 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
           </div>
         </>
       )}
+
+      {/* Section 7: Deep Analytics */}
+      <div className="flex items-center gap-2 text-slate-500 mb-2 mt-8 px-1">
+        <Activity size={18} />
+        <h3 className="text-sm font-bold">相関傾向分析</h3>
+      </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard
+          icon={DollarSign}
+          label="あなたの希望平均年収"
+          value={
+            typeof stats.market.avgSalary === "number"
+              ? `${stats.market.avgSalary.toLocaleString()}万円`
+              : "-"
+          }
+          colorClass={{ bg: "bg-emerald-50", text: "text-emerald-500" }}
+        />
+        <StatCard
+          icon={DollarSign}
+          label="あなたの希望初任給"
+          value={
+            typeof stats.market.avgStartingSalary === "number"
+              ? `${stats.market.avgStartingSalary.toLocaleString()}円`
+              : "-"
+          }
+          colorClass={{ bg: "bg-emerald-50", text: "text-emerald-500" }}
+        />
+        <StatCard
+          icon={CalendarCheck}
+          label="あなたの希望年間休日"
+          value={
+            typeof stats.market.avgHoliday === "number"
+              ? `${stats.market.avgHoliday}日`
+              : "-"
+          }
+          colorClass={{ bg: "bg-blue-50", text: "text-blue-500" }}
+        />
+        <StatCard
+          icon={Calendar}
+          label="平均提出余裕日数"
+          value={
+            stats.market.avgYearlyMargin !== "-"
+              ? `${stats.market.avgYearlyMargin}日`
+              : "-"
+          }
+          colorClass={{ bg: "bg-indigo-50", text: "text-indigo-500" }}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
+        <ChartCard title="制作所要時間と採用の関係">
+          {stats.charts.prodTimeChartData.length > 0 ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={stats.charts.prodTimeChartData}
+                margin={{ top: 10, right: 10, left: -10, bottom: 0 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="name" fontSize={10} tickLine={false} />
+                <YAxis fontSize={10} tickLine={false} />
+                <Tooltip content={<CustomTooltip />} />
+                <Bar
+                  dataKey="value"
+                  name="平均所要時間"
+                  fill={CHART_COLORS.info}
+                  radius={[4, 4, 0, 0]}
+                  barSize={40}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <EmptyState message="データ不足" />
+          )}
+        </ChartCard>
+
+        <ChartCard title="提出余裕日数と採用の関係">
+          {stats.charts.marginChartData.length > 0 ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={stats.charts.marginChartData}
+                margin={{ top: 10, right: 10, left: -10, bottom: 0 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="name" fontSize={10} tickLine={false} />
+                <YAxis fontSize={10} tickLine={false} />
+                <Tooltip content={<CustomTooltip />} />
+                <Bar
+                  dataKey="value"
+                  name="平均余裕日数"
+                  fill={CHART_COLORS.success}
+                  radius={[4, 4, 0, 0]}
+                  barSize={40}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <EmptyState message="データ不足" />
+          )}
+        </ChartCard>
+
+        <ChartCard title="文字数充足率と採用の関係">
+          {stats.charts.charRateChartData.length > 0 ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={stats.charts.charRateChartData}
+                margin={{ top: 10, right: 10, left: -10, bottom: 0 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="name" fontSize={10} tickLine={false} />
+                <YAxis fontSize={10} tickLine={false} domain={[0, 100]} />
+                <Tooltip content={<CustomTooltip />} />
+                <Bar
+                  dataKey="value"
+                  name="平均充足率(%)"
+                  fill={CHART_COLORS.warning}
+                  radius={[4, 4, 0, 0]}
+                  barSize={40}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <EmptyState message="データ不足" />
+          )}
+        </ChartCard>
+
+        <div className="lg:col-span-3">
+          <ChartCard title="着手の早さと制作所要時間の相関">
+            {stats.charts.scatterChartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <ScatterChart
+                  margin={{ top: 20, right: 20, bottom: 20, left: 0 }}
+                >
+                  <CartesianGrid />
+                  <XAxis
+                    type="number"
+                    dataKey="x"
+                    name="着手時の余裕日数"
+                    unit="日"
+                    fontSize={10}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    type="number"
+                    dataKey="y"
+                    name="制作時間"
+                    unit="h"
+                    fontSize={10}
+                    tickLine={false}
+                  />
+                  <Tooltip cursor={{ strokeDasharray: "3 3" }} />
+                  <Legend />
+                  <Scatter
+                    name="採用"
+                    data={stats.charts.scatterChartData.filter(
+                      (d) => d.status === "採用",
+                    )}
+                    fill={CHART_COLORS.warning}
+                  />
+                  <Scatter
+                    name="不採用"
+                    data={stats.charts.scatterChartData.filter(
+                      (d) => d.status === "不採用",
+                    )}
+                    fill={CHART_COLORS.danger}
+                  />
+                  <Scatter
+                    name="提出済"
+                    data={stats.charts.scatterChartData.filter(
+                      (d) => d.status === "提出済",
+                    )}
+                    fill={CHART_COLORS.success}
+                  />
+                </ScatterChart>
+              </ResponsiveContainer>
+            ) : (
+              <EmptyState message="データ不足" />
+            )}
+          </ChartCard>
+        </div>
+      </div>
     </div>
   );
 };
