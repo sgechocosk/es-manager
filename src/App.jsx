@@ -50,6 +50,7 @@ import {
   Zap,
   CheckCircle2,
   Activity,
+  Info,
 } from "lucide-react";
 import {
   BarChart,
@@ -652,6 +653,8 @@ const ActivityHeatmap = ({ activityLog }) => {
 };
 
 const StatisticsView = ({ entries, companyData, activityLog }) => {
+  const [showInfo, setShowInfo] = useState(false);
+
   const stats = useMemo(() => {
     let totalEntries = 0;
     let completedCount = 0;
@@ -1172,7 +1175,7 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 pb-20">
       {/* Section 0: Header */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-2">
+      <div className="flex flex-row items-center justify-between gap-2 pb-2">
         <div className="flex items-center gap-3">
           <div className="p-2.5 bg-indigo-600 text-white rounded-xl shadow-sm shadow-indigo-200">
             <BarChart3 size={24} strokeWidth={2.5} />
@@ -1181,22 +1184,57 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
             <h2 className="text-2xl font-black text-slate-800 tracking-tight leading-none">
               ダッシュボード
             </h2>
-            <p className="text-xs font-bold text-slate-400 mt-1">
-              活動状況の分析概要
-            </p>
+            <div className="flex items-center gap-2 mt-1">
+              <p className="text-xs font-bold text-slate-400">
+                活動状況の分析概要
+              </p>
+              <div className="relative group z-50 flex items-center ml-0.5">
+                <button
+                  onClick={() => setShowInfo(!showInfo)}
+                  className="outline-none focus:text-indigo-500"
+                >
+                  <Info
+                    size={14}
+                    className={`transition-colors ${showInfo ? "text-indigo-500" : "text-slate-300 group-hover:text-indigo-500"}`}
+                  />
+                </button>
+
+                {showInfo && (
+                  <div
+                    className="fixed inset-0 z-40 cursor-default"
+                    onClick={() => setShowInfo(false)}
+                  />
+                )}
+
+                <div
+                  className={`absolute left-full top-1/2 -translate-y-1/2 ml-3 w-max z-50 ${showInfo ? "block" : "hidden group-hover:block"}`}
+                >
+                  <div className="bg-slate-50 border border-slate-300 text-slate-500 text-xs p-3 rounded-lg relative leading-relaxed animate-in fade-in slide-in-from-left-1 text-left shadow-sm">
+                    <div className="w-2 h-2 bg-slate-50 border-l border-b border-slate-300 transform rotate-45 absolute -left-1.5 top-1/2 -translate-y-1/2"></div>
+                    入力内容に基づく単純な集計・推計値です。
+                    <br />
+                    あくまで活動の目安としてご活用ください。
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div className="inline-flex items-center gap-2 bg-white px-4 py-2 rounded-full border border-slate-200 shadow-sm transition-shadow hover:shadow-md self-end">
-          <div className="p-1.5 bg-blue-50 text-blue-500 rounded-full">
-            <Calendar size={14} />
+        <div className="inline-flex items-center gap-1.5 sm:gap-2 bg-white px-2.5 py-1.5 sm:px-4 sm:py-2 rounded-full border border-slate-200 shadow-sm transition-shadow hover:shadow-md shrink-0">
+          <div className="p-1 sm:p-1.5 bg-blue-50 text-blue-500 rounded-full">
+            <Calendar size={12} className="sm:w-[14px] sm:h-[14px]" />
           </div>
-          <span className="text-xs font-bold text-slate-500">活動開始から</span>
-          <div className="flex items-baseline gap-1">
-            <span className="text-xl font-black text-slate-700 font-mono">
+          <span className="hidden sm:inline text-xs font-bold text-slate-500">
+            活動開始から
+          </span>
+          <div className="flex items-baseline gap-0.5 sm:gap-1">
+            <span className="text-base sm:text-xl font-black text-slate-700 font-mono">
               {stats.overview.daysSinceStart}
             </span>
-            <span className="text-xs font-bold text-slate-400">日目</span>
+            <span className="text-[10px] sm:text-xs font-bold text-slate-400">
+              日目
+            </span>
           </div>
         </div>
       </div>
