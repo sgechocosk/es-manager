@@ -460,7 +460,7 @@ const HighlightText = ({ text, highlight, writingStyle, checkNgWords }) => {
 
 // --- Statistics Components ---
 const StatCard = ({ icon: Icon, label, value, subValue, colorClass }) => (
-  <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-3 transition-all hover:shadow-md h-full">
+  <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-3 h-full">
     <div
       className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${colorClass.bg} ${colorClass.text}`}
     >
@@ -484,7 +484,7 @@ const StatCard = ({ icon: Icon, label, value, subValue, colorClass }) => (
 
 const ChartCard = ({ title, children, height = "h-64", padding = "p-6" }) => (
   <div
-    className={`bg-white ${padding} rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow h-full flex flex-col`}
+    className={`bg-white ${padding} rounded-2xl border border-slate-100 shadow-sm h-full flex flex-col`}
   >
     <h3
       className={`text-sm font-bold text-slate-700 shrink-0 ${padding === "p-6" ? "mb-6" : "mb-3"}`}
@@ -1275,7 +1275,10 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
                   tickCount={4}
                   allowDecimals={false}
                 />
-                <Tooltip content={<CustomTooltip />} />
+                <Tooltip
+                  cursor={{ fill: "transparent" }}
+                  content={<CustomTooltip />}
+                />
                 <Bar
                   dataKey="count"
                   name="活動量"
@@ -1306,7 +1309,10 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
                   fontSize={10}
                   tickLine={false}
                 />
-                <Tooltip content={<CustomTooltip />} />
+                <Tooltip
+                  cursor={{ fill: "transparent" }}
+                  content={<CustomTooltip />}
+                />
                 <Bar
                   dataKey="count"
                   name="活動数"
@@ -1329,7 +1335,10 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="name" fontSize={12} tickLine={false} />
                   <YAxis fontSize={10} tickLine={false} />
-                  <Tooltip content={<CustomTooltip />} />
+                  <Tooltip
+                    cursor={{ fill: "transparent" }}
+                    content={<CustomTooltip />}
+                  />
                   <Legend
                     iconSize={10}
                     fontSize={12}
@@ -1376,6 +1385,8 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
                   outerRadius="80%"
                   paddingAngle={2}
                   dataKey="value"
+                  startAngle={90}
+                  endAngle={-270}
                 >
                   {stats.charts.marginData.map((entry, index) => (
                     <Cell
@@ -1402,7 +1413,7 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
                   dominantBaseline="middle"
                   className="text-slate-400 text-xs font-bold"
                 >
-                  Margin
+                  余裕度
                 </text>
               </PieChart>
             </ResponsiveContainer>
@@ -1479,6 +1490,8 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
                   outerRadius="70%"
                   paddingAngle={2}
                   dataKey="value"
+                  startAngle={90}
+                  endAngle={-270}
                 >
                   {stats.charts.selectionShareData.map((entry, index) => (
                     <Cell
@@ -1688,7 +1701,6 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
                       </span>
                       <span
                         className={`font-bold text-slate-700 truncate ${item.name.length > 10 ? "text-xs" : "text-sm"}`}
-                        title={item.name}
                       >
                         {item.name}
                       </span>
@@ -1726,7 +1738,6 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
                       </span>
                       <span
                         className={`font-bold text-slate-700 truncate ${item.name.length > 8 ? "text-xs" : "text-sm"}`}
-                        title={item.name}
                       >
                         {item.name}
                       </span>
@@ -1765,7 +1776,6 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
                       <div className="flex flex-col truncate min-w-0">
                         <span
                           className={`font-bold text-slate-700 truncate ${item.company.length > 12 ? "text-xs" : "text-sm"}`}
-                          title={item.company}
                         >
                           {item.company}
                         </span>
@@ -1920,7 +1930,6 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
                                     ? "text-xs"
                                     : "text-sm"
                                 }`}
-                                title={item.company}
                               >
                                 {item.company}
                               </span>
@@ -2004,7 +2013,10 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="name" fontSize={10} tickLine={false} />
                 <YAxis fontSize={10} tickLine={false} />
-                <Tooltip content={<CustomTooltip />} />
+                <Tooltip
+                  cursor={{ fill: "transparent" }}
+                  content={<CustomTooltip />}
+                />
                 <Bar
                   dataKey="value"
                   name="平均所要時間"
@@ -2029,7 +2041,10 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="name" fontSize={10} tickLine={false} />
                 <YAxis fontSize={10} tickLine={false} />
-                <Tooltip content={<CustomTooltip />} />
+                <Tooltip
+                  cursor={{ fill: "transparent" }}
+                  content={<CustomTooltip />}
+                />
                 <Bar
                   dataKey="value"
                   name="平均余裕日数"
@@ -2054,7 +2069,10 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="name" fontSize={10} tickLine={false} />
                 <YAxis fontSize={10} tickLine={false} domain={[0, 100]} />
-                <Tooltip content={<CustomTooltip />} />
+                <Tooltip
+                  cursor={{ fill: "transparent" }}
+                  content={<CustomTooltip />}
+                />
                 <Bar
                   dataKey="value"
                   name="平均充足率(%)"
