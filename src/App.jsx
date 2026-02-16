@@ -1176,18 +1176,19 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 pb-20">
       {/* Section 0: Header */}
       <div className="flex flex-row items-center justify-between gap-2 pb-2">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-indigo-600 text-white rounded-xl shadow-sm shadow-indigo-200">
-            <BarChart3 size={24} strokeWidth={2.5} />
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <div className="p-2 sm:p-2.5 bg-indigo-600 text-white rounded-xl shadow-sm shadow-indigo-200 shrink-0">
+            <BarChart3 size={20} className="sm:w-6 sm:h-6" strokeWidth={2.5} />
           </div>
-          <div>
-            <h2 className="text-2xl font-black text-slate-800 tracking-tight leading-none">
+          <div className="min-w-0">
+            <h2 className="text-lg sm:text-2xl font-black text-slate-800 tracking-tight leading-none truncate">
               ダッシュボード
             </h2>
-            <div className="flex items-center gap-2 mt-1">
-              <p className="text-xs font-bold text-slate-400">
+            <div className="flex items-center gap-1.5 mt-1">
+              <p className="text-[10px] sm:text-xs font-bold text-slate-400 truncate">
                 活動状況の分析概要
               </p>
+
               <div className="relative group z-50 flex items-center ml-0.5">
                 <button
                   onClick={() => setShowInfo(!showInfo)}
@@ -1207,10 +1208,15 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
                 )}
 
                 <div
-                  className={`absolute left-full top-1/2 -translate-y-1/2 ml-3 w-max z-50 ${showInfo ? "block" : "hidden group-hover:block"}`}
+                  className={`
+                    absolute z-50 
+                    left-0 top-full mt-2 w-60 sm:w-max sm:left-full sm:top-1/2 sm:-translate-y-1/2 sm:mt-0 sm:ml-3
+                    ${showInfo ? "block" : "hidden group-hover:block"}
+                  `}
                 >
-                  <div className="bg-slate-50 border border-slate-300 text-slate-500 text-xs p-3 rounded-lg relative leading-relaxed animate-in fade-in slide-in-from-left-1 text-left shadow-sm">
-                    <div className="w-2 h-2 bg-slate-50 border-l border-b border-slate-300 transform rotate-45 absolute -left-1.5 top-1/2 -translate-y-1/2"></div>
+                  <div className="bg-slate-50 border border-slate-300 text-slate-500 text-xs p-3 rounded-lg relative leading-relaxed animate-in fade-in slide-in-from-left-1 text-left shadow-lg">
+                    <div className="sm:hidden w-2 h-2 bg-slate-50 border-l border-t border-slate-300 transform rotate-45 absolute -top-1.5 left-2"></div>
+                    <div className="hidden sm:block w-2 h-2 bg-slate-50 border-l border-b border-slate-300 transform rotate-45 absolute -left-1.5 top-1/2 -translate-y-1/2"></div>
                     入力内容に基づく単純な集計・推計値です。
                     <br />
                     あくまで活動の目安としてご活用ください。
@@ -1221,7 +1227,7 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
           </div>
         </div>
 
-        <div className="inline-flex items-center gap-1.5 sm:gap-2 bg-white px-2.5 py-1.5 sm:px-4 sm:py-2 rounded-full border border-slate-200 shadow-sm transition-shadow hover:shadow-md shrink-0">
+        <div className="inline-flex items-center gap-1.5 sm:gap-2 bg-white px-2.5 py-1.5 sm:px-4 sm:py-2 rounded-full border border-slate-200 shadow-sm shrink-0">
           <div className="p-1 sm:p-1.5 bg-blue-50 text-blue-500 rounded-full">
             <Calendar size={12} className="sm:w-[14px] sm:h-[14px]" />
           </div>
