@@ -590,7 +590,7 @@ const ActivityHeatmap = ({ activityLog }) => {
         <span className="font-bold text-slate-800">{totalContributions}</span>
       </div>
 
-      <div className="flex gap-[3px] flex-1 ml-6 min-h-0">
+      <div className="flex gap-[3px] flex-1 ml-7 min-h-0">
         {weeks.map((week, w) => (
           <div key={w} className="flex flex-col gap-[3px] flex-1 min-w-0">
             <div className="h-3 relative">
@@ -602,37 +602,77 @@ const ActivityHeatmap = ({ activityLog }) => {
             </div>
 
             <div className="flex flex-col gap-[3px]">
-              {week.days.map((day, d) => (
-                <div
-                  key={d}
-                  className={`w-full aspect-square rounded-[2px] ${day.intensity} group relative`}
-                >
-                  {w === 0 && [1, 3, 5].includes(d) && (
-                    <span className="absolute right-full mr-2 top-1/2 -translate-y-1/2 text-[9px] text-slate-400 leading-none">
-                      {d === 1 && "Mon"}
-                      {d === 3 && "Wed"}
-                      {d === 5 && "Fri"}
-                    </span>
-                  )}
+              {week.days.map((day, d) => {
+                const isLeftEdge = w < 4;
+                const isRightEdge = w > weeks.length - 5;
+                const isTopEdge = d < 2;
 
-                  {!day.isFuture && (
-                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-50 pointer-events-none">
-                      <div className="bg-white p-2 border border-slate-100 shadow-lg rounded-lg text-xs whitespace-nowrap">
-                        <p className="font-bold text-slate-700 mb-1">
-                          {day.date}
-                        </p>
-                        <p className="text-slate-500">
-                          <span className="font-bold text-emerald-600">
-                            {day.count}
-                          </span>{" "}
-                          updates
-                        </p>
+                let tooltipClass =
+                  "absolute hidden group-hover:block z-50 pointer-events-none whitespace-nowrap";
+
+                if (isTopEdge) {
+                  tooltipClass += " top-full mt-2";
+                } else {
+                  tooltipClass += " bottom-full mb-2";
+                }
+
+                if (isLeftEdge) {
+                  tooltipClass += " left-0";
+                } else if (isRightEdge) {
+                  tooltipClass += " right-0";
+                } else {
+                  tooltipClass += " left-1/2 -translate-x-1/2";
+                }
+
+                let arrowClass =
+                  "w-2 h-2 bg-white transform rotate-45 absolute shadow-sm";
+
+                if (isTopEdge) {
+                  arrowClass += " -top-1 border-l border-t border-slate-100";
+                } else {
+                  arrowClass += " -bottom-1 border-r border-b border-slate-100";
+                }
+
+                if (isLeftEdge) {
+                  arrowClass += " left-1.5";
+                } else if (isRightEdge) {
+                  arrowClass += " right-1.5";
+                } else {
+                  arrowClass += " left-1/2 -translate-x-1/2";
+                }
+
+                return (
+                  <div
+                    key={d}
+                    className={`w-full aspect-square rounded-[2px] ${day.intensity} group relative`}
+                  >
+                    {w === 0 && [1, 3, 5].includes(d) && (
+                      <span className="absolute right-full mr-2 top-1/2 -translate-y-1/2 text-[9px] text-slate-400 leading-none">
+                        {d === 1 && "Mon"}
+                        {d === 3 && "Wed"}
+                        {d === 5 && "Fri"}
+                      </span>
+                    )}
+
+                    {!day.isFuture && (
+                      <div className={tooltipClass}>
+                        <div className="bg-white p-2 border border-slate-100 shadow-lg rounded-lg text-xs">
+                          <p className="font-bold text-slate-700 mb-1">
+                            {day.date}
+                          </p>
+                          <p className="text-slate-500">
+                            <span className="font-bold text-emerald-600">
+                              {day.count}
+                            </span>{" "}
+                            updates
+                          </p>
+                        </div>
+                        <div className={arrowClass}></div>
                       </div>
-                      <div className="w-2 h-2 bg-white border-r border-b border-slate-100 transform rotate-45 absolute left-1/2 -translate-x-1/2 -bottom-1 shadow-sm"></div>
-                    </div>
-                  )}
-                </div>
-              ))}
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         ))}
@@ -1174,6 +1214,18 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 pb-20">
+      <style>{`
+        .recharts-surface:focus,
+        .recharts-wrapper:focus,
+        .recharts-sector:focus,
+        .recharts-layer:focus,
+        path:focus,
+        rect:focus,
+        g:focus {
+          outline: none !important;
+        }
+      `}</style>
+
       {/* Section 0: Header */}
       <div className="flex flex-row items-center justify-between gap-2 pb-2">
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
