@@ -3588,7 +3588,7 @@ ${styleInstruction}`;
 
       userPrompt = `${contextInfo}
 
-${commonInput}
+${commonInputSection}
 
 【回答内容】
 ${answer}
