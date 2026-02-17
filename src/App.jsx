@@ -1213,7 +1213,7 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 pb-20">
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
       <style>{`
         .recharts-surface:focus,
         .recharts-wrapper:focus,
@@ -1241,7 +1241,7 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
                 活動状況の分析概要
               </p>
 
-              <div className="relative group z-50 flex items-center ml-0.5">
+              <div className="relative group z-30 flex items-center ml-0.5">
                 <button
                   onClick={() => setShowInfo(!showInfo)}
                   className="outline-none focus:text-indigo-500"
@@ -1254,14 +1254,14 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
 
                 {showInfo && (
                   <div
-                    className="fixed inset-0 z-40 cursor-default"
+                    className="fixed inset-0 z-20 cursor-default"
                     onClick={() => setShowInfo(false)}
                   />
                 )}
 
                 <div
                   className={`
-                    absolute z-50 
+                    absolute z-30 
                     left-0 top-full mt-2 w-60 sm:w-max sm:left-full sm:top-1/2 sm:-translate-y-1/2 sm:mt-0 sm:ml-3
                     ${showInfo ? "block" : "hidden group-hover:block"}
                   `}
