@@ -4498,6 +4498,9 @@ export default function App() {
 
   const [toast, setToast] = useState(null);
 
+  const mouseDownLocation = useRef(null);
+  const isMouseDownGlobal = useRef(false);
+
   // --- Effects: Initialization & Auto Save ---
   useEffect(() => {
     const savedSettingsJson = localStorage.getItem(STORAGE_KEY_SETTINGS);
@@ -5563,7 +5566,22 @@ export default function App() {
   return (
     <div
       className="min-h-screen bg-slate-50 text-slate-800 font-sans flex flex-col"
-      onClick={() => setActiveQAId(null)}
+      onMouseDown={(e) => {
+        isMouseDownGlobal.current = true;
+        const qaItem = e.target.closest('[id^="qa-item-"]');
+        mouseDownLocation.current = qaItem ? qaItem.id : "outside";
+      }}
+      onMouseUp={(e) => {
+        isMouseDownGlobal.current = false;
+        const qaItem = e.target.closest('[id^="qa-item-"]');
+        const upLocation = qaItem ? qaItem.id : "outside";
+        if (
+          mouseDownLocation.current === "outside" &&
+          upLocation === "outside"
+        ) {
+          setActiveQAId(null);
+        }
+      }}
     >
       <header className="bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-0 z-50 px-4 py-3 shadow-sm shrink-0">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
@@ -6279,10 +6297,7 @@ export default function App() {
                       <Save size={20} />
                     </button>
                   </div>
-                  <div
-                    className="p-6 space-y-4"
-                    onClick={() => setActiveQAId(null)}
-                  >
+                  <div className="p-6 space-y-4">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
                       <div>
                         <label className="text-xs font-bold text-slate-500">
@@ -6573,7 +6588,10 @@ export default function App() {
                                     }`}
                                     placeholder="質問内容"
                                     value={qa.question}
-                                    onFocus={() => setActiveQAId(qa.id)}
+                                    onFocus={() => {
+                                      if (!isMouseDownGlobal.current)
+                                        setActiveQAId(qa.id);
+                                    }}
                                     onChange={(e) =>
                                       updateQA(
                                         qa.id,
@@ -6614,7 +6632,10 @@ export default function App() {
                                   onChange={(e) =>
                                     updateQA(qa.id, "answer", e.target.value)
                                   }
-                                  onFocus={() => setActiveQAId(qa.id)}
+                                  onFocus={() => {
+                                    if (!isMouseDownGlobal.current)
+                                      setActiveQAId(qa.id);
+                                  }}
                                   placeholder="回答..."
                                   isActive={isActive}
                                   charLimit={qa.charLimit}
