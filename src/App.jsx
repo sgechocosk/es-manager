@@ -307,11 +307,15 @@ const normalizeCompanyData = (data) => {
 
 // --- Gemini API Logic ---
 const GEMINI_MODELS = [
-  // "gemini-3-pro-preview",
+  // "gemini-3.1-pro-preview", // 最新かつ無料利用不可
+  // "gemini-3.1-pro-preview-customtools", // 最新かつ無料利用不可
+
+  // "gemini-3-pro-preview", // 無料利用不可
   "gemini-3-flash-preview",
-  // "gemini-2.5-pro",
-  "gemini-2.5-flash",
-  "gemini-2.5-flash-lite",
+
+  // "gemini-2.5-pro", // 無料利用不可かつ非推奨~6/17
+  "gemini-2.5-flash", // 非推奨~6/17
+  "gemini-2.5-flash-lite", // 非推奨~7/22
 ];
 
 const callGeminiAPI = async (systemInstruction, userPrompt, onModelChange) => {
