@@ -4612,6 +4612,7 @@ export default function App() {
   const [isInitialized, setIsInitialized] = useState(false);
 
   const [activeQAId, setActiveQAId] = useState(null);
+  const [activeTagDropdownId, setActiveTagDropdownId] = useState(null);
 
   const [activityLog, setActivityLog] = useState({});
 
@@ -4856,6 +4857,33 @@ export default function App() {
   ]);
 
   // --- Helpers & Memos ---
+  const existingTags = useMemo(() => {
+    const tagCounts = {};
+    entries.forEach((e) => {
+      if (e.qas) {
+        e.qas.forEach((qa) => {
+          const tArr = splitTags(qa.tags);
+          tArr.forEach((t) => {
+            tagCounts[t] = (tagCounts[t] || 0) + 1;
+          });
+        });
+      }
+    });
+    return Object.entries(tagCounts)
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "ja"))
+      .map((entry) => entry[0]);
+  }, [entries]);
+
+  const handleTagClick = (qaId, currentTags, clickedTag) => {
+    const tagsArray = splitTags(currentTags);
+    if (!tagsArray.includes(clickedTag)) {
+      const newTags = currentTags
+        ? `${currentTags}, ${clickedTag}`
+        : clickedTag;
+      updateQA(qaId, "tags", newTags);
+    }
+  };
+
   const scrollToTop = (behavior = "auto") => {
     window.scrollTo({ top: 0, behavior: behavior });
   };
@@ -6615,10 +6643,16 @@ export default function App() {
                                 e.stopPropagation();
                                 setActiveQAId(qa.id);
                               }}
-                              className={`rounded-xl border transition-all duration-300 ease-in-out px-4 pt-2 pb-3 ${
+                              className={`relative rounded-xl border transition-all duration-300 ease-in-out px-4 pt-2 pb-3 ${
+                                activeTagDropdownId === qa.id ? "z-50" : "z-10"
+                              } ${
                                 isActive
                                   ? "bg-slate-50 shadow-sm border-indigo-200 ring-1 ring-indigo-200"
-                                  : "bg-white border-slate-200 hover:border-indigo-300 cursor-pointer opacity-90 hover:opacity-100"
+                                  : `bg-white border-slate-200 hover:border-indigo-300 cursor-pointer hover:opacity-100 ${
+                                      activeTagDropdownId === qa.id
+                                        ? "opacity-100"
+                                        : "opacity-90"
+                                    }`
                               }`}
                             >
                               <div className="relative z-10 flex items-center justify-between min-h-[32px] pointer-events-none">
@@ -6815,37 +6849,122 @@ export default function App() {
                               </div>
 
                               {isActive ? (
-                                <input
-                                  className="mt-2 w-full text-xs px-3 py-2 bg-white border rounded-md outline-none focus:border-indigo-500 animate-in fade-in slide-in-from-top-1 duration-200"
-                                  placeholder="タグ (例: 自己PR、ガクチカ)"
-                                  value={qa.tags}
-                                  onFocus={() => setActiveQAId(qa.id)}
-                                  onChange={(e) =>
-                                    updateQA(qa.id, "tags", e.target.value)
-                                  }
-                                />
-                              ) : (
-                                <div className="flex justify-between items-center gap-2 mt-3 animate-in fade-in duration-300">
+                                <div className="mt-2 relative animate-in fade-in slide-in-from-top-1 duration-200">
                                   <input
-                                    className="flex-1 text-xs px-2 py-1 bg-white border border-slate-200 rounded outline-none focus:border-indigo-500 transition-all placeholder-slate-300"
-                                    placeholder="タグ"
+                                    className="w-full text-xs px-3 py-2 bg-white border rounded-md outline-none focus:border-indigo-500"
+                                    placeholder="タグ (例: 自己PR、ガクチカ)"
                                     value={qa.tags}
-                                    onClick={(e) => e.stopPropagation()}
+                                    onFocus={() => {
+                                      setActiveQAId(qa.id);
+                                      setActiveTagDropdownId(qa.id);
+                                    }}
+                                    onBlur={() => setActiveTagDropdownId(null)}
                                     onChange={(e) =>
                                       updateQA(qa.id, "tags", e.target.value)
                                     }
                                   />
-                                  <div
-                                    className={`text-right text-[10px] font-mono shrink-0 ${
-                                      qa.charLimit &&
-                                      qa.answer.length > Number(qa.charLimit)
-                                        ? "text-rose-500 font-bold"
-                                        : "text-slate-400"
-                                    }`}
-                                  >
-                                    {qa.answer.length}文字
-                                    {qa.charLimit && ` / 上限: ${qa.charLimit}`}
+                                  {activeTagDropdownId === qa.id &&
+                                    (() => {
+                                      const currentTags = splitTags(qa.tags);
+                                      const availableTags = existingTags.filter(
+                                        (t) => !currentTags.includes(t),
+                                      );
+                                      if (availableTags.length === 0)
+                                        return null;
+                                      return (
+                                        <div className="absolute z-50 left-0 top-full mt-1 w-full bg-white border border-slate-200 shadow-xl rounded-lg p-3 flex flex-wrap gap-1.5 max-h-48 overflow-y-auto animate-in fade-in zoom-in-95">
+                                          <div className="w-full text-[10px] font-bold text-slate-400 mb-1 border-b border-slate-100 pb-1">
+                                            過去に利用したタグ
+                                          </div>
+                                          {availableTags.map((tag) => (
+                                            <button
+                                              key={tag}
+                                              onMouseDown={(e) =>
+                                                e.preventDefault()
+                                              }
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleTagClick(
+                                                  qa.id,
+                                                  qa.tags,
+                                                  tag,
+                                                );
+                                              }}
+                                              className="text-[10px] px-2.5 py-1 bg-slate-50 text-slate-600 rounded-full hover:bg-indigo-50 hover:text-indigo-600 border border-slate-200 hover:border-indigo-200 transition-colors shadow-sm"
+                                            >
+                                              {tag}
+                                            </button>
+                                          ))}
+                                        </div>
+                                      );
+                                    })()}
+                                </div>
+                              ) : (
+                                <div className="mt-3 relative animate-in fade-in duration-300">
+                                  <div className="flex justify-between items-center gap-2">
+                                    <input
+                                      className="flex-1 text-xs px-2 py-1 bg-white border border-slate-200 rounded outline-none focus:border-indigo-500 transition-all placeholder-slate-300"
+                                      placeholder="タグ"
+                                      value={qa.tags}
+                                      onClick={(e) => e.stopPropagation()}
+                                      onFocus={() =>
+                                        setActiveTagDropdownId(qa.id)
+                                      }
+                                      onBlur={() =>
+                                        setActiveTagDropdownId(null)
+                                      }
+                                      onChange={(e) =>
+                                        updateQA(qa.id, "tags", e.target.value)
+                                      }
+                                    />
+                                    <div
+                                      className={`text-right text-[10px] font-mono shrink-0 ${
+                                        qa.charLimit &&
+                                        qa.answer.length > Number(qa.charLimit)
+                                          ? "text-rose-500 font-bold"
+                                          : "text-slate-400"
+                                      }`}
+                                    >
+                                      {qa.answer.length}文字
+                                      {qa.charLimit &&
+                                        ` / 上限: ${qa.charLimit}`}
+                                    </div>
                                   </div>
+                                  {activeTagDropdownId === qa.id &&
+                                    (() => {
+                                      const currentTags = splitTags(qa.tags);
+                                      const availableTags = existingTags.filter(
+                                        (t) => !currentTags.includes(t),
+                                      );
+                                      if (availableTags.length === 0)
+                                        return null;
+                                      return (
+                                        <div className="absolute z-50 left-0 top-full mt-1 w-full bg-white border border-slate-200 shadow-xl rounded-lg p-3 flex flex-wrap gap-1.5 max-h-48 overflow-y-auto animate-in fade-in zoom-in-95">
+                                          <div className="w-full text-[10px] font-bold text-slate-400 mb-1 border-b border-slate-100 pb-1">
+                                            過去に利用したタグ
+                                          </div>
+                                          {availableTags.map((tag) => (
+                                            <button
+                                              key={tag}
+                                              onMouseDown={(e) =>
+                                                e.preventDefault()
+                                              }
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleTagClick(
+                                                  qa.id,
+                                                  qa.tags,
+                                                  tag,
+                                                );
+                                              }}
+                                              className="text-[10px] px-2.5 py-1 bg-slate-50 text-slate-600 rounded-full hover:bg-indigo-50 hover:text-indigo-600 border border-slate-200 hover:border-indigo-200 transition-colors shadow-sm"
+                                            >
+                                              {tag}
+                                            </button>
+                                          ))}
+                                        </div>
+                                      );
+                                    })()}
                                 </div>
                               )}
                             </div>
