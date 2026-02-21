@@ -2954,6 +2954,7 @@ const SettingsModal = ({
   const [checkNgWords, setCheckNgWords] = useState(true);
   const [showChecksInList, setShowChecksInList] = useState(false);
   const [showPromptMode, setShowPromptMode] = useState(false);
+  const [showModelName, setShowModelName] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -2963,6 +2964,7 @@ const SettingsModal = ({
       setCheckNgWords(initialSettings?.checkNgWords ?? true);
       setShowChecksInList(initialSettings?.showChecksInList ?? false);
       setShowPromptMode(initialSettings?.showPromptMode ?? false);
+      setShowModelName(initialSettings?.showModelName ?? false);
     }
   }, [isOpen, initialSettings]);
 
@@ -2979,6 +2981,7 @@ const SettingsModal = ({
       checkNgWords,
       showChecksInList,
       showPromptMode,
+      showModelName,
     };
     onSettingsSave(newSettings);
 
@@ -3004,7 +3007,7 @@ const SettingsModal = ({
           </button>
         </div>
         <div className="p-6 space-y-6 overflow-y-auto">
-          {/* API Key Section */}
+          {/* API Key Settings */}
           <div>
             <h4 className="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
               <Key size={16} /> APIキー設定
@@ -3024,6 +3027,7 @@ const SettingsModal = ({
 
           <hr className="border-slate-100" />
 
+          {/* Grammar Highlighting Settings */}
           <div>
             <h4 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
               <Edit2 size={16} /> 文章校正ハイライト設定
@@ -3141,6 +3145,7 @@ const SettingsModal = ({
 
           <hr className="border-slate-100" />
 
+          {/* Prompt Output Settings */}
           <div>
             <h4 className="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
               <MessageSquareCode size={16} /> プロンプト出力設定
@@ -3163,9 +3168,32 @@ const SettingsModal = ({
             </label>
           </div>
 
+          {/* Model Display Settings */}
+          <div>
+            <h4 className="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+              <Bot size={16} /> AIモデル名表示設定
+            </h4>
+            <label className="flex items-start gap-3 p-3 border rounded-lg hover:bg-slate-50 cursor-pointer transition-colors">
+              <input
+                type="checkbox"
+                checked={showModelName}
+                onChange={(e) => setShowModelName(e.target.checked)}
+                className="mt-1 w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500 border-gray-300"
+              />
+              <div className="flex-1">
+                <span className="block text-sm font-bold text-slate-700">
+                  思考中にモデル名を表示する
+                </span>
+                <span className="block text-xs text-slate-500 mt-1 leading-relaxed">
+                  有効にすると、AIの思考中に利用しているモデル名を表示します。
+                </span>
+              </div>
+            </label>
+          </div>
+
           <hr className="border-slate-100" />
 
-          {/* Auto Save Section */}
+          {/* Auto Save Settings */}
           <div>
             <h4 className="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
               <Save size={16} /> データの自動保存
@@ -3482,6 +3510,7 @@ const AIAssistant = ({
   qaId,
   writingStyle,
   showPromptMode = true,
+  showModelName = false,
 }) => {
   const hasApiKey = localStorage.getItem("GEMINI_API_KEY");
   const [loading, setLoading] = useState(false);
@@ -3830,7 +3859,7 @@ ${userPrompt.replace(/^[ \t]+/gm, "")}`;
           <span>
             {isPromptMode
               ? "プロンプトを生成中..."
-              : `AIが思考中... ${currentModel && `(${currentModel})`}`}
+              : `AIが思考中... ${showModelName && currentModel ? `(${currentModel})` : ""}`}
           </span>
         </div>
       )}
@@ -4489,7 +4518,9 @@ export default function App() {
     checkNgWords: true,
     showChecksInList: false,
     showPromptMode: false,
+    showModelName: false,
   });
+
   const [isInitialized, setIsInitialized] = useState(false);
 
   const [activeQAId, setActiveQAId] = useState(null);
@@ -4510,6 +4541,7 @@ export default function App() {
       checkNgWords: true,
       showChecksInList: false,
       showPromptMode: false,
+      showModelName: false,
     };
 
     if (savedSettingsJson) {
@@ -6684,6 +6716,7 @@ export default function App() {
                                       showPromptMode={
                                         appSettings.showPromptMode
                                       }
+                                      showModelName={appSettings.showModelName}
                                     />
                                   </div>
                                 </div>
