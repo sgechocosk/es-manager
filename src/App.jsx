@@ -5448,10 +5448,7 @@ export default function App() {
       if (qaId) {
         setActiveQAId(qaId);
       } else {
-        if (editState.qas.length > 0) {
-          setActiveQAId(editState.qas[0].id);
-        }
-        scrollToTop();
+        setActiveQAId(null);
       }
     }
     scrollToTop();
