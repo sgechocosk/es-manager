@@ -6412,7 +6412,7 @@ export default function App() {
                     <button
                       onClick={() => handleSaveEntry(false)}
                       disabled={!formData.company}
-                      title="保存"
+                      title="保存 (Ctrl+S)"
                       className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 rounded-full transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
                     >
                       <Save size={20} />
