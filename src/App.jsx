@@ -2953,6 +2953,7 @@ const SettingsModal = ({
   const [writingStyle, setWritingStyle] = useState("");
   const [checkNgWords, setCheckNgWords] = useState(true);
   const [showChecksInList, setShowChecksInList] = useState(false);
+  const [keepInstruction, setKeepInstruction] = useState("never");
   const [showPromptMode, setShowPromptMode] = useState(false);
   const [showModelName, setShowModelName] = useState(false);
 
@@ -2963,6 +2964,10 @@ const SettingsModal = ({
       setWritingStyle(initialSettings?.writingStyle || "");
       setCheckNgWords(initialSettings?.checkNgWords ?? true);
       setShowChecksInList(initialSettings?.showChecksInList ?? false);
+      const savedKeep = initialSettings?.keepInstruction;
+      if (savedKeep === true) setKeepInstruction("always");
+      else if (savedKeep === false) setKeepInstruction("never");
+      else setKeepInstruction(savedKeep || "never");
       setShowPromptMode(initialSettings?.showPromptMode ?? false);
       setShowModelName(initialSettings?.showModelName ?? false);
     }
@@ -2980,6 +2985,7 @@ const SettingsModal = ({
       writingStyle,
       checkNgWords,
       showChecksInList,
+      keepInstruction,
       showPromptMode,
       showModelName,
     };
@@ -3144,6 +3150,71 @@ const SettingsModal = ({
           </div>
 
           <hr className="border-slate-100" />
+
+          {/* AI Instruction Setting */}
+          <div>
+            <h4 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
+              <StickyNote size={16} /> AI指示保持設定
+            </h4>
+            <div className="space-y-2">
+              <label className="flex items-center gap-3 p-3 border rounded-lg hover:bg-slate-50 cursor-pointer transition-colors">
+                <input
+                  type="radio"
+                  name="keepInstruction"
+                  value="always"
+                  checked={keepInstruction === "always"}
+                  onChange={(e) => setKeepInstruction(e.target.value)}
+                  className="w-4 h-4 text-indigo-600 focus:ring-indigo-500 border-gray-300"
+                />
+                <div>
+                  <span className="block text-sm font-bold text-slate-700">
+                    常に保持する
+                  </span>
+                  <span className="block text-xs text-slate-500 mt-0.5">
+                    AI出力を閉じても、常に入力した指示内容が残ります。
+                  </span>
+                </div>
+              </label>
+
+              <label className="flex items-center gap-3 p-3 border rounded-lg hover:bg-slate-50 cursor-pointer transition-colors">
+                <input
+                  type="radio"
+                  name="keepInstruction"
+                  value="clear_on_success"
+                  checked={keepInstruction === "clear_on_success"}
+                  onChange={(e) => setKeepInstruction(e.target.value)}
+                  className="w-4 h-4 text-indigo-600 focus:ring-indigo-500 border-gray-300"
+                />
+                <div>
+                  <span className="block text-sm font-bold text-slate-700">
+                    出力成功するまで保持する
+                  </span>
+                  <span className="block text-xs text-slate-500 mt-0.5">
+                    AI出力が成功した場合はリセットし、エラー時は残します。
+                  </span>
+                </div>
+              </label>
+
+              <label className="flex items-center gap-3 p-3 border rounded-lg hover:bg-slate-50 cursor-pointer transition-colors">
+                <input
+                  type="radio"
+                  name="keepInstruction"
+                  value="never"
+                  checked={keepInstruction === "never"}
+                  onChange={(e) => setKeepInstruction(e.target.value)}
+                  className="w-4 h-4 text-indigo-600 focus:ring-indigo-500 border-gray-300"
+                />
+                <div>
+                  <span className="block text-sm font-bold text-slate-700">
+                    保持しない
+                  </span>
+                  <span className="block text-xs text-slate-500 mt-0.5">
+                    AI出力を閉じると、常に入力した指示内容をリセットします。
+                  </span>
+                </div>
+              </label>
+            </div>
+          </div>
 
           {/* Prompt Output Settings */}
           <div>
@@ -3509,6 +3580,7 @@ const AIAssistant = ({
   entryId,
   qaId,
   writingStyle,
+  keepInstruction = "never",
   showPromptMode = true,
   showModelName = false,
 }) => {
@@ -3740,9 +3812,20 @@ ${userPrompt.replace(/^[ \t]+/gm, "")}`;
   };
 
   const close = () => {
+    let shouldClear = true;
+    if (keepInstruction === "always" || keepInstruction === true) {
+      shouldClear = false;
+    } else if (keepInstruction === "clear_on_success") {
+      if (isPromptMode || isError) {
+        shouldClear = false;
+      }
+    }
+
     setResult("");
     setMode(null);
-    setInstruction("");
+    if (shouldClear) {
+      setInstruction("");
+    }
     setSelectedRefs([]);
     setIsCopied(false);
   };
@@ -4517,6 +4600,7 @@ export default function App() {
     writingStyle: "",
     checkNgWords: true,
     showChecksInList: false,
+    keepInstruction: "clear_on_success",
     showPromptMode: false,
     showModelName: false,
   });
@@ -4540,6 +4624,7 @@ export default function App() {
       writingStyle: "",
       checkNgWords: true,
       showChecksInList: false,
+      keepInstruction: "clear_on_success",
       showPromptMode: false,
       showModelName: false,
     };
@@ -6713,6 +6798,9 @@ export default function App() {
                                       entryId={editingId}
                                       qaId={qa.id}
                                       writingStyle={appSettings.writingStyle}
+                                      keepInstruction={
+                                        appSettings.keepInstruction
+                                      }
                                       showPromptMode={
                                         appSettings.showPromptMode
                                       }
