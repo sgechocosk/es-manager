@@ -63,16 +63,9 @@ import {
   ResponsiveContainer,
   PieChart,
   Pie,
-  Cell,
   Sector,
-  Radar,
-  RadarChart,
-  PolarGrid,
-  PolarAngleAxis,
-  PolarRadiusAxis,
   ScatterChart,
   Scatter,
-  ZAxis,
 } from "recharts";
 
 // --- Constants ---
@@ -164,21 +157,6 @@ const parseSalary = (value) => {
 
   let num = parseFloat(match[0]);
   return isMan ? num * 10000 : num;
-};
-
-const getDeadlineStatus = (deadline, completedAt) => {
-  if (!deadline) return "safe";
-  const targetDate = completedAt ? new Date(completedAt) : new Date();
-  const deadlineDate = new Date(deadline);
-
-  const diffTime = deadlineDate - targetDate;
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-  if (diffDays < 0) return "overdue";
-  if (diffDays <= 1) return "danger";
-  if (diffDays <= 3) return "warning";
-  if (diffDays < 7) return "normal";
-  return "safe";
 };
 
 // --- Utilities ---
@@ -504,29 +482,6 @@ const EmptyState = ({ message = "データ不足" }) => (
   <div className="h-full flex flex-col items-center justify-center text-slate-400">
     <Database size={24} className="mb-2 opacity-50" />
     <span className="text-xs font-bold">{message}</span>
-  </div>
-);
-
-const AwardCard = ({ icon: Icon, title, company, value, colorClass }) => (
-  <div
-    className={`p-6 rounded-2xl border flex items-center gap-4 relative overflow-hidden bg-gradient-to-br ${colorClass.bg}`}
-  >
-    <div
-      className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 shadow-sm bg-white ${colorClass.text}`}
-    >
-      <Icon size={28} />
-    </div>
-    <div className="relative z-10">
-      <p className={`text-xs font-bold mb-1 ${colorClass.text}`}>{title}</p>
-      <h3 className="text-lg font-black text-slate-800 line-clamp-1">
-        {company || "---"}
-      </h3>
-      <p className="text-sm font-bold text-slate-500">{value || "-"}</p>
-    </div>
-    <Icon
-      className={`absolute -right-4 -bottom-4 opacity-10 ${colorClass.text}`}
-      size={100}
-    />
   </div>
 );
 
@@ -1478,7 +1433,12 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
-                  data={stats.charts.marginData}
+                  data={stats.charts.marginData.map((entry, index) => ({
+                    ...entry,
+                    fill: stats.charts.MARGIN_COLORS[
+                      index % stats.charts.MARGIN_COLORS.length
+                    ],
+                  }))}
                   cx="50%"
                   cy="50%"
                   innerRadius="60%"
@@ -1487,18 +1447,8 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
                   dataKey="value"
                   startAngle={90}
                   endAngle={-270}
-                >
-                  {stats.charts.marginData.map((entry, index) => (
-                    <Cell
-                      key={`cell-${index}`}
-                      fill={
-                        stats.charts.MARGIN_COLORS[
-                          index % stats.charts.MARGIN_COLORS.length
-                        ]
-                      }
-                    />
-                  ))}
-                </Pie>
+                  shape={(props) => <Sector {...props} />}
+                />
                 <Tooltip />
                 <Legend
                   verticalAlign="bottom"
@@ -1583,7 +1533,16 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
-                  data={stats.charts.selectionShareData}
+                  data={stats.charts.selectionShareData.map((entry, index) => ({
+                    ...entry,
+                    fill: [
+                      CHART_COLORS.primary,
+                      CHART_COLORS.info,
+                      CHART_COLORS.secondary,
+                      CHART_COLORS.warning,
+                      "#94a3b8",
+                    ][index % 5],
+                  }))}
                   cx="50%"
                   cy="50%"
                   innerRadius="40%"
@@ -1592,22 +1551,8 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
                   dataKey="value"
                   startAngle={90}
                   endAngle={-270}
-                >
-                  {stats.charts.selectionShareData.map((entry, index) => (
-                    <Cell
-                      key={`cell-${index}`}
-                      fill={
-                        [
-                          CHART_COLORS.primary,
-                          CHART_COLORS.info,
-                          CHART_COLORS.secondary,
-                          CHART_COLORS.warning,
-                          "#94a3b8",
-                        ][index % 5]
-                      }
-                    />
-                  ))}
-                </Pie>
+                  shape={(props) => <Sector {...props} />}
+                />
                 <Tooltip />
                 <Legend
                   layout="horizontal"
