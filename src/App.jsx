@@ -30,6 +30,8 @@ import {
   Tags,
   ArrowUp,
   ArrowDown,
+  ChevronUp,
+  ChevronDown,
   Save,
   AlertTriangle,
   PanelRight,
@@ -3532,10 +3534,12 @@ const AIAssistant = ({
   keepInstruction = "never",
   showPromptMode = true,
   showModelName = false,
+  isActive = true,
 }) => {
   const hasApiKey = localStorage.getItem("GEMINI_API_KEY");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState("");
+  const [isCompact, setIsCompact] = useState(false);
   const [mode, setMode] = useState(null);
   const [instruction, setInstruction] = useState("");
   const [isRefModalOpen, setIsRefModalOpen] = useState(false);
@@ -3790,7 +3794,9 @@ ${userPrompt.replace(/^[ \t]+/gm, "")}`;
     ? MessageSquareCode
     : mode === "feedback"
       ? Bot
-      : Sparkles;
+      : mode === "generate"
+        ? BookOpen
+        : Sparkles;
 
   const titleText = isPromptMode
     ? "生成プロンプト (外部AI用)"
@@ -3815,8 +3821,11 @@ ${userPrompt.replace(/^[ \t]+/gm, "")}`;
     : "p-3 bg-slate-50 border-t flex justify-between items-center border-indigo-50";
 
   return (
-    <div className="mt-2 animate-in fade-in slide-in-from-top-1 duration-200">
-      {!mode && (
+    <div
+      className="mt-2 animate-in fade-in slide-in-from-top-1 duration-200"
+      onClick={(e) => e.stopPropagation()}
+    >
+      {!mode && isActive && (
         <div className="flex gap-2 flex-wrap items-center justify-end">
           <div className="w-full sm:flex-1 sm:w-auto min-w-[200px]">
             <input
@@ -3903,60 +3912,81 @@ ${userPrompt.replace(/^[ \t]+/gm, "")}`;
               <ThemeIcon size={16} />
               {titleText}
             </div>
-            <button
-              onClick={close}
-              title="閉じる"
-              className="text-slate-400 hover:text-slate-600"
-            >
-              <X size={16} />
-            </button>
-          </div>
-          <div className="p-4 text-sm text-slate-700 leading-relaxed whitespace-pre-wrap bg-white font-sans">
-            {result}
-          </div>
-          <div className={footerClass}>
-            <div className="text-xs font-mono text-slate-500 pl-1">
-              {mode !== "feedback" &&
-                !isError &&
-                !(isPromptMode && (mode === "refine" || mode === "generate")) &&
-                `${result.length}文字`}
-            </div>
-            <div className="flex gap-2">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setIsCompact(!isCompact)}
+                title={isCompact ? "展開する" : "折りたたむ"}
+                className="text-slate-400 hover:text-slate-600 px-1 transition-transform"
+              >
+                {isCompact ? (
+                  <ChevronDown size={18} />
+                ) : (
+                  <ChevronUp size={18} />
+                )}
+              </button>
               <button
                 onClick={close}
-                className="px-3 py-1.5 text-xs font-bold text-slate-500 hover:bg-slate-200 rounded-md transition-colors"
+                title="閉じる"
+                className="text-slate-400 hover:text-slate-600"
               >
-                閉じる
+                <X size={18} />
               </button>
-
-              {isPromptMode ? (
-                <button
-                  onClick={handleCopyPrompt}
-                  className={`px-3 py-1.5 text-xs font-bold text-white rounded-md shadow-sm flex items-center gap-1.5 transition-colors ${
-                    isCopied
-                      ? "bg-emerald-700"
-                      : "bg-emerald-600 hover:bg-emerald-700"
-                  }`}
-                >
-                  {isCopied ? <Check size={14} /> : <Copy size={14} />}
-                  {isCopied ? "コピー完了" : "コピー"}
-                </button>
-              ) : (
-                mode !== "feedback" &&
-                !isError && (
-                  <button
-                    onClick={() => {
-                      onApply(result);
-                      close();
-                    }}
-                    className="px-3 py-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-md shadow-sm flex items-center gap-1.5 transition-colors"
-                  >
-                    <Check size={14} /> 反映する
-                  </button>
-                )
-              )}
             </div>
           </div>
+
+          {!isCompact && (
+            <>
+              <div className="p-4 text-sm text-slate-700 leading-relaxed whitespace-pre-wrap bg-white font-sans">
+                {result}
+              </div>
+              <div className={footerClass}>
+                <div className="text-xs font-mono text-slate-500 pl-1">
+                  {mode !== "feedback" &&
+                    !isError &&
+                    !(
+                      isPromptMode &&
+                      (mode === "refine" || mode === "generate")
+                    ) &&
+                    `${result.length}文字`}
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={close}
+                    className="px-3 py-1.5 text-xs font-bold text-slate-500 hover:bg-slate-200 rounded-md transition-colors"
+                  >
+                    閉じる
+                  </button>
+
+                  {isPromptMode ? (
+                    <button
+                      onClick={handleCopyPrompt}
+                      className={`px-3 py-1.5 text-xs font-bold text-white rounded-md shadow-sm flex items-center gap-1.5 transition-colors ${
+                        isCopied
+                          ? "bg-emerald-700"
+                          : "bg-emerald-600 hover:bg-emerald-700"
+                      }`}
+                    >
+                      {isCopied ? <Check size={14} /> : <Copy size={14} />}
+                      {isCopied ? "コピー完了" : "コピー"}
+                    </button>
+                  ) : (
+                    mode !== "feedback" &&
+                    !isError && (
+                      <button
+                        onClick={() => {
+                          onApply(result);
+                          close();
+                        }}
+                        className="px-3 py-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-md shadow-sm flex items-center gap-1.5 transition-colors"
+                      >
+                        <Check size={14} /> 反映する
+                      </button>
+                    )
+                  )}
+                </div>
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -6763,31 +6793,28 @@ export default function App() {
                                         </span>
                                       )}
                                     </div>
-                                    <AIAssistant
-                                      question={qa.question}
-                                      answer={qa.answer}
-                                      charLimit={qa.charLimit}
-                                      company={formData.company}
-                                      industry={formData.industry}
-                                      selectionType={formData.selectionType}
-                                      note={qa.note}
-                                      onApply={(text) =>
-                                        updateQA(qa.id, "answer", text)
-                                      }
-                                      allEntries={entries}
-                                      entryId={editingId}
-                                      qaId={qa.id}
-                                      writingStyle={appSettings.writingStyle}
-                                      keepInstruction={
-                                        appSettings.keepInstruction
-                                      }
-                                      showPromptMode={
-                                        appSettings.showPromptMode
-                                      }
-                                      showModelName={appSettings.showModelName}
-                                    />
                                   </div>
                                 </div>
+                                <AIAssistant
+                                  question={qa.question}
+                                  answer={qa.answer}
+                                  charLimit={qa.charLimit}
+                                  company={formData.company}
+                                  industry={formData.industry}
+                                  selectionType={formData.selectionType}
+                                  note={qa.note}
+                                  onApply={(text) =>
+                                    updateQA(qa.id, "answer", text)
+                                  }
+                                  allEntries={entries}
+                                  entryId={editingId}
+                                  qaId={qa.id}
+                                  writingStyle={appSettings.writingStyle}
+                                  keepInstruction={appSettings.keepInstruction}
+                                  showPromptMode={appSettings.showPromptMode}
+                                  showModelName={appSettings.showModelName}
+                                  isActive={isActive}
+                                />
                               </div>
 
                               {isActive ? (
