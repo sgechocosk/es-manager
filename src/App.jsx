@@ -3858,78 +3858,90 @@ ${userPrompt.replace(/^[ \t]+/gm, "")}`;
     : "p-3 bg-slate-50 border-t flex justify-between items-center border-indigo-50";
 
   return (
-    <div
-      className="mt-2 animate-in fade-in slide-in-from-top-1 duration-200"
-      onClick={(e) => e.stopPropagation()}
-    >
-      {!mode && isActive && (
-        <div className="flex gap-2 flex-wrap items-center justify-end">
-          <div className="w-full sm:flex-1 sm:w-auto min-w-[200px]">
-            <input
-              type="text"
-              placeholder="AIへの指示 (例: 具体的に、簡潔に...)"
-              className="w-full text-xs px-3 py-1.5 border border-slate-200 rounded-lg focus:border-indigo-400 outline-none"
-              value={instruction}
-              onChange={(e) => setInstruction(e.target.value)}
-            />
-          </div>
-          <button
-            onClick={() => handleAction("refine")}
-            disabled={!answer}
-            className="flex items-center gap-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded-lg shadow-sm transition-colors disabled:opacity-50"
-          >
-            <Sparkles size={12} /> 推敲
-          </button>
-          <button
-            onClick={() => handleAction("feedback")}
-            disabled={!answer}
-            className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 px-3 py-1.5 rounded-lg border border-emerald-200 transition-colors disabled:opacity-50"
-          >
-            <Bot size={14} /> FB
-          </button>
-          <button
-            onClick={() => setIsRefModalOpen(true)}
-            className="flex items-center gap-1.5 text-xs font-bold text-indigo-700 bg-indigo-100 hover:bg-indigo-200 px-3 py-1.5 rounded-lg border border-indigo-200 transition-colors"
-          >
-            <BookOpen size={12} /> 統合
-          </button>
-
-          {showPromptMode && (
-            <label
-              className="flex items-center cursor-pointer select-none ml-1"
-              title="APIを呼ばずに外部AI用のプロンプトを生成・表示します"
+    <div className="mt-2" onClick={(e) => e.stopPropagation()}>
+      <div
+        className={`grid transition-[grid-template-rows,opacity,margin] duration-300 ease-in-out ${
+          !mode && isActive
+            ? "grid-rows-[1fr] opacity-100 mt-2"
+            : "grid-rows-[0fr] opacity-0 mt-0"
+        }`}
+      >
+        <div className="overflow-hidden">
+          <div className="flex gap-2 flex-wrap items-center justify-end pb-1">
+            <div className="w-full sm:flex-1 sm:w-auto min-w-[200px]">
+              <input
+                type="text"
+                placeholder="AIへの指示 (例: 具体的に、簡潔に...)"
+                className="w-full text-xs px-3 py-1.5 border border-slate-200 rounded-lg focus:border-indigo-400 outline-none"
+                value={instruction}
+                onChange={(e) => setInstruction(e.target.value)}
+                tabIndex={isActive ? 0 : -1}
+              />
+            </div>
+            <button
+              onClick={() => handleAction("refine")}
+              disabled={!answer || !isActive}
+              className="flex items-center gap-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded-lg shadow-sm transition-colors disabled:opacity-50"
+              tabIndex={isActive ? 0 : -1}
             >
-              <div className="relative">
-                <input
-                  type="checkbox"
-                  checked={isPromptMode}
-                  onChange={(e) => setIsPromptMode(e.target.checked)}
-                  className="sr-only"
-                />
-                <div
-                  className={`w-9 h-5 rounded-full shadow-inner transition-colors duration-200 ease-in-out ${
-                    isPromptMode ? "bg-emerald-500" : "bg-slate-300"
-                  }`}
-                ></div>
-                <div
-                  className={`absolute top-0.5 left-0.5 bg-white w-4 h-4 rounded-full shadow-sm transition-transform duration-200 ease-in-out flex items-center justify-center ${
-                    isPromptMode ? "translate-x-4" : "translate-x-0"
-                  }`}
-                >
-                  <MessageSquareCode
-                    size={10}
-                    className={`transition-opacity duration-200 ${
-                      isPromptMode
-                        ? "text-emerald-600 opacity-100"
-                        : "opacity-0"
-                    }`}
+              <Sparkles size={12} /> 推敲
+            </button>
+            <button
+              onClick={() => handleAction("feedback")}
+              disabled={!answer || !isActive}
+              className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 px-3 py-1.5 rounded-lg border border-emerald-200 transition-colors disabled:opacity-50"
+              tabIndex={isActive ? 0 : -1}
+            >
+              <Bot size={14} /> FB
+            </button>
+            <button
+              onClick={() => setIsRefModalOpen(true)}
+              disabled={!isActive}
+              className="flex items-center gap-1.5 text-xs font-bold text-indigo-700 bg-indigo-100 hover:bg-indigo-200 px-3 py-1.5 rounded-lg border border-indigo-200 transition-colors"
+              tabIndex={isActive ? 0 : -1}
+            >
+              <BookOpen size={12} /> 統合
+            </button>
+
+            {showPromptMode && (
+              <label
+                className="flex items-center cursor-pointer select-none ml-1"
+                title="プロンプトを表示します"
+              >
+                <div className="relative">
+                  <input
+                    type="checkbox"
+                    checked={isPromptMode}
+                    onChange={(e) => setIsPromptMode(e.target.checked)}
+                    className="sr-only"
+                    disabled={!isActive}
+                    tabIndex={isActive ? 0 : -1}
                   />
+                  <div
+                    className={`w-9 h-5 rounded-full shadow-inner transition-colors duration-200 ease-in-out ${
+                      isPromptMode ? "bg-emerald-500" : "bg-slate-300"
+                    }`}
+                  ></div>
+                  <div
+                    className={`absolute top-0.5 left-0.5 bg-white w-4 h-4 rounded-full shadow-sm transition-transform duration-200 ease-in-out flex items-center justify-center ${
+                      isPromptMode ? "translate-x-4" : "translate-x-0"
+                    }`}
+                  >
+                    <MessageSquareCode
+                      size={10}
+                      className={`transition-opacity duration-200 ${
+                        isPromptMode
+                          ? "text-emerald-600 opacity-100"
+                          : "opacity-0"
+                      }`}
+                    />
+                  </div>
                 </div>
-              </div>
-            </label>
-          )}
+              </label>
+            )}
+          </div>
         </div>
-      )}
+      </div>
 
       {loading && (
         <div className="mt-3 p-4 bg-slate-50 rounded-xl border border-slate-200 flex items-center gap-3 text-sm text-slate-500 animate-pulse">
@@ -6859,14 +6871,24 @@ export default function App() {
                                 />
                               </div>
 
-                              {isActive ? (
-                                <div className="mt-2 relative animate-in fade-in slide-in-from-top-1 duration-200">
+                              <div
+                                className={`relative transition-all duration-300 ease-in-out ${isActive ? "mt-2" : "mt-3"}`}
+                              >
+                                <div className="flex justify-between items-center gap-2">
                                   <input
-                                    className="w-full text-xs px-3 py-2 bg-white border rounded-md outline-none focus:border-indigo-500"
-                                    placeholder="タグ (例: 自己PR、ガクチカ)"
+                                    className={`flex-1 transition-all duration-300 ease-in-out bg-white border border-slate-200 outline-none focus:border-indigo-500 placeholder-slate-300 ${
+                                      isActive
+                                        ? "text-xs px-3 py-2 rounded-md"
+                                        : "text-xs px-2 py-1 rounded"
+                                    }`}
+                                    placeholder={
+                                      isActive
+                                        ? "タグ (例: 自己PR、ガクチカ)"
+                                        : "タグ"
+                                    }
                                     value={qa.tags}
+                                    onClick={(e) => e.stopPropagation()}
                                     onFocus={() => {
-                                      setActiveQAId(qa.id);
                                       setActiveTagDropdownId(qa.id);
                                     }}
                                     onBlur={() => setActiveTagDropdownId(null)}
@@ -6874,62 +6896,15 @@ export default function App() {
                                       updateQA(qa.id, "tags", e.target.value)
                                     }
                                   />
-                                  {activeTagDropdownId === qa.id &&
-                                    (() => {
-                                      const currentTags = splitTags(qa.tags);
-                                      const availableTags = existingTags.filter(
-                                        (t) => !currentTags.includes(t),
-                                      );
-                                      if (availableTags.length === 0)
-                                        return null;
-                                      return (
-                                        <div className="absolute z-50 left-0 top-full mt-1 w-full bg-white border border-slate-200 shadow-xl rounded-lg p-3 flex flex-wrap gap-1.5 max-h-48 overflow-y-auto animate-in fade-in zoom-in-95">
-                                          <div className="w-full text-[10px] font-bold text-slate-400 mb-1 border-b border-slate-100 pb-1">
-                                            過去に利用したタグ
-                                          </div>
-                                          {availableTags.map((tag) => (
-                                            <button
-                                              key={tag}
-                                              onMouseDown={(e) =>
-                                                e.preventDefault()
-                                              }
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleTagClick(
-                                                  qa.id,
-                                                  qa.tags,
-                                                  tag,
-                                                );
-                                              }}
-                                              className="text-[10px] px-2.5 py-1 bg-slate-50 text-slate-600 rounded-full hover:bg-indigo-50 hover:text-indigo-600 border border-slate-200 hover:border-indigo-200 transition-colors shadow-sm"
-                                            >
-                                              {tag}
-                                            </button>
-                                          ))}
-                                        </div>
-                                      );
-                                    })()}
-                                </div>
-                              ) : (
-                                <div className="mt-3 relative animate-in fade-in duration-300">
-                                  <div className="flex justify-between items-center gap-2">
-                                    <input
-                                      className="flex-1 text-xs px-2 py-1 bg-white border border-slate-200 rounded outline-none focus:border-indigo-500 transition-all placeholder-slate-300"
-                                      placeholder="タグ"
-                                      value={qa.tags}
-                                      onClick={(e) => e.stopPropagation()}
-                                      onFocus={() =>
-                                        setActiveTagDropdownId(qa.id)
-                                      }
-                                      onBlur={() =>
-                                        setActiveTagDropdownId(null)
-                                      }
-                                      onChange={(e) =>
-                                        updateQA(qa.id, "tags", e.target.value)
-                                      }
-                                    />
+                                  <div
+                                    className={`flex items-center justify-end overflow-hidden transition-all duration-300 ease-in-out shrink-0 ${
+                                      isActive
+                                        ? "max-w-0 opacity-0"
+                                        : "max-w-[150px] opacity-100"
+                                    }`}
+                                  >
                                     <div
-                                      className={`text-right text-[10px] font-mono shrink-0 ${
+                                      className={`text-right text-[10px] font-mono whitespace-nowrap ${
                                         qa.charLimit &&
                                         qa.answer.length > Number(qa.charLimit)
                                           ? "text-rose-500 font-bold"
@@ -6941,43 +6916,42 @@ export default function App() {
                                         ` / 上限: ${qa.charLimit}`}
                                     </div>
                                   </div>
-                                  {activeTagDropdownId === qa.id &&
-                                    (() => {
-                                      const currentTags = splitTags(qa.tags);
-                                      const availableTags = existingTags.filter(
-                                        (t) => !currentTags.includes(t),
-                                      );
-                                      if (availableTags.length === 0)
-                                        return null;
-                                      return (
-                                        <div className="absolute z-50 left-0 top-full mt-1 w-full bg-white border border-slate-200 shadow-xl rounded-lg p-3 flex flex-wrap gap-1.5 max-h-48 overflow-y-auto animate-in fade-in zoom-in-95">
-                                          <div className="w-full text-[10px] font-bold text-slate-400 mb-1 border-b border-slate-100 pb-1">
-                                            過去に利用したタグ
-                                          </div>
-                                          {availableTags.map((tag) => (
-                                            <button
-                                              key={tag}
-                                              onMouseDown={(e) =>
-                                                e.preventDefault()
-                                              }
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleTagClick(
-                                                  qa.id,
-                                                  qa.tags,
-                                                  tag,
-                                                );
-                                              }}
-                                              className="text-[10px] px-2.5 py-1 bg-slate-50 text-slate-600 rounded-full hover:bg-indigo-50 hover:text-indigo-600 border border-slate-200 hover:border-indigo-200 transition-colors shadow-sm"
-                                            >
-                                              {tag}
-                                            </button>
-                                          ))}
-                                        </div>
-                                      );
-                                    })()}
                                 </div>
-                              )}
+                                {activeTagDropdownId === qa.id &&
+                                  (() => {
+                                    const currentTags = splitTags(qa.tags);
+                                    const availableTags = existingTags.filter(
+                                      (t) => !currentTags.includes(t),
+                                    );
+                                    if (availableTags.length === 0) return null;
+                                    return (
+                                      <div className="absolute z-50 left-0 top-full mt-1 w-full bg-white border border-slate-200 shadow-xl rounded-lg p-3 flex flex-wrap gap-1.5 max-h-48 overflow-y-auto animate-in fade-in zoom-in-95">
+                                        <div className="w-full text-[10px] font-bold text-slate-400 mb-1 border-b border-slate-100 pb-1">
+                                          過去に利用したタグ
+                                        </div>
+                                        {availableTags.map((tag) => (
+                                          <button
+                                            key={tag}
+                                            onMouseDown={(e) =>
+                                              e.preventDefault()
+                                            }
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleTagClick(
+                                                qa.id,
+                                                qa.tags,
+                                                tag,
+                                              );
+                                            }}
+                                            className="text-[10px] px-2.5 py-1 bg-slate-50 text-slate-600 rounded-full hover:bg-indigo-50 hover:text-indigo-600 border border-slate-200 hover:border-indigo-200 transition-colors shadow-sm"
+                                          >
+                                            {tag}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    );
+                                  })()}
+                              </div>
                             </div>
                           );
                         })}
