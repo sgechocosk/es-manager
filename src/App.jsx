@@ -5,6 +5,7 @@ import React, {
   useMemo,
   useRef,
 } from "react";
+import { createPortal } from "react-dom";
 import {
   Check,
   Copy,
@@ -2387,6 +2388,17 @@ const CompanyDataEditModal = ({
     }
   }, [isOpen, initialData, companyName]);
 
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isOpen]);
+
   const handleNameChange = (e) => {
     const val = e.target.value;
     setNewCompanyName(val);
@@ -2448,9 +2460,9 @@ const CompanyDataEditModal = ({
 
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm animate-in fade-in">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col animate-in zoom-in-95">
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm animate-in fade-in">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95">
         <div className="px-6 py-4 border-b flex justify-between items-center bg-slate-50 rounded-t-xl">
           <h3 className="font-bold text-slate-700 flex items-center gap-2">
             <Building2 size={18} className="text-indigo-600" />
@@ -2721,7 +2733,8 @@ const CompanyDataEditModal = ({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };
 
@@ -2924,6 +2937,17 @@ const SettingsModal = ({
     }
   }, [isOpen, initialSettings]);
 
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isOpen]);
+
   const handleSave = () => {
     if (apiKey.trim()) {
       localStorage.setItem("GEMINI_API_KEY", apiKey.trim());
@@ -2948,8 +2972,8 @@ const SettingsModal = ({
 
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm animate-in fade-in duration-200">
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
         <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
           <h3 className="font-bold text-slate-700 flex items-center gap-2">
@@ -3272,7 +3296,8 @@ const SettingsModal = ({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };
 
@@ -3287,6 +3312,17 @@ const ReferenceSelectorModal = ({
 }) => {
   const [search, setSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState(new Set());
+
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isOpen]);
 
   const allQAs = useMemo(() => {
     let items = [];
@@ -3370,9 +3406,9 @@ const ReferenceSelectorModal = ({
 
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm animate-in fade-in">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-5xl h-[90vh] flex flex-col animate-in zoom-in-95">
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm animate-in fade-in">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95">
         <div className="px-5 py-3 border-b flex justify-between items-center bg-slate-50 rounded-t-xl shrink-0">
           <h3 className="font-bold text-slate-700 flex items-center gap-2 text-sm">
             <BookOpen size={18} className="text-indigo-600" /> 過去の回答を選択
@@ -3514,7 +3550,8 @@ const ReferenceSelectorModal = ({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };
 
