@@ -5726,9 +5726,24 @@ export default function App() {
       className="min-h-screen bg-slate-50 text-slate-800 font-sans flex flex-col"
       onMouseDown={(e) => {
         isMouseDownGlobal.current = true;
+        const isIgnoredArea = e.target.closest(
+          'header, .fixed, [id^="qa-item-"]',
+        );
+        mouseDownLocation.current = isIgnoredArea ? "ignore" : "outside";
       }}
       onMouseUp={(e) => {
         isMouseDownGlobal.current = false;
+        const isIgnoredArea = e.target.closest(
+          'header, .fixed, [id^="qa-item-"]',
+        );
+        const upLocation = isIgnoredArea ? "ignore" : "outside";
+
+        if (
+          mouseDownLocation.current === "outside" &&
+          upLocation === "outside"
+        ) {
+          setActiveQAId(null);
+        }
       }}
     >
       <header className="bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-0 z-50 px-4 py-3 shadow-sm shrink-0">
