@@ -163,6 +163,23 @@ const parseSalary = (value) => {
 };
 
 // --- Utilities ---
+const getSafariUrl = (url) => {
+  if (!url) return url;
+  const isIOS =
+    /iPhone|iPad|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const isPWA =
+    window.navigator.standalone ||
+    window.matchMedia("(display-mode: standalone)").matches;
+
+  if (isIOS && isPWA) {
+    return url
+      .replace(/^https:\/\//i, "x-safari-https://")
+      .replace(/^http:\/\//i, "x-safari-http://");
+  }
+  return url;
+};
+
 const splitTags = (tagInput) => {
   if (Array.isArray(tagInput)) return tagInput;
   if (!tagInput || typeof tagInput !== "string") return [];
@@ -4167,7 +4184,7 @@ const ESEntryDisplay = ({
           </h2>
           {companyUrl && (
             <a
-              href={companyUrl}
+              href={getSafariUrl(companyUrl)}
               target="_blank"
               rel="noopener noreferrer"
               className="p-1.5 text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-md transition-colors"
@@ -6318,7 +6335,7 @@ export default function App() {
                                   } else if (col.id === "myPageUrl") {
                                     content = data.myPageUrl ? (
                                       <a
-                                        href={data.myPageUrl}
+                                        href={getSafariUrl(data.myPageUrl)}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="text-indigo-600 hover:text-indigo-800 hover:underline flex items-center gap-1.5 w-fit"
@@ -6334,7 +6351,7 @@ export default function App() {
                                   } else if (col.id === "recruitmentUrl") {
                                     content = data.recruitmentUrl ? (
                                       <a
-                                        href={data.recruitmentUrl}
+                                        href={getSafariUrl(data.recruitmentUrl)}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="text-indigo-600 hover:text-indigo-800 hover:underline flex items-center gap-1.5 w-fit"
@@ -6500,7 +6517,7 @@ export default function App() {
                           <div className="absolute right-1 top-1/2 -translate-y-1/2 flex gap-1">
                             {formData.recruitmentUrl && (
                               <a
-                                href={formData.recruitmentUrl}
+                                href={getSafariUrl(formData.recruitmentUrl)}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-md transition-colors"
@@ -6512,7 +6529,7 @@ export default function App() {
                             )}
                             {formData.myPageUrl && (
                               <a
-                                href={formData.myPageUrl}
+                                href={getSafariUrl(formData.myPageUrl)}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors"
