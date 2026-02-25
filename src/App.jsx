@@ -5519,7 +5519,6 @@ export default function App() {
     };
     setFormData(newState);
     setInitialFormState(JSON.parse(JSON.stringify(newState)));
-    setActiveQAId(newId);
     setView("form");
     scrollToTop();
   };
