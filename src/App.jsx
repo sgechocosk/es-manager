@@ -4666,9 +4666,15 @@ export default function App() {
 
   const scrollTimeoutRef = useRef(null);
   const lastScrollY = useRef(0);
+  const isAutoScrolling = useRef(false);
 
   useEffect(() => {
     const handleScroll = () => {
+      if (isAutoScrolling.current) {
+        lastScrollY.current = window.scrollY;
+        return;
+      }
+
       const currentScrollY = window.scrollY;
 
       if (currentScrollY < lastScrollY.current - 5) {
@@ -6077,74 +6083,97 @@ export default function App() {
                   <div className="space-y-8 pb-24 relative">
                     {Object.keys(entriesByStatus).length > 0 && (
                       <div
-                        className={`fixed bottom-3 left-1/2 -translate-x-1/2 z-50 w-auto max-w-[95%] sm:max-w-2xl transition-all duration-500 ease-in-out sm:duration-150 ${
+                        onMouseEnter={() => {
+                          if (scrollTimeoutRef.current)
+                            clearTimeout(scrollTimeoutRef.current);
+                          setIsMobileNavVisible(true);
+                        }}
+                        onMouseLeave={() => {
+                          if (scrollTimeoutRef.current)
+                            clearTimeout(scrollTimeoutRef.current);
+                          scrollTimeoutRef.current = setTimeout(() => {
+                            setIsMobileNavVisible(false);
+                          }, 4000);
+                        }}
+                        onTouchStart={() => {
+                          if (scrollTimeoutRef.current)
+                            clearTimeout(scrollTimeoutRef.current);
+                          setIsMobileNavVisible(true);
+                        }}
+                        onTouchEnd={() => {
+                          if (scrollTimeoutRef.current)
+                            clearTimeout(scrollTimeoutRef.current);
+                          scrollTimeoutRef.current = setTimeout(() => {
+                            setIsMobileNavVisible(false);
+                          }, 4000);
+                        }}
+                        className={`fixed bottom-0 left-1/2 -translate-x-1/2 z-50 w-auto max-w-[95%] sm:max-w-2xl transition-all duration-500 ease-in-out sm:duration-150 ${
                           isMobileNavVisible
                             ? "translate-y-0 opacity-100 pointer-events-auto"
                             : "translate-y-8 opacity-0 pointer-events-none"
-                        } sm:translate-y-0 sm:opacity-50 sm:hover:opacity-100 sm:pointer-events-auto`}
+                        } sm:translate-y-0 sm:opacity-30 sm:hover:opacity-100 sm:pointer-events-auto`}
                       >
-                        <div className="flex items-center justify-start sm:justify-center gap-1 p-1.5 bg-white/80 backdrop-blur-md rounded-full shadow-lg border border-slate-200 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-                          {["未提出", "作成中", "提出済", "採用", "不採用"]
-                            .concat(
-                              Object.keys(entriesByStatus).filter(
-                                (s) =>
-                                  ![
-                                    "未提出",
-                                    "作成中",
-                                    "提出済",
-                                    "採用",
-                                    "不採用",
-                                  ].includes(s),
-                              ),
-                            )
-                            .map((status, _, array) => {
-                              const count = entriesByStatus[status]?.length;
-                              if (!count) return null;
+                        <div className="p-1.5 bg-white/80 backdrop-blur-md rounded-full shadow-lg border border-slate-200 overflow-hidden">
+                          <div className="flex items-center justify-start gap-1 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                            {["未提出", "作成中", "提出済", "採用", "不採用"]
+                              .concat(
+                                Object.keys(entriesByStatus).filter(
+                                  (s) =>
+                                    ![
+                                      "未提出",
+                                      "作成中",
+                                      "提出済",
+                                      "採用",
+                                      "不採用",
+                                    ].includes(s),
+                                ),
+                              )
+                              .map((status, _, array) => {
+                                const count = entriesByStatus[status]?.length;
+                                if (!count) return null;
 
-                              const isFirst =
-                                array.find(
-                                  (s) => entriesByStatus[s]?.length > 0,
-                                ) === status;
+                                const isFirst =
+                                  array.find(
+                                    (s) => entriesByStatus[s]?.length > 0,
+                                  ) === status;
 
-                              return (
-                                <button
-                                  key={`nav-${status}`}
-                                  onClick={() => {
-                                    setIsMobileNavVisible(true);
-                                    if (scrollTimeoutRef.current)
-                                      clearTimeout(scrollTimeoutRef.current);
-                                    scrollTimeoutRef.current = setTimeout(
-                                      () => {
-                                        setIsMobileNavVisible(false);
-                                      },
-                                      4000,
-                                    );
+                                return (
+                                  <button
+                                    key={`nav-${status}`}
+                                    onClick={() => {
+                                      isAutoScrolling.current = true;
+                                      setIsMobileNavVisible(true);
 
-                                    if (isFirst) {
-                                      window.scrollTo({
-                                        top: 0,
-                                        behavior: "smooth",
-                                      });
-                                    } else {
-                                      document
-                                        .getElementById(
-                                          `status-section-${status}`,
-                                        )
-                                        ?.scrollIntoView({
+                                      if (isFirst) {
+                                        window.scrollTo({
+                                          top: 0,
                                           behavior: "smooth",
-                                          block: "start",
                                         });
-                                    }
-                                  }}
-                                  className="flex items-center gap-1.5 px-3 sm:px-4 py-2 text-xs font-bold text-slate-600 rounded-full hover:bg-slate-100 hover:text-indigo-600 transition-colors whitespace-nowrap shrink-0 group"
-                                >
-                                  {status}
-                                  <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full font-mono group-hover:bg-indigo-100 group-hover:text-indigo-600 transition-colors">
-                                    {count}
-                                  </span>
-                                </button>
-                              );
-                            })}
+                                      } else {
+                                        document
+                                          .getElementById(
+                                            `status-section-${status}`,
+                                          )
+                                          ?.scrollIntoView({
+                                            behavior: "smooth",
+                                            block: "start",
+                                          });
+                                      }
+
+                                      setTimeout(() => {
+                                        isAutoScrolling.current = false;
+                                      }, 1000);
+                                    }}
+                                    className="flex items-center gap-1.5 px-3 sm:px-4 py-2 text-xs font-bold text-slate-600 rounded-full hover:bg-slate-100 hover:text-indigo-600 transition-colors whitespace-nowrap shrink-0 group"
+                                  >
+                                    {status}
+                                    <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full font-mono group-hover:bg-indigo-100 group-hover:text-indigo-600 transition-colors">
+                                      {count}
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                          </div>
                         </div>
                       </div>
                     )}
@@ -6260,7 +6289,88 @@ export default function App() {
 
                 {/* View: Tag Group */}
                 {viewMode === "tag" && (
-                  <div className="space-y-8">
+                  <div className="space-y-8 pb-24 relative">
+                    {Object.keys(tagGroups).length > 0 && (
+                      <div
+                        onMouseEnter={() => {
+                          if (scrollTimeoutRef.current)
+                            clearTimeout(scrollTimeoutRef.current);
+                          setIsMobileNavVisible(true);
+                        }}
+                        onMouseLeave={() => {
+                          if (scrollTimeoutRef.current)
+                            clearTimeout(scrollTimeoutRef.current);
+                          scrollTimeoutRef.current = setTimeout(() => {
+                            setIsMobileNavVisible(false);
+                          }, 4000);
+                        }}
+                        onTouchStart={() => {
+                          if (scrollTimeoutRef.current)
+                            clearTimeout(scrollTimeoutRef.current);
+                          setIsMobileNavVisible(true);
+                        }}
+                        onTouchEnd={() => {
+                          if (scrollTimeoutRef.current)
+                            clearTimeout(scrollTimeoutRef.current);
+                          scrollTimeoutRef.current = setTimeout(() => {
+                            setIsMobileNavVisible(false);
+                          }, 4000);
+                        }}
+                        className={`fixed bottom-0 left-1/2 -translate-x-1/2 z-50 w-auto max-w-[95%] sm:max-w-2xl transition-all duration-500 ease-in-out sm:duration-150 ${
+                          isMobileNavVisible
+                            ? "translate-y-0 opacity-100 pointer-events-auto"
+                            : "translate-y-8 opacity-0 pointer-events-none"
+                        } sm:translate-y-0 sm:opacity-30 sm:hover:opacity-100 sm:pointer-events-auto`}
+                      >
+                        <div className="p-1.5 bg-white/80 backdrop-blur-md rounded-full shadow-lg border border-slate-200 overflow-hidden">
+                          <div className="flex items-center justify-start gap-1 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                            {Object.keys(tagGroups).map((tagName, _, array) => {
+                              const count = tagGroups[tagName]?.length;
+                              if (!count) return null;
+
+                              const isFirst = array[0] === tagName;
+
+                              return (
+                                <button
+                                  key={`nav-${tagName}`}
+                                  onClick={() => {
+                                    isAutoScrolling.current = true;
+                                    setIsMobileNavVisible(true);
+
+                                    if (isFirst) {
+                                      window.scrollTo({
+                                        top: 0,
+                                        behavior: "smooth",
+                                      });
+                                    } else {
+                                      document
+                                        .getElementById(
+                                          `tag-section-${tagName}`,
+                                        )
+                                        ?.scrollIntoView({
+                                          behavior: "smooth",
+                                          block: "start",
+                                        });
+                                    }
+
+                                    setTimeout(() => {
+                                      isAutoScrolling.current = false;
+                                    }, 1000);
+                                  }}
+                                  className="flex items-center gap-1.5 px-3 sm:px-4 py-2 text-xs font-bold text-slate-600 rounded-full hover:bg-slate-100 hover:text-indigo-600 transition-colors whitespace-nowrap shrink-0 group"
+                                >
+                                  #{tagName}
+                                  <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full font-mono group-hover:bg-indigo-100 group-hover:text-indigo-600 transition-colors">
+                                    {count}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     {Object.keys(tagGroups).length === 0 && (
                       <div className="text-center text-slate-400 py-10">
                         タグ付けされた質問はありません
@@ -6269,7 +6379,8 @@ export default function App() {
                     {Object.entries(tagGroups).map(([tagName, items]) => (
                       <div
                         key={tagName}
-                        className="bg-slate-50/50 rounded-xl border border-slate-200 p-4"
+                        id={`tag-section-${tagName}`}
+                        className="bg-slate-50/50 rounded-xl border border-slate-200 p-4 scroll-mt-40 sm:scroll-mt-32"
                       >
                         <h3 className="text-sm font-bold text-indigo-700 mb-4 flex items-center gap-2">
                           <Tags size={16} /> #{tagName}
