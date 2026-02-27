@@ -4665,17 +4665,30 @@ export default function App() {
   const isMouseDownGlobal = useRef(false);
 
   const scrollTimeoutRef = useRef(null);
+  const scrollEndTimerRef = useRef(null);
   const lastScrollY = useRef(0);
   const isAutoScrolling = useRef(false);
 
   useEffect(() => {
     const handleScroll = () => {
-      if (isAutoScrolling.current) {
-        lastScrollY.current = window.scrollY;
+      const currentScrollY = window.scrollY;
+
+      if (currentScrollY < 50) {
+        setIsMobileNavVisible(true);
+        lastScrollY.current = currentScrollY;
         return;
       }
 
-      const currentScrollY = window.scrollY;
+      if (isAutoScrolling.current) {
+        lastScrollY.current = currentScrollY;
+
+        if (scrollEndTimerRef.current) clearTimeout(scrollEndTimerRef.current);
+        scrollEndTimerRef.current = setTimeout(() => {
+          isAutoScrolling.current = false;
+        }, 100);
+
+        return;
+      }
 
       if (currentScrollY < lastScrollY.current - 5) {
         setIsMobileNavVisible(true);
@@ -6159,10 +6172,6 @@ export default function App() {
                                             block: "start",
                                           });
                                       }
-
-                                      setTimeout(() => {
-                                        isAutoScrolling.current = false;
-                                      }, 1000);
                                     }}
                                     className="flex items-center gap-1.5 px-3 sm:px-4 py-2 text-xs font-bold text-slate-600 rounded-full hover:bg-slate-100 hover:text-indigo-600 transition-colors whitespace-nowrap shrink-0 group"
                                   >
@@ -6352,10 +6361,6 @@ export default function App() {
                                           block: "start",
                                         });
                                     }
-
-                                    setTimeout(() => {
-                                      isAutoScrolling.current = false;
-                                    }, 1000);
                                   }}
                                   className="flex items-center gap-1.5 px-3 sm:px-4 py-2 text-xs font-bold text-slate-600 rounded-full hover:bg-slate-100 hover:text-indigo-600 transition-colors whitespace-nowrap shrink-0 group"
                                 >
