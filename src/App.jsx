@@ -5749,6 +5749,23 @@ export default function App() {
     setActiveQAId(newId);
   };
 
+  const insertQA = (index) => {
+    const newId = Date.now();
+    setFormData((p) => {
+      const newQas = [...p.qas];
+      newQas.splice(index, 0, {
+        id: newId,
+        question: "",
+        answer: "",
+        tags: "",
+        charLimit: "",
+        note: "",
+      });
+      return { ...p, qas: newQas };
+    });
+    setActiveQAId(newId);
+  };
+
   const moveQA = (index, direction) => {
     setFormData((p) => {
       const newQas = [...p.qas];
@@ -6900,7 +6917,7 @@ export default function App() {
                       <label className="text-sm font-bold text-slate-700 mb-4 block">
                         Q&A
                       </label>
-                      <div className="space-y-6">
+                      <div className="space-y-6 relative">
                         {formData.qas.map((qa, idx) => {
                           const isActive = activeQAId === qa.id;
 
@@ -6924,6 +6941,22 @@ export default function App() {
                                     }`
                               }`}
                             >
+                              {idx === 0 && (
+                                <div
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    insertQA(0);
+                                  }}
+                                  className="absolute bottom-full left-1/2 -translate-x-1/2 w-1/3 h-6 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity z-50 cursor-pointer group/insert"
+                                >
+                                  <div className="w-full h-0.5 bg-indigo-400 relative flex items-center justify-center group-hover/insert:h-1 group-hover/insert:bg-indigo-500 transition-all">
+                                    <div className="bg-indigo-500 text-white rounded-full p-0.5 absolute shadow-sm transform group-hover/insert:scale-110 transition-transform">
+                                      <Plus size={14} />
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+
                               <div className="relative z-10 flex items-center justify-between min-h-[32px] pointer-events-none">
                                 <div
                                   className={`text-xs font-bold transition-colors duration-300 shrink-0 ${
@@ -7195,6 +7228,22 @@ export default function App() {
                                     );
                                   })()}
                               </div>
+
+                              {idx !== formData.qas.length - 1 && (
+                                <div
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    insertQA(idx + 1);
+                                  }}
+                                  className="absolute top-full left-1/2 -translate-x-1/2 w-1/3 h-6 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity z-50 cursor-pointer group/insert"
+                                >
+                                  <div className="w-full h-0.5 bg-indigo-400 relative flex items-center justify-center group-hover/insert:h-1 group-hover/insert:bg-indigo-500 transition-all">
+                                    <div className="bg-indigo-500 text-white rounded-full p-0.5 absolute shadow-sm transform group-hover/insert:scale-110 transition-transform">
+                                      <Plus size={14} />
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           );
                         })}
