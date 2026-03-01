@@ -6187,14 +6187,19 @@ export default function App() {
                                           behavior: "smooth",
                                         });
                                       } else {
-                                        document
-                                          .getElementById(
-                                            `status-section-${status}`,
-                                          )
-                                          ?.scrollIntoView({
+                                        const el = document.getElementById(
+                                          `status-section-${status}`,
+                                        );
+                                        if (el) {
+                                          const y =
+                                            el.getBoundingClientRect().top +
+                                            window.scrollY -
+                                            120;
+                                          window.scrollTo({
+                                            top: y,
                                             behavior: "smooth",
-                                            block: "start",
                                           });
+                                        }
                                       }
                                     }}
                                     className="flex items-center gap-1.5 px-3 sm:px-4 py-2 text-xs font-bold text-slate-600 rounded-full hover:bg-slate-100 hover:text-indigo-600 transition-colors whitespace-nowrap shrink-0 group"
@@ -6497,14 +6502,19 @@ export default function App() {
                                         behavior: "smooth",
                                       });
                                     } else {
-                                      document
-                                        .getElementById(
-                                          `tag-section-${tagName}`,
-                                        )
-                                        ?.scrollIntoView({
+                                      const el = document.getElementById(
+                                        `tag-section-${tagName}`,
+                                      );
+                                      if (el) {
+                                        const y =
+                                          el.getBoundingClientRect().top +
+                                          window.scrollY -
+                                          120;
+                                        window.scrollTo({
+                                          top: y,
                                           behavior: "smooth",
-                                          block: "start",
                                         });
+                                      }
                                     }
                                   }}
                                   className="flex items-center gap-1.5 px-3 sm:px-4 py-2 text-xs font-bold text-slate-600 rounded-full hover:bg-slate-100 hover:text-indigo-600 transition-colors whitespace-nowrap shrink-0 group"
