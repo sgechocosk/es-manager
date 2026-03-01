@@ -4663,6 +4663,11 @@ export default function App() {
     setCollapsedStatuses((prev) => ({ ...prev, [status]: !prev[status] }));
   };
 
+  const [collapsedTags, setCollapsedTags] = useState({});
+  const toggleTagCollapse = (tag) => {
+    setCollapsedTags((prev) => ({ ...prev, [tag]: !prev[tag] }));
+  };
+
   const mouseDownLocation = useRef(null);
   const isMouseDownGlobal = useRef(false);
 
@@ -6438,7 +6443,7 @@ export default function App() {
 
                 {/* View: Tag Group */}
                 {viewMode === "tag" && (
-                  <div className="space-y-8 pb-24 relative">
+                  <div className="pb-24 relative">
                     {Object.keys(tagGroups).length > 0 && (
                       <div
                         onMouseEnter={() => {
@@ -6521,36 +6526,65 @@ export default function App() {
                         タグ付けされた質問はありません
                       </div>
                     )}
-                    {Object.entries(tagGroups).map(([tagName, items]) => (
-                      <div
-                        key={tagName}
-                        id={`tag-section-${tagName}`}
-                        className="bg-slate-50/50 rounded-xl border border-slate-200 p-4 scroll-mt-40 sm:scroll-mt-32"
-                      >
-                        <h3 className="text-sm font-bold text-indigo-700 mb-4 flex items-center gap-2">
-                          <Tags size={16} /> #{tagName}
-                          <span className="bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full text-xs">
-                            {items.length}
-                          </span>
-                        </h3>
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                          {items.map((item, idx) => (
-                            <QAItemDisplay
-                              key={`${item.entryId}-${idx}`}
-                              qa={item}
-                              tags={item.tagsArray}
-                              companyName={item.companyName}
-                              status={item.status}
-                              selectionType={item.selectionType}
-                              showCompanyInfo={true}
-                              onEdit={handleEditById}
-                              highlight={searchQuery}
-                              appSettings={appSettings}
-                            />
-                          ))}
+                    {Object.entries(tagGroups).map(([tagName, items]) => {
+                      const isCollapsed = collapsedTags[tagName];
+                      return (
+                        <div
+                          key={tagName}
+                          id={`tag-section-${tagName}`}
+                          className={`bg-slate-50/50 rounded-xl border border-slate-200 scroll-mt-40 sm:scroll-mt-32 transition-all duration-300 ease-in-out px-4 ${
+                            !isCollapsed ? "py-4 mb-8" : "py-3 mb-3"
+                          }`}
+                        >
+                          <div
+                            className={`flex items-center justify-between transition-[margin] duration-300 ease-in-out ${!isCollapsed ? "mb-4" : "mb-0"}`}
+                          >
+                            <h3 className="text-sm font-bold text-indigo-700 flex items-center gap-2">
+                              <Tags size={16} /> #{tagName}
+                              <span className="bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full text-xs">
+                                {items.length}
+                              </span>
+                            </h3>
+                            <button
+                              onClick={() => toggleTagCollapse(tagName)}
+                              className="text-slate-400 hover:text-slate-600 px-1 transition-transform"
+                            >
+                              {isCollapsed ? (
+                                <ChevronDown size={18} />
+                              ) : (
+                                <ChevronUp size={18} />
+                              )}
+                            </button>
+                          </div>
+                          <div
+                            className={`grid transition-[grid-template-rows,opacity] duration-300 ease-in-out ${
+                              !isCollapsed
+                                ? "grid-rows-[1fr] opacity-100"
+                                : "grid-rows-[0fr] opacity-0"
+                            }`}
+                          >
+                            <div className="overflow-hidden">
+                              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                {items.map((item, idx) => (
+                                  <QAItemDisplay
+                                    key={`${item.entryId}-${idx}`}
+                                    qa={item}
+                                    tags={item.tagsArray}
+                                    companyName={item.companyName}
+                                    status={item.status}
+                                    selectionType={item.selectionType}
+                                    showCompanyInfo={true}
+                                    onEdit={handleEditById}
+                                    highlight={searchQuery}
+                                    appSettings={appSettings}
+                                  />
+                                ))}
+                              </div>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
 
