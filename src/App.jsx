@@ -3979,7 +3979,6 @@ ${userPrompt.replace(/^[ \t]+/gm, "")}`;
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setIsCompact(!isCompact)}
-                title={isCompact ? "展開する" : "折りたたむ"}
                 className="text-slate-400 hover:text-slate-600 px-1 transition-transform"
               >
                 {isCompact ? (
@@ -4658,6 +4657,11 @@ export default function App() {
   const [toast, setToast] = useState(null);
 
   const [isMobileNavVisible, setIsMobileNavVisible] = useState(true);
+
+  const [collapsedStatuses, setCollapsedStatuses] = useState({});
+  const toggleStatusCollapse = (status) => {
+    setCollapsedStatuses((prev) => ({ ...prev, [status]: !prev[status] }));
+  };
 
   const mouseDownLocation = useRef(null);
   const isMouseDownGlobal = useRef(false);
@@ -6108,7 +6112,7 @@ export default function App() {
 
                 {/* View: Status Group */}
                 {viewMode === "status" && (
-                  <div className="space-y-8 pb-24 relative">
+                  <div className="pb-24 relative">
                     {Object.keys(entriesByStatus).length > 0 && (
                       <div
                         onMouseEnter={() => {
@@ -6211,36 +6215,62 @@ export default function App() {
                       (status) => {
                         const entries = entriesByStatus[status];
                         if (!entries || entries.length === 0) return null;
+                        const isCollapsed = collapsedStatuses[status];
                         return (
                           <div
                             key={status}
                             id={`status-section-${status}`}
-                            className="bg-slate-50/50 rounded-xl border border-slate-200 p-4 scroll-mt-40 sm:scroll-mt-32"
+                            className={`bg-slate-50/50 rounded-xl border border-slate-200 scroll-mt-40 sm:scroll-mt-32 transition-all duration-300 ease-in-out px-4 ${
+                              !isCollapsed ? "py-4 mb-8" : "py-3 mb-3"
+                            }`}
                           >
-                            <div className="mb-4 flex items-center gap-2">
-                              <StatusBadge status={status} />
-                              <span className="text-xs text-slate-400 font-bold">
-                                {entries.length}社
-                              </span>
+                            <div
+                              className={`flex items-center justify-between transition-[margin] duration-300 ease-in-out ${!isCollapsed ? "mb-4" : "mb-0"}`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <StatusBadge status={status} />
+                                <span className="text-xs text-slate-400 font-bold">
+                                  {entries.length}社
+                                </span>
+                              </div>
+                              <button
+                                onClick={() => toggleStatusCollapse(status)}
+                                className="text-slate-400 hover:text-slate-600 px-1 transition-transform"
+                              >
+                                {isCollapsed ? (
+                                  <ChevronDown size={18} />
+                                ) : (
+                                  <ChevronUp size={18} />
+                                )}
+                              </button>
                             </div>
-                            <div className="space-y-6">
-                              {entries.map((entry) => {
-                                const cData = companyData[entry.company] || {};
-                                return (
-                                  <ESEntryDisplay
-                                    key={entry.id}
-                                    entry={{
-                                      ...entry,
-                                      industry: cData.industry,
-                                    }}
-                                    onEdit={startEdit}
-                                    onDelete={handleDelete}
-                                    companyUrl={cData.myPageUrl}
-                                    highlight={searchQuery}
-                                    appSettings={appSettings}
-                                  />
-                                );
-                              })}
+                            <div
+                              className={`grid transition-[grid-template-rows,opacity] duration-300 ease-in-out ${
+                                !isCollapsed
+                                  ? "grid-rows-[1fr] opacity-100"
+                                  : "grid-rows-[0fr] opacity-0"
+                              }`}
+                            >
+                              <div className="overflow-hidden space-y-6">
+                                {entries.map((entry) => {
+                                  const cData =
+                                    companyData[entry.company] || {};
+                                  return (
+                                    <ESEntryDisplay
+                                      key={entry.id}
+                                      entry={{
+                                        ...entry,
+                                        industry: cData.industry,
+                                      }}
+                                      onEdit={startEdit}
+                                      onDelete={handleDelete}
+                                      companyUrl={cData.myPageUrl}
+                                      highlight={searchQuery}
+                                      appSettings={appSettings}
+                                    />
+                                  );
+                                })}
+                              </div>
                             </div>
                           </div>
                         );
@@ -6257,32 +6287,127 @@ export default function App() {
                             "不採用",
                           ].includes(s),
                       )
-                      .map((status) => (
-                        <div
-                          key={status}
-                          id={`status-section-${status}`}
-                          className="bg-slate-50/50 rounded-xl border border-slate-200 p-4 scroll-mt-40 sm:scroll-mt-32"
-                        >
-                          <h3 className="text-sm font-bold text-slate-600 mb-4 px-1">
-                            {status}
-                          </h3>
-                          <div className="space-y-6">
-                            {entriesByStatus[status].map((entry) => {
-                              const cData = companyData[entry.company] || {};
-                              return (
-                                <ESEntryDisplay
-                                  key={entry.id}
-                                  entry={{ ...entry, industry: cData.industry }}
-                                  onEdit={startEdit}
-                                  onDelete={handleDelete}
-                                  companyUrl={cData.myPageUrl}
-                                  appSettings={appSettings}
-                                />
-                              );
-                            })}
+                      .map((status) => {
+                        const entries = entriesByStatus[status];
+                        const isCollapsed = collapsedStatuses[status];
+                        return (
+                          <div
+                            key={status}
+                            id={`status-section-${status}`}
+                            className={`bg-slate-50/50 rounded-xl border border-slate-200 scroll-mt-40 sm:scroll-mt-32 transition-all duration-300 ease-in-out px-4 ${
+                              !isCollapsed ? "py-4 mb-8" : "py-3 mb-3"
+                            }`}
+                          >
+                            <div
+                              className={`flex items-center justify-between transition-[margin] duration-300 ease-in-out ${!isCollapsed ? "mb-4" : "mb-0"}`}
+                            >
+                              <h3 className="text-sm font-bold text-slate-600 px-1 flex items-center gap-2">
+                                {status}
+                                <span className="text-xs text-slate-400 font-normal">
+                                  {entries.length}社
+                                </span>
+                              </h3>
+                              <button
+                                onClick={() => toggleStatusCollapse(status)}
+                                className="text-slate-400 hover:text-slate-600 px-1 transition-transform"
+                              >
+                                {isCollapsed ? (
+                                  <ChevronDown size={18} />
+                                ) : (
+                                  <ChevronUp size={18} />
+                                )}
+                              </button>
+                            </div>
+                            {!isCollapsed && (
+                              <div className="space-y-6">
+                                {entries.map((entry) => {
+                                  const cData =
+                                    companyData[entry.company] || {};
+                                  return (
+                                    <ESEntryDisplay
+                                      key={entry.id}
+                                      entry={{
+                                        ...entry,
+                                        industry: cData.industry,
+                                      }}
+                                      onEdit={startEdit}
+                                      onDelete={handleDelete}
+                                      companyUrl={cData.myPageUrl}
+                                      appSettings={appSettings}
+                                    />
+                                  );
+                                })}
+                              </div>
+                            )}
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
+                    {Object.keys(entriesByStatus)
+                      .filter(
+                        (s) =>
+                          ![
+                            "未提出",
+                            "作成中",
+                            "提出済",
+                            "採用",
+                            "不採用",
+                          ].includes(s),
+                      )
+                      .map((status) => {
+                        const entries = entriesByStatus[status];
+                        const isCollapsed = collapsedStatuses[status];
+                        return (
+                          <div
+                            key={status}
+                            id={`status-section-${status}`}
+                            className={`bg-slate-50/50 rounded-xl border border-slate-200 scroll-mt-40 sm:scroll-mt-32 transition-all duration-300 ease-in-out px-4 ${
+                              !isCollapsed ? "py-4 mb-8" : "py-3 mb-3"
+                            }`}
+                          >
+                            <div
+                              className={`flex items-center justify-between transition-[margin] duration-300 ease-in-out ${!isCollapsed ? "mb-4" : "mb-0"}`}
+                            >
+                              <h3 className="text-sm font-bold text-slate-600 px-1 flex items-center gap-2">
+                                {status}
+                                <span className="text-xs text-slate-400 font-normal">
+                                  {entries.length}社
+                                </span>
+                              </h3>
+                              <button
+                                onClick={() => toggleStatusCollapse(status)}
+                                className="text-slate-400 hover:text-slate-600 px-1 transition-transform"
+                              >
+                                {isCollapsed ? (
+                                  <ChevronDown size={18} />
+                                ) : (
+                                  <ChevronUp size={18} />
+                                )}
+                              </button>
+                            </div>
+                            {!isCollapsed && (
+                              <div className="space-y-6">
+                                {entries.map((entry) => {
+                                  const cData =
+                                    companyData[entry.company] || {};
+                                  return (
+                                    <ESEntryDisplay
+                                      key={entry.id}
+                                      entry={{
+                                        ...entry,
+                                        industry: cData.industry,
+                                      }}
+                                      onEdit={startEdit}
+                                      onDelete={handleDelete}
+                                      companyUrl={cData.myPageUrl}
+                                      appSettings={appSettings}
+                                    />
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                   </div>
                 )}
 
