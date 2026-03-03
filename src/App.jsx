@@ -6144,7 +6144,7 @@ export default function App() {
                             setIsMobileNavVisible(false);
                           }, 4000);
                         }}
-                        className={`fixed bottom-0 left-1/2 -translate-x-1/2 z-50 w-auto max-w-[95%] sm:max-w-2xl transition-all duration-500 ease-in-out sm:duration-150 ${
+                        className={`fixed bottom-5 left-1/2 -translate-x-1/2 z-50 w-auto max-w-[95%] sm:max-w-2xl transition-all duration-500 ease-in-out sm:duration-150 ${
                           isMobileNavVisible
                             ? "translate-y-0 opacity-100 pointer-events-auto"
                             : "translate-y-8 opacity-0 pointer-events-none"
@@ -6475,7 +6475,7 @@ export default function App() {
                             setIsMobileNavVisible(false);
                           }, 4000);
                         }}
-                        className={`fixed bottom-0 left-1/2 -translate-x-1/2 z-50 w-auto max-w-[95%] sm:max-w-2xl transition-all duration-500 ease-in-out sm:duration-150 ${
+                        className={`fixed bottom-5 left-1/2 -translate-x-1/2 z-50 w-auto max-w-[95%] sm:max-w-2xl transition-all duration-500 ease-in-out sm:duration-150 ${
                           isMobileNavVisible
                             ? "translate-y-0 opacity-100 pointer-events-auto"
                             : "translate-y-8 opacity-0 pointer-events-none"
