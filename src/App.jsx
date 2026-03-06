@@ -2761,6 +2761,13 @@ const ReferenceSidebar = ({
   appSettings,
 }) => {
   const [search, setSearch] = useState("");
+  const searchInputRef = useRef(null);
+
+  useEffect(() => {
+    if (isOpen && searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
+  }, [isOpen]);
 
   const filteredQAs = useMemo(() => {
     let allItems = [];
@@ -2842,6 +2849,7 @@ const ReferenceSidebar = ({
             size={14}
           />
           <input
+            ref={searchInputRef}
             type="text"
             placeholder="企業、質問、タグ、回答を検索..."
             className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-indigo-500 bg-slate-50 focus:bg-white transition-colors"
@@ -3457,6 +3465,7 @@ const ReferenceSelectorModal = ({
                 className="w-full pl-9 pr-4 py-1.5 border rounded-lg text-xs outline-none focus:border-indigo-500 bg-slate-50 focus:bg-white transition-colors"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
+                autoFocus
               />
             </div>
           </div>
@@ -4488,6 +4497,7 @@ const DraftEditor = ({
               }`}
               placeholder={getTodayDateString()}
               value={data.title}
+              autoFocus={!data.title}
               onChange={handleTitleChange}
               list="company-list-suggestions"
             />
@@ -4909,6 +4919,19 @@ export default function App() {
         const element = document.getElementById(`qa-item-${activeQAId}`);
         if (element) {
           element.scrollIntoView({ behavior: "smooth", block: "center" });
+
+          const questionInput = element.querySelector(
+            'input[placeholder="質問内容"]',
+          );
+          const textarea = element.querySelector("textarea");
+
+          if (questionInput && !questionInput.value) {
+            questionInput.focus({ preventScroll: true });
+          } else if (textarea) {
+            textarea.focus({ preventScroll: true });
+            const len = textarea.value.length;
+            textarea.setSelectionRange(len, len);
+          }
         }
       }, 100);
       return () => clearTimeout(timer);
@@ -6909,6 +6932,7 @@ export default function App() {
                           <input
                             className="w-full pl-3 pr-16 py-2 border rounded-lg outline-none focus:border-indigo-500"
                             value={formData.company}
+                            autoFocus={!editingId}
                             onChange={(e) => {
                               const newCompany = e.target.value;
                               const cData =
@@ -7223,6 +7247,7 @@ export default function App() {
                                         e.target.value,
                                       )
                                     }
+                                    autoFocus={isActive && !qa.question}
                                   />
                                 </div>
                               </div>
