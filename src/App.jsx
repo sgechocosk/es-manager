@@ -2510,7 +2510,7 @@ const CompanyDataEditModal = ({
                 placeholder="例: 株式会社Tech"
                 value={newCompanyName}
                 onChange={handleNameChange}
-                autoFocus
+                autoFocus={!companyName}
               />
             </div>
             {nameError && (
