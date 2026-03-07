@@ -669,6 +669,497 @@ const ActivityHeatmap = ({ activityLog }) => {
   );
 };
 
+const CalendarView = ({ entries, onEdit, onAdd }) => {
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [hoveredEntryId, setHoveredEntryId] = useState(null);
+  const [selectedDateDetails, setSelectedDateDetails] = useState(null);
+  const [isClosing, setIsClosing] = useState(false);
+  const closeTimerRef = useRef(null);
+  const [visibleItems, setVisibleItems] = useState(() => {
+    const saved = localStorage.getItem("ES_MANAGER_CALENDAR_SETTINGS");
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error("Failed to load calendar settings", e);
+      }
+    }
+    return ["deadline", "createdAt", "completedAt"];
+  });
+  const [isColumnSelectorOpen, setIsColumnSelectorOpen] = useState(false);
+
+  useEffect(() => {
+    localStorage.setItem(
+      "ES_MANAGER_CALENDAR_SETTINGS",
+      JSON.stringify(visibleItems),
+    );
+  }, [visibleItems]);
+
+  const year = currentDate.getFullYear();
+  const month = currentDate.getMonth();
+
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstDay = new Date(year, month, 1).getDay();
+
+  const handleClosePanel = () => {
+    if (isClosing) return;
+    setIsClosing(true);
+
+    closeTimerRef.current = setTimeout(() => {
+      setSelectedDateDetails(null);
+      setIsClosing(false);
+      closeTimerRef.current = null;
+    }, 800);
+  };
+
+  const prevMonth = () => {
+    setCurrentDate(new Date(year, month - 1, 1));
+    setSelectedDateDetails(null);
+  };
+  const nextMonth = () => {
+    setCurrentDate(new Date(year, month + 1, 1));
+    setSelectedDateDetails(null);
+  };
+  const goToday = () => {
+    setCurrentDate(new Date());
+    setSelectedDateDetails(null);
+  };
+
+  const days = Array(firstDay)
+    .fill(null)
+    .concat(Array.from({ length: daysInMonth }, (_, i) => i + 1));
+
+  const eventsMap = {};
+  entries.forEach((entry) => {
+    if (entry.deadline && visibleItems.includes("deadline")) {
+      const d = new Date(entry.deadline);
+      if (d.getFullYear() === year && d.getMonth() === month) {
+        const date = d.getDate();
+        if (!eventsMap[date]) eventsMap[date] = [];
+        eventsMap[date].push({
+          ...entry,
+          type: "deadline",
+          time: entry.deadline,
+        });
+      }
+    }
+    if (entry.createdAt && visibleItems.includes("createdAt")) {
+      const d = new Date(entry.createdAt);
+      if (d.getFullYear() === year && d.getMonth() === month) {
+        const date = d.getDate();
+        if (!eventsMap[date]) eventsMap[date] = [];
+        eventsMap[date].push({
+          ...entry,
+          type: "createdAt",
+          time: entry.createdAt,
+        });
+      }
+    }
+    if (entry.completedAt && visibleItems.includes("completedAt")) {
+      const d = new Date(entry.completedAt);
+      if (d.getFullYear() === year && d.getMonth() === month) {
+        const date = d.getDate();
+        if (!eventsMap[date]) eventsMap[date] = [];
+        eventsMap[date].push({
+          ...entry,
+          type: "completedAt",
+          time: entry.completedAt,
+        });
+      }
+    }
+  });
+
+  const today = new Date();
+  const isCurrentMonth =
+    today.getFullYear() === year && today.getMonth() === month;
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-[calc(100vh-200px)] min-h-[500px] animate-in fade-in relative">
+      <div className="p-4 border-b flex justify-between items-center bg-white shrink-0">
+        <div className="flex items-center gap-1 sm:gap-2">
+          <button
+            onClick={prevMonth}
+            className="p-1.5 text-slate-600 hover:bg-slate-200 rounded-md transition-colors"
+          >
+            <ChevronUp className="-rotate-90" size={20} />
+          </button>
+          <h2 className="text-lg sm:text-xl font-bold text-slate-800 w-28 sm:w-32 text-center">
+            {year}年 {month + 1}月
+          </h2>
+          <button
+            onClick={nextMonth}
+            className="p-1.5 text-slate-600 hover:bg-slate-200 rounded-md transition-colors"
+          >
+            <ChevronDown className="-rotate-90" size={20} />
+          </button>
+          <button
+            onClick={goToday}
+            className="px-2 sm:px-3 py-1 text-xs font-bold bg-white border border-slate-200 rounded-md hover:bg-slate-50 transition-colors ml-1 sm:ml-2"
+          >
+            今日
+          </button>
+        </div>
+
+        <div className="relative">
+          <button
+            onClick={() => setIsColumnSelectorOpen(!isColumnSelectorOpen)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 text-slate-600 rounded-lg text-xs font-bold hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 transition-colors"
+          >
+            <Columns size={14} />{" "}
+            <span className="hidden sm:inline">表示項目設定</span>
+          </button>
+
+          {isColumnSelectorOpen && (
+            <>
+              <div
+                className="fixed inset-0 z-10"
+                onClick={() => setIsColumnSelectorOpen(false)}
+              />
+              <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-slate-200 rounded-lg shadow-lg z-20 p-2 animate-in fade-in zoom-in-95 duration-200">
+                <div className="text-xs font-bold text-slate-500 px-2 py-1 mb-1 border-b border-slate-100">
+                  表示する項目を選択
+                </div>
+                <div className="max-h-60 overflow-y-auto space-y-1">
+                  {[
+                    {
+                      id: "deadline",
+                      label: "提出期限",
+                      dotColor: "bg-rose-500",
+                    },
+                    {
+                      id: "createdAt",
+                      label: "作成日",
+                      dotColor: "bg-indigo-500",
+                    },
+                    {
+                      id: "completedAt",
+                      label: "提出日",
+                      dotColor: "bg-emerald-500",
+                    },
+                  ].map((col) => (
+                    <label
+                      key={col.id}
+                      className="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-50 rounded cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={visibleItems.includes(col.id)}
+                        onChange={() => {
+                          setVisibleItems((prev) =>
+                            prev.includes(col.id)
+                              ? prev.filter((id) => id !== col.id)
+                              : [...prev, col.id],
+                          );
+                        }}
+                        className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5 shrink-0"
+                      />
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          className={`w-2 h-2 rounded-full ${col.dotColor} shrink-0`}
+                        ></span>
+                        <span className="text-xs text-slate-700">
+                          {col.label}
+                        </span>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-7 border-b bg-white shrink-0">
+        {["日", "月", "火", "水", "木", "金", "土"].map((d, i) => (
+          <div
+            key={d}
+            className={`py-2 text-center text-xs font-bold ${
+              i === 0
+                ? "text-red-500"
+                : i === 6
+                  ? "text-blue-500"
+                  : "text-slate-600"
+            }`}
+          >
+            {d}
+          </div>
+        ))}
+      </div>
+
+      <div className="flex-1 overflow-y-auto bg-white">
+        <div className="grid grid-cols-7 min-h-full auto-rows-[minmax(80px,auto)] sm:auto-rows-[minmax(100px,auto)]">
+          {days.map((day, idx) => {
+            const isToday = isCurrentMonth && day === today.getDate();
+            const isSelected = selectedDateDetails?.day === day;
+            return (
+              <div
+                key={idx}
+                onClick={() => {
+                  if (day) {
+                    if (selectedDateDetails?.day === day) {
+                      if (!isClosing) {
+                        handleClosePanel();
+                      } else {
+                        if (closeTimerRef.current) {
+                          clearTimeout(closeTimerRef.current);
+                          closeTimerRef.current = null;
+                        }
+                        setIsClosing(false);
+                      }
+                    } else {
+                      if (closeTimerRef.current) {
+                        clearTimeout(closeTimerRef.current);
+                        closeTimerRef.current = null;
+                      }
+                      setIsClosing(false);
+
+                      const monthStr = String(month + 1).padStart(2, "0");
+                      const dayStr = String(day).padStart(2, "0");
+                      setSelectedDateDetails({
+                        day: day,
+                        fullDateStr: `${year}-${monthStr}-${dayStr}`,
+                      });
+                    }
+                  }
+                }}
+                className={`border-b border-r border-slate-100 p-0.5 sm:p-1 flex flex-col ${
+                  day
+                    ? "bg-white cursor-pointer hover:bg-slate-50 transition-colors"
+                    : "bg-transparent"
+                } ${isSelected ? "bg-indigo-50/50" : ""}`}
+              >
+                {day && (
+                  <>
+                    <div
+                      className={`text-[10px] sm:text-xs font-bold mb-0.5 flex items-center justify-center shrink-0 w-5 h-5 rounded-full ${
+                        isToday ? "text-white bg-indigo-600" : "text-slate-600"
+                      }`}
+                    >
+                      {day}
+                    </div>
+                    <div className="flex-1 space-y-0.5">
+                      {eventsMap[day]
+                        ?.sort((a, b) => new Date(a.time) - new Date(b.time))
+                        .map((entry, i) => {
+                          let colorClass = "";
+                          let typeLabel = "";
+
+                          if (entry.type === "deadline") {
+                            colorClass =
+                              "bg-rose-50 text-rose-700 border-rose-100 hover:bg-rose-100";
+                            typeLabel = "期限";
+                          } else if (entry.type === "createdAt") {
+                            colorClass =
+                              "bg-indigo-50 text-indigo-700 border-indigo-100 hover:bg-indigo-100";
+                            typeLabel = "作成";
+                          } else if (entry.type === "completedAt") {
+                            colorClass =
+                              "bg-emerald-50 text-emerald-700 border-emerald-100 hover:bg-emerald-100";
+                            typeLabel = "提出";
+                          }
+
+                          const displayTitle = entry.selectionType
+                            ? `${entry.company} - ${entry.selectionType}`
+                            : entry.company;
+
+                          const tooltip = `[${typeLabel}] ${displayTitle}`;
+
+                          const isHovered = hoveredEntryId === entry.id;
+                          const isOtherHovered =
+                            hoveredEntryId !== null &&
+                            hoveredEntryId !== entry.id;
+
+                          const hoverEffects = isOtherHovered
+                            ? "opacity-30 grayscale-[50%]"
+                            : isHovered
+                              ? "opacity-100 ring-1 ring-slate-400 shadow-sm z-10 relative"
+                              : "opacity-100";
+
+                          return (
+                            <div
+                              key={`${entry.id}-${entry.type}-${i}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onEdit(entry);
+                              }}
+                              onMouseEnter={() => setHoveredEntryId(entry.id)}
+                              onMouseLeave={() => setHoveredEntryId(null)}
+                              title={tooltip}
+                              className={`text-[9px] sm:text-[10px] px-1 py-0.5 rounded-[3px] border cursor-pointer transition-all duration-200 overflow-hidden whitespace-nowrap leading-tight ${colorClass} ${hoverEffects}`}
+                              style={{ textOverflow: "clip" }}
+                            >
+                              {displayTitle}
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {(selectedDateDetails || isClosing) && (
+        <>
+          <style>{`
+        @keyframes slideUpSmooth {
+          from { transform: translateY(100%); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
+        }
+        @keyframes slideDownSmooth {
+          from { transform: translateY(0); opacity: 1; }
+          to { transform: translateY(100%); opacity: 0; }
+        }
+        .animate-slide-up-smooth {
+          animation: slideUpSmooth 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        .animate-slide-down-smooth {
+          animation: slideDownSmooth 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+      `}</style>
+          <div className="fixed bottom-0 left-4 right-4 sm:left-8 sm:right-8 md:left-1/2 md:w-full md:max-w-3xl md:-translate-x-1/2 z-50">
+            <div
+              className={`max-h-[min(60vh,500px)] w-full bg-white rounded-t-[32px] shadow-[0_-15px_50px_-10px_rgba(0,0,0,0.15)] border border-slate-200 border-b-0 flex flex-col transition-all duration-300 ease-in-out ${isClosing ? "animate-slide-down-smooth" : "animate-slide-up-smooth"}`}
+            >
+              <div className="p-3 md:p-5 border-b border-slate-100 flex justify-between items-center shrink-0">
+                <h3 className="font-bold text-slate-800 text-base md:text-lg flex items-center gap-2">
+                  <Calendar className="text-indigo-600 w-4 h-4 md:w-5 md:h-5" />
+                  {selectedDateDetails?.fullDateStr.replace(/-/g, "/")}{" "}
+                  のスケジュール
+                </h3>
+                <button
+                  onClick={handleClosePanel}
+                  className="p-2 text-slate-400 hover:bg-slate-100 rounded-full transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-3 md:p-5 space-y-2 md:space-y-3">
+                {eventsMap[selectedDateDetails?.day]?.length > 0 ? (
+                  eventsMap[selectedDateDetails?.day]
+                    .sort((a, b) => new Date(a.time) - new Date(b.time))
+                    .map((entry, i) => {
+                      let colorClass = "";
+                      let typeLabel = "";
+                      let timeLeftStr = "";
+
+                      if (entry.type === "deadline") {
+                        colorClass =
+                          "bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100";
+                        typeLabel = "期限";
+
+                        const isCompleted = [
+                          "提出済",
+                          "採用",
+                          "不採用",
+                        ].includes(entry.status);
+
+                        if (isCompleted) {
+                          timeLeftStr = "提出済";
+                        } else {
+                          const diffMs = new Date(entry.time) - new Date();
+
+                          if (diffMs < 0) {
+                            timeLeftStr = "期限切れ";
+                          } else {
+                            const diffDays = Math.floor(
+                              diffMs / (1000 * 60 * 60 * 24),
+                            );
+                            const diffHours = Math.floor(
+                              (diffMs % (1000 * 60 * 60 * 24)) /
+                                (1000 * 60 * 60),
+                            );
+                            if (diffDays > 0) {
+                              timeLeftStr = `あと${diffDays}日${diffHours}時間`;
+                            } else if (diffHours > 0) {
+                              timeLeftStr = `あと${diffHours}時間`;
+                            } else {
+                              const diffMins = Math.floor(
+                                (diffMs % (1000 * 60 * 60)) / (1000 * 60),
+                              );
+                              timeLeftStr = `あと${diffMins}分`;
+                            }
+                          }
+                        }
+                      } else if (entry.type === "createdAt") {
+                        colorClass =
+                          "bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100";
+                        typeLabel = "作成";
+                      } else if (entry.type === "completedAt") {
+                        colorClass =
+                          "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100";
+                        typeLabel = "提出";
+                      }
+
+                      return (
+                        <div
+                          key={`detail-${entry.id}-${entry.type}-${i}`}
+                          onClick={() => {
+                            onEdit(entry);
+                            handleClosePanel();
+                          }}
+                          className={`p-3 md:p-4 rounded-xl border cursor-pointer transition-colors flex items-center justify-between gap-2 md:gap-3 ${colorClass}`}
+                        >
+                          <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
+                            <span className="text-[10px] md:text-[11px] font-bold px-1.5 md:px-2 py-0.5 md:py-1 rounded bg-white/60 shrink-0">
+                              {typeLabel}
+                            </span>
+                            <div className="flex flex-col md:flex-row md:items-center min-w-0 flex-1">
+                              <span className="font-bold text-sm md:text-base truncate leading-tight md:leading-normal">
+                                {entry.company}
+                              </span>
+                              {entry.selectionType && (
+                                <span className="text-[10px] md:text-base opacity-80 md:opacity-100 truncate mt-0.5 md:mt-0 md:ml-1">
+                                  <span className="hidden md:inline"> - </span>
+                                  {entry.selectionType}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex flex-col items-end shrink-0 ml-1 md:ml-0">
+                            <div className="text-xs md:text-sm font-mono opacity-80">
+                              {entry.time.substring(11, 16)}
+                            </div>
+                            {timeLeftStr && (
+                              <div className="text-[9px] md:text-[10px] font-bold mt-0.5">
+                                {timeLeftStr}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                ) : (
+                  <div className="text-center text-slate-400 py-10 text-base font-bold flex items-center justify-center h-full">
+                    この日の予定はありません
+                  </div>
+                )}
+              </div>
+
+              <div className="p-3 md:p-5 border-t border-slate-100 bg-white">
+                <button
+                  onClick={() => {
+                    if (selectedDateDetails)
+                      onAdd(selectedDateDetails.fullDateStr);
+                    handleClosePanel();
+                  }}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 md:py-3.5 bg-indigo-600 text-white rounded-xl text-sm md:text-base font-bold hover:bg-indigo-700 transition-colors shadow-md hover:shadow-lg"
+                >
+                  <Plus className="w-4 h-4 md:w-5 md:h-5" /> この日付で新規作成
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
 const StatisticsView = ({ entries, companyData, activityLog }) => {
   const [showInfo, setShowInfo] = useState(false);
 
@@ -5584,12 +6075,16 @@ export default function App() {
     if (entry) startEdit(entry, qaId);
   };
 
-  const startNewEntry = () => {
+  const startNewEntry = (initialDeadline = "") => {
     resetForm();
     setIsMemoMode(false);
     const newId = Date.now();
     const newState = {
       ...DEFAULT_FORM_DATA,
+      deadline:
+        typeof initialDeadline === "string" && initialDeadline
+          ? `${initialDeadline}T23:59`
+          : "",
       qas: [
         {
           id: newId,
@@ -6065,6 +6560,21 @@ export default function App() {
             >
               <Database size={14} />
               企業データ
+            </button>
+
+            <button
+              onClick={() => {
+                setViewMode("calendar");
+                scrollToTop("smooth");
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap border ${
+                viewMode === "calendar"
+                  ? "bg-indigo-600 text-white shadow-sm"
+                  : "bg-white text-slate-500 border border-slate-200 hover:bg-slate-50"
+              }`}
+            >
+              <Calendar size={14} />
+              カレンダー
             </button>
 
             <button
@@ -6883,6 +7393,15 @@ export default function App() {
                       </table>
                     </div>
                   </div>
+                )}
+
+                {/* View: Calendar */}
+                {viewMode === "calendar" && (
+                  <CalendarView
+                    entries={processedCompanyEntries}
+                    onEdit={startEdit}
+                    onAdd={startNewEntry}
+                  />
                 )}
 
                 {/* View: Statistics */}
