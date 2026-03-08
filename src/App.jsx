@@ -5529,14 +5529,21 @@ export default function App() {
     });
   }, [entries, companyData]);
 
+  const enrichedEntries = useMemo(() => {
+    return entries.map((entry) => ({
+      ...entry,
+      industry: companyData[entry.company]?.industry || "",
+    }));
+  }, [entries, companyData]);
+
   const processedCompanyEntries = useMemo(() => {
-    let result = entries;
+    let result = enrichedEntries;
 
     if (searchQuery) {
       const lowerQ = searchQuery.toLowerCase();
       const terms = lowerQ.split(/[\s\u3000]+/).filter((t) => t.length > 0);
 
-      result = entries
+      result = enrichedEntries
         .map((entry) => {
           const entryBaseText =
             `${entry.company} ${entry.industry} ${entry.selectionType}`.toLowerCase();
@@ -5576,14 +5583,14 @@ export default function App() {
       }
       return (a.company || "").localeCompare(b.company || "", "ja");
     });
-  }, [entries, searchQuery]);
+  }, [enrichedEntries, searchQuery]);
 
   const flattenedQAs = useMemo(() => {
     let allItems = [];
     const lowerQ = searchQuery.toLowerCase();
     const terms = lowerQ.split(/[\s\u3000]+/).filter((t) => t.length > 0);
 
-    entries.forEach((entry) => {
+    enrichedEntries.forEach((entry) => {
       if (entry.qas) {
         entry.qas.forEach((qa) => {
           const tags = splitTags(qa.tags);
@@ -5622,7 +5629,7 @@ export default function App() {
       const dateB = new Date(b.updatedAt || 0);
       return dateB - dateA;
     });
-  }, [entries, searchQuery]);
+  }, [enrichedEntries, searchQuery]);
 
   const tagGroups = useMemo(() => {
     const groups = {};
@@ -7847,7 +7854,7 @@ export default function App() {
                                   onApply={(text) =>
                                     updateQA(qa.id, "answer", text)
                                   }
-                                  allEntries={entries}
+                                  allEntries={enrichedEntries}
                                   entryId={editingId}
                                   qaId={qa.id}
                                   writingStyle={appSettings.writingStyle}
@@ -7995,7 +8002,7 @@ export default function App() {
         <ReferenceSidebar
           isOpen={isRefPanelOpen}
           onClose={() => setIsRefPanelOpen(false)}
-          entries={entries}
+          entries={enrichedEntries}
           editingId={editingId}
           appSettings={appSettings}
         />
