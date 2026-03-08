@@ -5416,17 +5416,22 @@ export default function App() {
         if (element) {
           element.scrollIntoView({ behavior: "smooth", block: "center" });
 
-          const questionInput = element.querySelector(
-            'input[placeholder="質問内容"]',
-          );
-          const textarea = element.querySelector("textarea");
+          const activeEl = document.activeElement;
+          const isAlreadyFocusedInside = element.contains(activeEl);
 
-          if (questionInput && !questionInput.value) {
-            questionInput.focus({ preventScroll: true });
-          } else if (textarea) {
-            textarea.focus({ preventScroll: true });
-            const len = textarea.value.length;
-            textarea.setSelectionRange(len, len);
+          if (!isAlreadyFocusedInside) {
+            const questionInput = element.querySelector(
+              'input[placeholder="質問内容"]',
+            );
+            const textarea = element.querySelector("textarea");
+
+            if (questionInput && !questionInput.value) {
+              questionInput.focus({ preventScroll: true });
+            } else if (textarea) {
+              textarea.focus({ preventScroll: true });
+              const len = textarea.value.length;
+              textarea.setSelectionRange(len, len);
+            }
           }
         }
       }, 100);
@@ -7885,11 +7890,7 @@ export default function App() {
                                         ? "text-xs px-3 py-2 rounded-md"
                                         : "text-xs px-2 py-1 rounded"
                                     }`}
-                                    placeholder={
-                                      isActive
-                                        ? "タグ (例: 自己PR、ガクチカ)"
-                                        : "タグ"
-                                    }
+                                    placeholder="タグ (例: 自己PR、ガクチカ)"
                                     value={qa.tags}
                                     onClick={(e) => e.stopPropagation()}
                                     onFocus={() => {
