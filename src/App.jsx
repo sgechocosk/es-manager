@@ -4912,6 +4912,11 @@ const DraftEditor = ({
         e.preventDefault();
         handleSaveClick(false);
       }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setActiveItemId(null);
+        if (document.activeElement) document.activeElement.blur();
+      }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
@@ -5456,6 +5461,11 @@ export default function App() {
         if ((e.ctrlKey || e.metaKey) && e.key === "b") {
           e.preventDefault();
           setIsRefPanelOpen((prev) => !prev);
+        }
+        if (e.key === "Escape") {
+          e.preventDefault();
+          setActiveQAId(null);
+          if (document.activeElement) document.activeElement.blur();
         }
       }
     };
