@@ -5362,11 +5362,7 @@ export default function App() {
   // --- Effects: BeforeUnload ---
   useEffect(() => {
     const handleBeforeUnload = (e) => {
-      if (appSettings.autoSave) return;
-
-      const hasEntries = entries.length > 0 || drafts.length > 0;
       let isFormDirty = false;
-
       if (view === "form" && !isMemoMode && initialFormState) {
         const currentJson = JSON.stringify({
           ...formData,
@@ -5379,17 +5375,28 @@ export default function App() {
         isFormDirty = currentJson !== initialJson;
       }
 
-      if (!hasEntries && !isFormDirty) {
-        return;
+      let isDraftDirty = false;
+      if (view === "form" && isMemoMode && initialDraftState) {
+        isDraftDirty =
+          JSON.stringify(draftFormData) !== JSON.stringify(initialDraftState);
       }
 
-      if (hasEntries || isFormDirty) {
-        e.preventDefault();
-        const message =
-          "データは保存されていません。リロードすると失われます。";
-        e.returnValue = message;
-        return message;
+      const isEditingDirty = isFormDirty || isDraftDirty;
+
+      if (appSettings.autoSave) {
+        if (!isEditingDirty) return;
+      } else {
+        const hasData =
+          entries.length > 0 ||
+          drafts.length > 0 ||
+          Object.keys(companyData).length > 0;
+        if (!hasData && !isEditingDirty) return;
       }
+
+      e.preventDefault();
+      const message = "データは保存されていません。リロードすると失われます。";
+      e.returnValue = message;
+      return message;
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
@@ -5397,8 +5404,11 @@ export default function App() {
     view,
     entries,
     drafts,
+    companyData,
     formData,
+    draftFormData,
     initialFormState,
+    initialDraftState,
     appSettings.autoSave,
     isMemoMode,
   ]);
