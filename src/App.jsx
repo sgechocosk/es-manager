@@ -6844,16 +6844,61 @@ export default function App() {
                 {/* View: Drafts */}
                 {viewMode === "drafts" && drafts.length > 0 && (
                   <div className="space-y-6">
-                    {drafts.map((draft) => (
-                      <DraftDisplay
-                        key={draft.id}
-                        draft={draft}
-                        onEdit={startEdit}
-                        onDelete={handleDelete}
-                        highlight={searchQuery}
-                        appSettings={appSettings}
-                      />
-                    ))}
+                    {(() => {
+                      const filteredDrafts = drafts.filter((draft) => {
+                        if (!searchQuery) return true;
+
+                        const terms = searchQuery
+                          .toLowerCase()
+                          .split(/[\s\u3000]+/)
+                          .filter((t) => t.length > 0);
+                        const positiveTerms = terms.filter(
+                          (t) => !t.startsWith("-"),
+                        );
+                        const negativeTerms = terms
+                          .filter((t) => t.startsWith("-"))
+                          .map((t) => t.slice(1));
+
+                        const text = [
+                          draft.title,
+                          ...(draft.items || []).flatMap((item) => [
+                            item.question,
+                            item.answer,
+                          ]),
+                        ]
+                          .filter(Boolean)
+                          .join(" ")
+                          .toLowerCase();
+
+                        const isMatch = positiveTerms.every((term) =>
+                          text.includes(term),
+                        );
+                        const isNotExcluded = negativeTerms.every(
+                          (term) => !text.includes(term),
+                        );
+
+                        return isMatch && isNotExcluded;
+                      });
+
+                      if (filteredDrafts.length === 0) {
+                        return (
+                          <div className="text-center text-slate-400 py-10">
+                            該当するメモがありません
+                          </div>
+                        );
+                      }
+
+                      return filteredDrafts.map((draft) => (
+                        <DraftDisplay
+                          key={draft.id}
+                          draft={draft}
+                          onEdit={startEdit}
+                          onDelete={handleDelete}
+                          highlight={searchQuery}
+                          appSettings={appSettings}
+                        />
+                      ));
+                    })()}
                   </div>
                 )}
 
