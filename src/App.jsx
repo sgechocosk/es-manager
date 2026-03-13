@@ -4215,6 +4215,7 @@ const AIAssistant = ({
     setMode(actionType);
     setResult("");
     setCurrentModel("");
+    setIsCompact(false);
 
     const styleInstruction =
       writingStyle === "keigo"
