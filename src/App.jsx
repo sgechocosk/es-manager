@@ -5162,6 +5162,9 @@ export default function App() {
 
   const [toast, setToast] = useState(null);
 
+  const lastSavedDataStr = useRef("");
+  const lastSavedLogStr = useRef("");
+
   const [isMobileNavVisible, setIsMobileNavVisible] = useState(true);
 
   const [collapsedStatuses, setCollapsedStatuses] = useState({});
@@ -5327,18 +5330,33 @@ export default function App() {
     if (!isInitialized) return;
 
     if (appSettings.autoSave) {
-      const dataToSave = {
-        entries: entries,
-        drafts: drafts,
-        companyData: companyData,
-        activityLog: activityLog,
-        updatedAt: getCurrentJSTTime(),
-      };
-      localStorage.setItem(STORAGE_KEY_DATA, JSON.stringify(dataToSave));
-      localStorage.setItem(
-        STORAGE_KEY_ACTIVITY_LOG,
-        JSON.stringify(activityLog),
-      );
+      const coreData = { entries, drafts, companyData };
+      const currentDataStr = JSON.stringify(coreData);
+      const currentLogStr = JSON.stringify(activityLog);
+
+      let shouldSaveData = false;
+      let shouldSaveLog = false;
+
+      if (lastSavedDataStr.current !== currentDataStr) {
+        shouldSaveData = true;
+        lastSavedDataStr.current = currentDataStr;
+      }
+      if (lastSavedLogStr.current !== currentLogStr) {
+        shouldSaveLog = true;
+        lastSavedLogStr.current = currentLogStr;
+      }
+
+      if (shouldSaveData) {
+        const dataToSave = {
+          ...coreData,
+          activityLog,
+          updatedAt: getCurrentJSTTime(),
+        };
+        localStorage.setItem(STORAGE_KEY_DATA, JSON.stringify(dataToSave));
+      }
+      if (shouldSaveLog) {
+        localStorage.setItem(STORAGE_KEY_ACTIVITY_LOG, currentLogStr);
+      }
     } else {
       localStorage.removeItem(STORAGE_KEY_DATA);
       localStorage.removeItem(STORAGE_KEY_ACTIVITY_LOG);
@@ -5351,6 +5369,69 @@ export default function App() {
     appSettings.autoSave,
     isInitialized,
   ]);
+
+  // --- Effects: Sync across tabs ---
+  useEffect(() => {
+    if (!isInitialized) return;
+
+    const handleStorageChange = (e) => {
+      if (e.key === STORAGE_KEY_SETTINGS && e.newValue) {
+        try {
+          const newSettings = JSON.parse(e.newValue);
+          setAppSettings((prev) => ({ ...prev, ...newSettings }));
+        } catch (error) {
+          console.error("Failed to sync settings", error);
+        }
+        return;
+      }
+
+      if (!appSettings.autoSave) return;
+
+      if (e.key === STORAGE_KEY_DATA && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+
+          let loadedEntries = Array.isArray(parsed.entries)
+            ? parsed.entries
+            : [];
+          let loadedDrafts = Array.isArray(parsed.drafts) ? parsed.drafts : [];
+          let loadedCompanyData = parsed.companyData || {};
+
+          if (parsed.companyUrls && !parsed.companyData) {
+            Object.entries(parsed.companyUrls).forEach(([name, val]) => {
+              loadedCompanyData[name] = normalizeCompanyData(val);
+            });
+          }
+
+          const coreData = {
+            entries: loadedEntries,
+            drafts: loadedDrafts,
+            companyData: loadedCompanyData,
+          };
+          lastSavedDataStr.current = JSON.stringify(coreData);
+
+          setEntries(loadedEntries);
+          setDrafts(loadedDrafts);
+          setCompanyData(loadedCompanyData);
+        } catch (error) {
+          console.error("Failed to sync data", error);
+        }
+      }
+
+      if (e.key === STORAGE_KEY_ACTIVITY_LOG && e.newValue) {
+        try {
+          lastSavedLogStr.current = e.newValue;
+          const parsedLog = JSON.parse(e.newValue);
+          setActivityLog(migrateActivityLog(parsedLog));
+        } catch (error) {
+          console.error("Failed to sync log", error);
+        }
+      }
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
+  }, [isInitialized, appSettings.autoSave]);
 
   useEffect(() => {
     localStorage.setItem(
