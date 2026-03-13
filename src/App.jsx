@@ -3398,6 +3398,7 @@ const ReferenceSidebar = ({
                   <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded truncate max-w-[140px] block">
                     <HighlightText text={item.company} highlight={search} />
                   </span>
+                  <StatusBadge status={item.status} />
                   {item.selectionType && (
                     <span className="text-[10px] text-slate-400 border border-slate-100 px-1.5 py-0.5 rounded">
                       <HighlightText
@@ -3431,8 +3432,8 @@ const ReferenceSidebar = ({
               />
             </p>
 
-            {item.tags.length > 0 && (
-              <div className="mt-2 flex flex-wrap gap-1">
+            <div className="mt-2 flex flex-wrap justify-between items-end gap-2">
+              <div className="flex flex-wrap gap-1">
                 {item.tags.map((tag, i) => (
                   <span
                     key={i}
@@ -3443,7 +3444,10 @@ const ReferenceSidebar = ({
                   </span>
                 ))}
               </div>
-            )}
+              <div className="text-[10px] font-mono text-slate-400 bg-slate-50 px-2 py-0.5 rounded border border-slate-100 shrink-0">
+                {item.answer ? item.answer.length : 0}文字
+              </div>
+            </div>
           </div>
         ))}
       </div>
