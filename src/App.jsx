@@ -4057,6 +4057,7 @@ const ReferenceSelectorModal = ({
                             highlight={search}
                           />
                         </span>
+                        <StatusBadge status={item.status} />
                         {item.selectionType && (
                           <span className="text-[10px] text-slate-400 border border-slate-100 px-1.5 py-0.5 rounded">
                             <HighlightText
@@ -4075,8 +4076,8 @@ const ReferenceSelectorModal = ({
                         />
                       </p>
 
-                      <div className="flex-1 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-slate-200">
-                        <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap">
+                      <div className="flex-1 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-slate-200 flex flex-col">
+                        <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap flex-1">
                           <HighlightText
                             text={item.answer}
                             highlight={search}
@@ -4092,6 +4093,43 @@ const ReferenceSelectorModal = ({
                             }
                           />
                         </p>
+                        {(() => {
+                          const searchTerms = search
+                            .toLowerCase()
+                            .replace(/＃/g, "#")
+                            .split(/[\s\u3000]+/)
+                            .filter((t) => t.length > 0 && !t.startsWith("-"))
+                            .map((t) => (t.startsWith("#") ? t.slice(1) : t));
+
+                          const matchedTags =
+                            searchTerms.length > 0
+                              ? item.tags.filter((tag) =>
+                                  searchTerms.some((term) =>
+                                    tag.toLowerCase().includes(term),
+                                  ),
+                                )
+                              : [];
+
+                          if (matchedTags.length === 0) return null;
+
+                          return (
+                            <div className="mt-2 flex flex-wrap gap-1 shrink-0">
+                              {matchedTags.map((tag, i) => (
+                                <span
+                                  key={i}
+                                  className="text-[9px] px-1.5 py-0.5 bg-indigo-50 text-indigo-600 rounded border border-indigo-100"
+                                >
+                                  #
+                                  <HighlightText
+                                    text={tag}
+                                    highlight={search}
+                                    isTag={true}
+                                  />
+                                </span>
+                              ))}
+                            </div>
+                          );
+                        })()}
                       </div>
                     </div>
                   </div>
