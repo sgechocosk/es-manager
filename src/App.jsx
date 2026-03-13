@@ -378,13 +378,23 @@ const STATUS_COLORS = {
   不採用: "bg-rose-50 text-rose-400",
 };
 
-const HighlightText = ({ text, highlight, writingStyle, checkNgWords }) => {
+const HighlightText = ({
+  text,
+  highlight,
+  writingStyle,
+  checkNgWords,
+  isTag,
+}) => {
   if (!text) return <>{text}</>;
 
   const searchTerms = highlight
     ? highlight
         .toLowerCase()
+        .replace(/＃/g, "#")
         .split(/[\s\u3000]+/)
+        .filter((t) => t.length > 0 && !t.startsWith("-"))
+        .filter((t) => (isTag ? true : !t.startsWith("#")))
+        .map((t) => (t.startsWith("#") ? t.slice(1) : t))
         .filter((t) => t.length > 0)
     : [];
 
@@ -3264,11 +3274,9 @@ const ReferenceSidebar = ({
     let allItems = [];
     entries.forEach((entry) => {
       if (editingId && entry.id === editingId) return;
-
       if (entry.qas) {
         entry.qas.forEach((qa) => {
           if (!qa.answer || !qa.answer.trim()) return;
-
           allItems.push({
             uniqueId: `${entry.id}_${qa.id}`,
             question: qa.question,
@@ -3277,7 +3285,9 @@ const ReferenceSidebar = ({
             selectionType: entry.selectionType,
             industry: entry.industry || "",
             note: qa.note || "",
-            tags: Array.isArray(qa.tags) ? qa.tags : [],
+            tags: Array.isArray(qa.tags) ? qa.tags : splitTags(qa.tags),
+            status: entry.status || "",
+            charLimit: qa.charLimit || "",
           });
         });
       }
@@ -3285,26 +3295,47 @@ const ReferenceSidebar = ({
 
     if (!search) return allItems;
 
-    const terms = search
+    const rawTerms = search
       .toLowerCase()
+      .replace(/＃/g, "#")
       .split(/[\s\u3000]+/)
       .filter((t) => t.length > 0);
+    const hasCharSearch = rawTerms.some((t) => t.includes("文字"));
+
+    const tagTerms = rawTerms
+      .filter((t) => t.startsWith("#"))
+      .map((t) => t.slice(1));
+    const positiveTerms = rawTerms.filter(
+      (t) => !t.startsWith("-") && !t.startsWith("#"),
+    );
+    const negativeTerms = rawTerms
+      .filter((t) => t.startsWith("-"))
+      .map((t) => t.slice(1));
 
     return allItems.filter((item) => {
+      const hasAllTags = tagTerms.every((term) =>
+        item.tags.some((tag) => tag.toLowerCase().includes(term)),
+      );
+      if (!hasAllTags) return false;
+
       const text = [
         item.company,
         item.industry,
         item.selectionType,
+        item.status,
         item.question,
         item.answer,
-        item.note,
         item.tags.join(" "),
+        hasCharSearch && item.charLimit ? `${item.charLimit}文字` : "",
       ]
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
 
-      return terms.every((term) => text.includes(term));
+      const isMatch = positiveTerms.every((term) => text.includes(term));
+      const isNotExcluded = negativeTerms.every((term) => !text.includes(term));
+
+      return isMatch && isNotExcluded;
     });
   }, [entries, search, editingId]);
 
@@ -3407,7 +3438,8 @@ const ReferenceSidebar = ({
                     key={i}
                     className="text-[9px] px-1.5 py-0.5 bg-indigo-50 text-indigo-600 rounded border border-indigo-100"
                   >
-                    #<HighlightText text={tag} highlight={search} />
+                    #
+                    <HighlightText text={tag} highlight={search} isTag={true} />
                   </span>
                 ))}
               </div>
@@ -3853,8 +3885,10 @@ const ReferenceSelectorModal = ({
             industry: entry.industry || "",
             selectionType: entry.selectionType || "",
             note: qa.note || "",
-            tags: Array.isArray(qa.tags) ? qa.tags.join(" ") : qa.tags || "",
+            tags: Array.isArray(qa.tags) ? qa.tags : splitTags(qa.tags),
             updatedAt: entry.updatedAt,
+            status: entry.status || "",
+            charLimit: qa.charLimit || "",
           });
         });
       }
@@ -3869,35 +3903,54 @@ const ReferenceSelectorModal = ({
 
   const filteredQAs = useMemo(() => {
     let targetList = allQAs;
-
     if (excludedUniqueId) {
       targetList = targetList.filter(
         (item) => item.uniqueId !== excludedUniqueId,
       );
     }
-
     if (!search) return targetList;
 
-    const terms = search
+    const rawTerms = search
       .toLowerCase()
+      .replace(/＃/g, "#")
       .split(/[\s\u3000]+/)
       .filter((t) => t.length > 0);
+    const hasCharSearch = rawTerms.some((t) => t.includes("文字"));
+
+    const tagTerms = rawTerms
+      .filter((t) => t.startsWith("#"))
+      .map((t) => t.slice(1));
+    const positiveTerms = rawTerms.filter(
+      (t) => !t.startsWith("-") && !t.startsWith("#"),
+    );
+    const negativeTerms = rawTerms
+      .filter((t) => t.startsWith("-"))
+      .map((t) => t.slice(1));
 
     return targetList.filter((item) => {
+      const hasAllTags = tagTerms.every((term) =>
+        item.tags.some((tag) => tag.toLowerCase().includes(term)),
+      );
+      if (!hasAllTags) return false;
+
       const text = [
         item.company,
-        item.question,
-        item.answer,
         item.industry,
         item.selectionType,
-        item.note,
-        item.tags,
+        item.status,
+        item.question,
+        item.answer,
+        item.tags.join(" "),
+        hasCharSearch && item.charLimit ? `${item.charLimit}文字` : "",
       ]
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
 
-      return terms.every((term) => text.includes(term));
+      const isMatch = positiveTerms.every((term) => text.includes(term));
+      const isNotExcluded = negativeTerms.every((term) => !text.includes(term));
+
+      return isMatch && isNotExcluded;
     });
   }, [allQAs, search, excludedUniqueId]);
 
@@ -4650,7 +4703,7 @@ const QAItemDisplay = ({
               key={i}
               className="inline-flex items-center px-2 py-1 rounded text-[10px] font-medium bg-indigo-50 text-indigo-600 border border-indigo-100"
             >
-              #<HighlightText text={tag} highlight={highlight} />
+              #<HighlightText text={tag} highlight={highlight} isTag={true} />
             </span>
           ))}
       </div>
@@ -4807,7 +4860,12 @@ const ESEntryDisplay = ({
                         key={i}
                         className="inline-flex items-center px-2 py-1 rounded text-[10px] font-medium bg-indigo-50 text-indigo-600 border border-indigo-100"
                       >
-                        #<HighlightText text={tag} highlight={highlight} />
+                        #
+                        <HighlightText
+                          text={tag}
+                          highlight={highlight}
+                          isTag={true}
+                        />
                       </span>
                     ))}
                 </div>
@@ -5646,20 +5704,59 @@ export default function App() {
     let result = enrichedEntries;
 
     if (searchQuery) {
-      const lowerQ = searchQuery.toLowerCase();
-      const terms = lowerQ.split(/[\s\u3000]+/).filter((t) => t.length > 0);
+      const rawTerms = searchQuery
+        .toLowerCase()
+        .replace(/＃/g, "#")
+        .split(/[\s\u3000]+/)
+        .filter((t) => t.length > 0);
+      const hasCharSearch = rawTerms.some((t) => t.includes("文字"));
+
+      const tagTerms = rawTerms
+        .filter((t) => t.startsWith("#"))
+        .map((t) => t.slice(1));
+      const positiveTerms = rawTerms.filter(
+        (t) => !t.startsWith("-") && !t.startsWith("#"),
+      );
+      const negativeTerms = rawTerms
+        .filter((t) => t.startsWith("-"))
+        .map((t) => t.slice(1));
 
       result = enrichedEntries
         .map((entry) => {
           const entryBaseText =
-            `${entry.company} ${entry.industry} ${entry.selectionType}`.toLowerCase();
+            `${entry.company} ${entry.industry} ${entry.selectionType} ${entry.status || ""}`.toLowerCase();
 
           const filteredQAs = (entry.qas || []).filter((qa) => {
-            const qaTags = Array.isArray(qa.tags) ? qa.tags.join(" ") : qa.tags;
-            const combinedText =
-              `${entryBaseText} ${qa.question} ${qa.answer} ${qa.note} ${qaTags}`.toLowerCase();
+            const tagsArr = Array.isArray(qa.tags)
+              ? qa.tags
+              : splitTags(qa.tags || "");
 
-            return terms.every((term) => combinedText.includes(term));
+            const hasAllTags = tagTerms.every((term) =>
+              tagsArr.some((tag) => tag.toLowerCase().includes(term)),
+            );
+            if (!hasAllTags) return false;
+
+            const charLimitText =
+              hasCharSearch && qa.charLimit ? `${qa.charLimit}文字` : "";
+            const combinedText = [
+              entryBaseText,
+              qa.question,
+              qa.answer,
+              tagsArr.join(" "),
+              charLimitText,
+            ]
+              .filter(Boolean)
+              .join(" ")
+              .toLowerCase();
+
+            const isMatch = positiveTerms.every((term) =>
+              combinedText.includes(term),
+            );
+            const isNotExcluded = negativeTerms.every(
+              (term) => !combinedText.includes(term),
+            );
+
+            return isMatch && isNotExcluded;
           });
 
           if (filteredQAs.length > 0) return { ...entry, qas: filteredQAs };
@@ -5693,29 +5790,55 @@ export default function App() {
 
   const flattenedQAs = useMemo(() => {
     let allItems = [];
-    const lowerQ = searchQuery.toLowerCase();
-    const terms = lowerQ.split(/[\s\u3000]+/).filter((t) => t.length > 0);
+    const rawTerms = searchQuery
+      .toLowerCase()
+      .replace(/＃/g, "#")
+      .split(/[\s\u3000]+/)
+      .filter((t) => t.length > 0);
+    const hasCharSearch = rawTerms.some((t) => t.includes("文字"));
+
+    const tagTerms = rawTerms
+      .filter((t) => t.startsWith("#"))
+      .map((t) => t.slice(1));
+    const positiveTerms = rawTerms.filter(
+      (t) => !t.startsWith("-") && !t.startsWith("#"),
+    );
+    const negativeTerms = rawTerms
+      .filter((t) => t.startsWith("-"))
+      .map((t) => t.slice(1));
 
     enrichedEntries.forEach((entry) => {
       if (entry.qas) {
         entry.qas.forEach((qa) => {
           const tags = splitTags(qa.tags);
 
+          const hasAllTags = tagTerms.every((term) =>
+            tags.some((tag) => tag.toLowerCase().includes(term)),
+          );
+          if (!hasAllTags) return;
+
           const fullContext = [
             entry.company,
             entry.industry,
             entry.selectionType,
+            entry.status,
             qa.question,
             qa.answer,
-            qa.note,
             tags.join(" "),
+            hasCharSearch && qa.charLimit ? `${qa.charLimit}文字` : "",
           ]
+            .filter(Boolean)
             .join(" ")
             .toLowerCase();
 
-          const match = terms.every((term) => fullContext.includes(term));
+          const isMatch = positiveTerms.every((term) =>
+            fullContext.includes(term),
+          );
+          const isNotExcluded = negativeTerms.every(
+            (term) => !fullContext.includes(term),
+          );
 
-          if (match) {
+          if (isMatch && isNotExcluded) {
             allItems.push({
               ...qa,
               tagsArray: tags,
