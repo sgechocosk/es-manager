@@ -76,8 +76,13 @@ const STORAGE_KEY_SETTINGS = "ES_MANAGER_SETTINGS";
 const STORAGE_KEY_DATA = "ES_MANAGER_DATA";
 const STORAGE_KEY_VIEW_SETTINGS = "ES_MANAGER_VIEW_SETTINGS";
 const STORAGE_KEY_ACTIVITY_LOG = "ES_MANAGER_ACTIVITY_LOG";
-const STORAGE_KEY_WELCOME = "ES_MANAGER_HAS_SEEN_WELCOME";
+const STORAGE_KEY_TUTORIAL = "ES_MANAGER_TUTORIAL";
 const HEADER_HEIGHT = "57px";
+
+const DEFAULT_TUTORIAL_STATE = {
+  hasSeenWelcome: false,
+  hasClickedNewEntry: false,
+};
 
 const COMPLETED_STATUSES = ["提出済", "採用", "不採用"];
 
@@ -5278,13 +5283,40 @@ const DEFAULT_FORM_DATA = {
 };
 
 export default function App() {
-  // --- State ---
-  const [isWelcomeModalOpen, setIsWelcomeModalOpen] = useState(() => {
-    return !localStorage.getItem(STORAGE_KEY_WELCOME);
+  // --- Tutorial State ---
+  const [tutorialProgress, setTutorialProgress] = useState(() => {
+    const saved = localStorage.getItem(STORAGE_KEY_TUTORIAL);
+    return saved
+      ? { ...DEFAULT_TUTORIAL_STATE, ...JSON.parse(saved) }
+      : DEFAULT_TUTORIAL_STATE;
   });
+
+  const updateTutorialProgress = (updates) => {
+    setTutorialProgress((prev) => {
+      const next = { ...prev, ...updates };
+      localStorage.setItem(STORAGE_KEY_TUTORIAL, JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const [isWelcomeModalOpen, setIsWelcomeModalOpen] = useState(
+    () => !tutorialProgress.hasSeenWelcome,
+  );
+  const [showNewEntryTooltip, setShowNewEntryTooltip] = useState(() => {
+    return (
+      tutorialProgress.hasSeenWelcome && !tutorialProgress.hasClickedNewEntry
+    );
+  });
+
   const handleCloseWelcomeModal = () => {
-    localStorage.setItem(STORAGE_KEY_WELCOME, "true");
+    updateTutorialProgress({ hasSeenWelcome: true });
     setIsWelcomeModalOpen(false);
+
+    if (!tutorialProgress.hasClickedNewEntry) {
+      setTimeout(() => {
+        setShowNewEntryTooltip(true);
+      }, 400);
+    }
   };
   const [entries, setEntries] = useState([]);
   const [drafts, setDrafts] = useState([]);
@@ -6438,7 +6470,18 @@ export default function App() {
     if (entry) startEdit(entry, qaId);
   };
 
+  const handleCloseTooltip = (e) => {
+    e.stopPropagation();
+    setShowNewEntryTooltip(false);
+    updateTutorialProgress({ hasClickedNewEntry: true });
+  };
+
   const startNewEntry = (initialDeadline = "") => {
+    if (showNewEntryTooltip) {
+      setShowNewEntryTooltip(false);
+      updateTutorialProgress({ hasClickedNewEntry: true });
+    }
+
     resetForm();
     setIsMemoMode(false);
     const newId = Date.now();
@@ -6814,21 +6857,42 @@ export default function App() {
               <div className="flex items-center gap-1 ml-auto shrink-0">
                 <button
                   onClick={startNewMemo}
-                  title="メモ作成"
                   className="bg-orange-500 hover:bg-orange-600 text-white p-2 rounded-lg sm:px-4 flex items-center gap-1.5 shadow-md transition-all active:scale-95 ml-2 shrink-0"
                 >
                   <StickyNote size={18} />
                   <span className="hidden md:inline font-medium">メモ作成</span>
                 </button>
 
-                <button
-                  onClick={startNewEntry}
-                  title="新規作成"
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white p-2 rounded-lg sm:px-4 flex items-center gap-1.5 shadow-md transition-all active:scale-95 ml-1 shrink-0"
-                >
-                  <Plus size={18} />
-                  <span className="hidden md:inline font-medium">新規作成</span>
-                </button>
+                <div className="relative flex items-center">
+                  <button
+                    onClick={startNewEntry}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white p-2 rounded-lg sm:px-4 flex items-center gap-1.5 shadow-md transition-all active:scale-95 ml-1 shrink-0 relative z-10"
+                  >
+                    <Plus size={18} />
+                    <span className="hidden md:inline font-medium">
+                      新規作成
+                    </span>
+                  </button>
+
+                  {showNewEntryTooltip && (
+                    <div className="absolute top-full right-0 mt-3.5 w-60 bg-white border border-slate-200 rounded-xl shadow-xl p-4 z-[100] animate-in fade-in slide-in-from-top-2 duration-500 cursor-default">
+                      <div className="absolute -top-2 right-6 w-4 h-4 bg-white border-t border-l border-slate-200 transform rotate-45"></div>
+
+                      <button
+                        onClick={handleCloseTooltip}
+                        className="absolute top-2 right-2 z-20 text-slate-400 hover:text-slate-600 p-1 transition-colors"
+                      >
+                        <X size={14} />
+                      </button>
+
+                      <div className="relative z-10 pr-3 pt-0.5">
+                        <p className="text-sm font-bold text-slate-700 leading-relaxed">
+                          最初のESを作成してみましょう！
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}
