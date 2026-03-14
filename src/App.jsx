@@ -82,6 +82,7 @@ const HEADER_HEIGHT = "57px";
 const DEFAULT_TUTORIAL_STATE = {
   hasSeenWelcome: false,
   hasClickedNewEntry: false,
+  hasSeenFormTutorial: false,
 };
 
 const COMPLETED_STATUSES = ["提出済", "採用", "不採用"];
@@ -5313,6 +5314,80 @@ export default function App() {
       tutorialProgress.hasSeenWelcome && !tutorialProgress.hasClickedNewEntry
     );
   });
+  const [formTutorialStep, setFormTutorialStep] = useState(0);
+
+  const handleNextFormTutorial = () => {
+    if (formTutorialStep < 4) {
+      setFormTutorialStep((prev) => prev + 1);
+    } else {
+      setFormTutorialStep(0);
+      updateTutorialProgress({ hasSeenFormTutorial: true });
+    }
+  };
+
+  const formTutorialContent = {
+    1: {
+      title: "基本情報の入力",
+      text: "企業名やステータス、提出期限などの基本情報を入力します。企業名は必須です。",
+    },
+    2: {
+      title: "ES回答の作成",
+      text: "質問内容と回答を入力します。文字数制限の管理やAI機能、タグによる分類が利用できます。",
+    },
+    3: {
+      title: "質問の追加",
+      text: "複数の設問がある場合は、ここから入力枠を追加することができます。",
+    },
+    4: {
+      title: "保存して完了",
+      text: "入力が終わったら保存します。後から何度でも再開・編集が可能です。",
+    },
+  };
+
+  useEffect(() => {
+    if (formTutorialStep > 0) {
+      const timer = setTimeout(() => {
+        const target = document.querySelector(
+          `[data-tutorial="${formTutorialStep}"]`,
+        );
+        if (target) {
+          target.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [formTutorialStep]);
+
+  useEffect(() => {
+    if (formTutorialStep > 0) {
+      const preventScroll = (e) => e.preventDefault();
+      const preventKey = (e) => {
+        const blockedKeys = [
+          "ArrowUp",
+          "ArrowDown",
+          "Space",
+          "PageUp",
+          "PageDown",
+          "Home",
+          "End",
+          "Tab",
+        ];
+        if (blockedKeys.includes(e.code)) {
+          e.preventDefault();
+        }
+      };
+
+      window.addEventListener("wheel", preventScroll, { passive: false });
+      window.addEventListener("touchmove", preventScroll, { passive: false });
+      window.addEventListener("keydown", preventKey, { passive: false });
+
+      return () => {
+        window.removeEventListener("wheel", preventScroll);
+        window.removeEventListener("touchmove", preventScroll);
+        window.removeEventListener("keydown", preventKey);
+      };
+    }
+  }, [formTutorialStep]);
 
   const handleCloseWelcomeModal = () => {
     updateTutorialProgress({ hasSeenWelcome: true });
@@ -6488,6 +6563,10 @@ export default function App() {
       updateTutorialProgress({ hasClickedNewEntry: true });
     }
 
+    if (!tutorialProgress.hasSeenFormTutorial) {
+      setFormTutorialStep(1);
+    }
+
     resetForm();
     setIsMemoMode(false);
     const newId = Date.now();
@@ -6882,7 +6961,7 @@ export default function App() {
 
                   {showNewEntryTooltip && (
                     <div className="absolute top-full right-0 mt-3.5 w-60 bg-white border border-slate-200 rounded-xl shadow-xl p-4 z-[100] animate-in fade-in slide-in-from-top-2 duration-500 cursor-default">
-                      <div className="absolute -top-2 right-6 w-4 h-4 bg-white border-t border-l border-slate-200 transform rotate-45"></div>
+                      <div className="absolute -top-2 right-[9px] sm:right-10 w-4 h-4 bg-white border-t border-l border-slate-200 transform rotate-45"></div>
 
                       <button
                         onClick={handleCloseTooltip}
@@ -7920,7 +7999,10 @@ export default function App() {
                     </button>
                   </div>
                   <div className="p-6 space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
+                    <div
+                      data-tutorial="1"
+                      className={`grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 transition-all duration-500 ${formTutorialStep === 1 ? "relative z-[101] bg-white p-4 rounded-xl shadow-lg pointer-events-none -mx-4" : ""}`}
+                    >
                       <div>
                         <label className="text-xs font-bold text-slate-500">
                           企業名 <span className="text-red-500">*</span>
@@ -7929,7 +8011,7 @@ export default function App() {
                           <input
                             className="w-full pl-3 pr-16 py-2 border rounded-lg outline-none focus:border-indigo-500"
                             value={formData.company}
-                            autoFocus={!editingId}
+                            autoFocus={!editingId && formTutorialStep !== 1}
                             onChange={(e) => {
                               const newCompany = e.target.value;
                               const cData =
@@ -8107,17 +8189,20 @@ export default function App() {
                       </label>
                       <div className="space-y-6 relative">
                         {formData.qas.map((qa, idx) => {
-                          const isActive = activeQAId === qa.id;
+                          const isActive =
+                            activeQAId === qa.id ||
+                            (formTutorialStep === 2 && idx === 0);
 
                           return (
                             <div
                               key={qa.id}
                               id={`qa-item-${qa.id}`}
+                              data-tutorial={idx === 0 ? "2" : undefined}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setActiveQAId(qa.id);
                               }}
-                              className={`relative rounded-xl border transition-all duration-300 ease-in-out px-4 pt-2 pb-3 ${
+                              className={`relative rounded-xl border transition-all duration-500 ease-in-out px-4 pt-2 pb-3 ${
                                 activeTagDropdownId === qa.id ? "z-50" : "z-10"
                               } ${
                                 isActive
@@ -8127,6 +8212,10 @@ export default function App() {
                                         ? "opacity-100"
                                         : "opacity-90"
                                     }`
+                              } ${
+                                formTutorialStep === 2 && idx === 0
+                                  ? "z-[101] bg-white shadow-lg pointer-events-none"
+                                  : ""
                               }`}
                             >
                               {idx === 0 && (
@@ -8434,17 +8523,29 @@ export default function App() {
                         })}
                       </div>
                       <button
+                        data-tutorial="3"
                         onClick={(e) => {
                           e.stopPropagation();
                           addQA();
                         }}
-                        className="mt-4 w-full py-3 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 hover:border-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 flex items-center justify-center gap-2 text-sm font-bold"
+                        className={`mt-4 w-full py-3 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 hover:border-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 flex items-center justify-center gap-2 text-sm font-bold transition-all duration-500 ${
+                          formTutorialStep === 3
+                            ? "relative z-[101] bg-white shadow-lg pointer-events-none"
+                            : ""
+                        }`}
                       >
                         <Plus size={16} /> 質問を追加
                       </button>
                     </div>
 
-                    <div className="flex justify-end gap-3 pt-4 border-t">
+                    <div
+                      data-tutorial="4"
+                      className={`flex justify-end gap-3 pt-4 border-t transition-all duration-500 ${
+                        formTutorialStep === 4
+                          ? "relative z-[101] bg-white p-4 rounded-xl shadow-lg pointer-events-none -mx-4 -mb-4"
+                          : ""
+                      }`}
+                    >
                       <button
                         onClick={handleCancel}
                         className="px-5 py-2 rounded-lg text-slate-500 hover:bg-slate-100 font-bold text-sm"
@@ -8497,6 +8598,42 @@ export default function App() {
         isOpen={isWelcomeModalOpen}
         onClose={handleCloseWelcomeModal}
       />
+
+      {formTutorialStep > 0 && (
+        <>
+          <div className="fixed inset-0 z-[100] bg-slate-900/60 animate-in fade-in duration-300" />
+
+          <div className="fixed inset-0 z-[102] flex justify-center pointer-events-none">
+            <div
+              className={`w-full max-w-sm mx-4 absolute transition-all duration-700 ease-in-out pointer-events-auto ${
+                formTutorialStep <= 2
+                  ? "top-[calc(100dvh-260px)] sm:top-[calc(100dvh-280px)]"
+                  : "top-24 sm:top-28"
+              }`}
+            >
+              <div className="bg-white rounded-2xl shadow-2xl p-6 relative animate-in fade-in zoom-in-95">
+                <h3 className="text-lg font-black text-indigo-600 mb-2">
+                  {formTutorialContent[formTutorialStep].title}
+                </h3>
+                <p className="text-sm text-slate-600 mb-6 leading-relaxed">
+                  {formTutorialContent[formTutorialStep].text}
+                </p>
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-bold text-slate-400">
+                    {formTutorialStep} / 4
+                  </span>
+                  <button
+                    onClick={handleNextFormTutorial}
+                    className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-xl shadow-md transition-colors"
+                  >
+                    {formTutorialStep < 4 ? "次へ" : "さっそく取り掛かる"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
 
       {toast && (
         <div className="fixed bottom-4 right-4 z-[100] animate-in slide-in-from-bottom-2 fade-in duration-300">
