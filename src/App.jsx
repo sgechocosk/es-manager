@@ -148,24 +148,26 @@ const parseSalary = (value) => {
   );
 
   normalized = normalized.replace(/,/g, "");
-  const isMan = normalized.includes("万");
 
+  let num = null;
   if (normalized.includes("~") || normalized.includes("〜")) {
     const parts = normalized
       .split(/[~〜]/)
       .map((s) => parseFloat(s.replace(/[^0-9.]/g, "")))
       .filter((n) => !isNaN(n));
     if (parts.length === 2) {
-      const avg = (parts[0] + parts[1]) / 2;
-      return isMan ? avg * 10000 : avg;
+      num = (parts[0] + parts[1]) / 2;
+    } else if (parts.length === 1) {
+      num = parts[0];
     }
+  } else {
+    const match = normalized.match(/[0-9.]+/);
+    if (match) num = parseFloat(match[0]);
   }
 
-  const match = normalized.match(/[0-9.]+/);
-  if (!match) return null;
+  if (num === null) return null;
 
-  let num = parseFloat(match[0]);
-  return isMan ? num * 10000 : num;
+  return num <= 10000 ? num * 10000 : num;
 };
 
 // --- Utilities ---
@@ -1548,7 +1550,10 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
         startingSalarySum += startSalary;
         startingSalaryCount++;
       }
-      const holiday = parseInt(data.annualHoliday);
+      const holidayMatch = data.annualHoliday
+        ? String(data.annualHoliday).match(/[0-9]+/)
+        : null;
+      const holiday = holidayMatch ? parseInt(holidayMatch[0], 10) : NaN;
       if (!isNaN(holiday) && holiday > 0) {
         holidaySum += holiday;
         holidayCount++;
@@ -1659,7 +1664,8 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
         scatterChartData: scatterData,
       },
       market: {
-        avgSalary: salaryCount > 0 ? Math.round(salarySum / salaryCount) : "-",
+        avgSalary:
+          salaryCount > 0 ? Math.floor(salarySum / salaryCount / 10000) : "-",
         avgStartingSalary:
           startingSalaryCount > 0
             ? Math.round(startingSalarySum / startingSalaryCount)
@@ -3014,7 +3020,7 @@ const CompanyDataEditModal = ({
                     ? "border-rose-300 focus:border-rose-500 bg-rose-50 text-rose-900"
                     : "focus:border-indigo-500"
                 }`}
-                placeholder="例: 株式会社Tech"
+                placeholder="例: 〇〇株式会社"
                 value={newCompanyName}
                 onChange={handleNameChange}
                 autoFocus={!companyName}
@@ -3058,7 +3064,7 @@ const CompanyDataEditModal = ({
               <input
                 type="text"
                 className="w-full px-3 py-2 border rounded-lg text-sm outline-none focus:border-indigo-500"
-                placeholder="例: IT、メーカー"
+                placeholder="例: IT、営業"
                 value={data.industry}
                 onChange={(e) => handleChange("industry", e.target.value)}
               />
@@ -3101,12 +3107,12 @@ const CompanyDataEditModal = ({
             </div>
             <div>
               <label className="text-xs font-bold text-slate-500 mb-1 block">
-                ID番号
+                マイページID番号
               </label>
               <input
                 type="text"
                 className="w-full px-3 py-2 border rounded-lg text-sm outline-none focus:border-indigo-500"
-                placeholder="例: AA12345"
+                placeholder="例: AA12345..."
                 value={data.idNumber}
                 onChange={(e) => handleChange("idNumber", e.target.value)}
               />
@@ -3116,7 +3122,7 @@ const CompanyDataEditModal = ({
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 bg-slate-50/50 p-4 rounded-xl border border-slate-100">
             <div>
               <label className="text-xs font-bold text-slate-500 mb-1 block">
-                採用人数
+                採用人数 (名)
               </label>
               <div className="relative">
                 <Users
@@ -3126,7 +3132,7 @@ const CompanyDataEditModal = ({
                 <input
                   type="text"
                   className="w-full pl-7 pr-2 py-1.5 border rounded-md text-xs outline-none focus:border-indigo-500"
-                  placeholder="例: 50名"
+                  placeholder="例: 100"
                   value={data.hiringNumber}
                   onChange={(e) => handleChange("hiringNumber", e.target.value)}
                 />
@@ -3134,7 +3140,7 @@ const CompanyDataEditModal = ({
             </div>
             <div>
               <label className="text-xs font-bold text-slate-500 mb-1 block">
-                平均年収
+                平均年収 (万円)
               </label>
               <div className="relative">
                 <DollarSign
@@ -3144,7 +3150,7 @@ const CompanyDataEditModal = ({
                 <input
                   type="text"
                   className="w-full pl-7 pr-2 py-1.5 border rounded-md text-xs outline-none focus:border-indigo-500"
-                  placeholder="例: 800万"
+                  placeholder="例: 500"
                   value={data.avgSalary}
                   onChange={(e) => handleChange("avgSalary", e.target.value)}
                 />
@@ -3152,7 +3158,7 @@ const CompanyDataEditModal = ({
             </div>
             <div>
               <label className="text-xs font-bold text-slate-500 mb-1 block">
-                初任給
+                初任給 (円)
               </label>
               <div className="relative">
                 <DollarSign
@@ -3162,7 +3168,7 @@ const CompanyDataEditModal = ({
                 <input
                   type="text"
                   className="w-full pl-7 pr-2 py-1.5 border rounded-md text-xs outline-none focus:border-indigo-500"
-                  placeholder="例: 25万"
+                  placeholder="例: 250,000"
                   value={data.startingSalary}
                   onChange={(e) =>
                     handleChange("startingSalary", e.target.value)
@@ -3172,7 +3178,7 @@ const CompanyDataEditModal = ({
             </div>
             <div>
               <label className="text-xs font-bold text-slate-500 mb-1 block">
-                年間休日
+                年間休日 (日)
               </label>
               <div className="relative">
                 <CalendarCheck
@@ -3182,7 +3188,7 @@ const CompanyDataEditModal = ({
                 <input
                   type="text"
                   className="w-full pl-7 pr-2 py-1.5 border rounded-md text-xs outline-none focus:border-indigo-500"
-                  placeholder="例: 125日"
+                  placeholder="例: 125"
                   value={data.annualHoliday}
                   onChange={(e) =>
                     handleChange("annualHoliday", e.target.value)
@@ -3232,7 +3238,7 @@ const CompanyDataEditModal = ({
             </label>
             <textarea
               className="w-full px-3 py-2 border rounded-lg text-sm outline-none focus:border-indigo-500 min-h-[80px]"
-              placeholder="メモや特記事項..."
+              placeholder="メモや特記事項"
               value={data.note}
               onChange={(e) => handleChange("note", e.target.value)}
             />
@@ -5167,7 +5173,7 @@ const DraftEditor = ({
                         handleItemChange(idx, "answer", e.target.value)
                       }
                       onFocus={() => setActiveItemId(item.id)}
-                      placeholder="回答・内容..."
+                      placeholder="回答・内容"
                       isActive={isActive}
                       writingStyle={writingStyle}
                       checkNgWords={checkNgWords}
@@ -7937,7 +7943,7 @@ export default function App() {
                                 industry: formData.industry || cData.industry,
                               });
                             }}
-                            placeholder="例: 株式会社Tech"
+                            placeholder="例: 〇〇株式会社"
                           />
                           <div className="absolute right-1 top-1/2 -translate-y-1/2 flex gap-1">
                             {formData.recruitmentUrl && (
@@ -8002,7 +8008,7 @@ export default function App() {
                                   industry: e.target.value,
                                 })
                               }
-                              placeholder="例: IT、エンジニア"
+                              placeholder="例: IT、営業"
                             />
                           </div>
                         </>
@@ -8276,7 +8282,7 @@ export default function App() {
                                     if (!isMouseDownGlobal.current)
                                       setActiveQAId(qa.id);
                                   }}
-                                  placeholder="回答..."
+                                  placeholder="回答"
                                   isActive={isActive}
                                   charLimit={qa.charLimit}
                                   writingStyle={appSettings.writingStyle}
