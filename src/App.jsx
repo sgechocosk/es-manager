@@ -76,6 +76,7 @@ const STORAGE_KEY_SETTINGS = "ES_MANAGER_SETTINGS";
 const STORAGE_KEY_DATA = "ES_MANAGER_DATA";
 const STORAGE_KEY_VIEW_SETTINGS = "ES_MANAGER_VIEW_SETTINGS";
 const STORAGE_KEY_ACTIVITY_LOG = "ES_MANAGER_ACTIVITY_LOG";
+const STORAGE_KEY_WELCOME = "ES_MANAGER_HAS_SEEN_WELCOME";
 const HEADER_HEIGHT = "57px";
 
 const COMPLETED_STATUSES = ["提出済", "採用", "不採用"];
@@ -5192,6 +5193,77 @@ const DraftEditor = ({
   );
 };
 
+const WelcomeModal = ({ isOpen, onClose }) => {
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm flex flex-col items-center overflow-hidden animate-in zoom-in-95 duration-200 p-8">
+        <img
+          src="/favicon.png"
+          alt="ES Manager Icon"
+          className="w-16 h-16 rounded-2xl shadow-sm mb-6"
+        />
+
+        <h2 className="text-2xl font-black text-slate-800 mb-4 text-center">
+          ES Manager へようこそ！
+        </h2>
+
+        <p className="text-sm text-slate-600 text-center mb-6 leading-relaxed">
+          就職活動におけるエントリーシートを一元管理し、
+          <br />
+          作成を効率化するためのツールです。
+        </p>
+
+        <div className="w-full bg-slate-50 rounded-xl p-5 mb-8">
+          <ul className="space-y-3 text-sm text-slate-700 font-medium">
+            <li className="flex items-start gap-2">
+              <CheckCircle2
+                size={18}
+                className="text-emerald-500 shrink-0 mt-0.5"
+              />
+              <span>企業ごとのES進捗や提出期限の管理</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <CheckCircle2
+                size={18}
+                className="text-emerald-500 shrink-0 mt-0.5"
+              />
+              <span>過去の回答の簡単な検索と再利用</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <CheckCircle2
+                size={18}
+                className="text-emerald-500 shrink-0 mt-0.5"
+              />
+              <span>AIを活用した回答の推敲・フィードバック</span>
+            </li>
+          </ul>
+        </div>
+
+        <button
+          onClick={onClose}
+          className="w-full py-3 text-base font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-md transition-all active:scale-95"
+        >
+          はじめる
+        </button>
+      </div>
+    </div>,
+    document.body,
+  );
+};
+
 // --- Default Data ---
 const DEFAULT_FORM_DATA = {
   company: "",
@@ -5207,6 +5279,13 @@ const DEFAULT_FORM_DATA = {
 
 export default function App() {
   // --- State ---
+  const [isWelcomeModalOpen, setIsWelcomeModalOpen] = useState(() => {
+    return !localStorage.getItem(STORAGE_KEY_WELCOME);
+  });
+  const handleCloseWelcomeModal = () => {
+    localStorage.setItem(STORAGE_KEY_WELCOME, "true");
+    setIsWelcomeModalOpen(false);
+  };
   const [entries, setEntries] = useState([]);
   const [drafts, setDrafts] = useState([]);
   const [view, setView] = useState("list");
@@ -8342,6 +8421,11 @@ export default function App() {
         }
         onSave={handleSaveCompanyData}
         existingCompanies={companyDataList}
+      />
+
+      <WelcomeModal
+        isOpen={isWelcomeModalOpen}
+        onClose={handleCloseWelcomeModal}
       />
 
       {toast && (
