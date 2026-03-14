@@ -3978,7 +3978,12 @@ const ReferenceSelectorModal = ({
   if (!isOpen) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm animate-in fade-in">
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm animate-in fade-in"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
       <div className="bg-white rounded-xl shadow-xl w-full max-w-5xl h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95">
         <div className="px-5 py-3 border-b flex justify-between items-center bg-slate-50 rounded-t-xl shrink-0">
           <h3 className="font-bold text-slate-700 flex items-center gap-2 text-sm">
