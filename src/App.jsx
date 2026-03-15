@@ -83,6 +83,8 @@ const DEFAULT_TUTORIAL_STATE = {
   hasSeenWelcome: false,
   hasClickedNewEntry: false,
   hasSeenFormTutorial: false,
+  hasCreatedFirstData: false,
+  hasSeenFeatureUnlockTooltip: false,
 };
 
 const COMPLETED_STATUSES = ["提出済", "採用", "不採用"];
@@ -5315,6 +5317,14 @@ export default function App() {
     );
   });
   const [formTutorialStep, setFormTutorialStep] = useState(0);
+  const [showFeatureUnlockTooltip, setShowFeatureUnlockTooltip] = useState(
+    () => {
+      return (
+        tutorialProgress.hasCreatedFirstData &&
+        !tutorialProgress.hasSeenFeatureUnlockTooltip
+      );
+    },
+  );
 
   const handleNextFormTutorial = () => {
     if (formTutorialStep < 4) {
@@ -5322,6 +5332,12 @@ export default function App() {
     } else {
       setFormTutorialStep(0);
       updateTutorialProgress({ hasSeenFormTutorial: true });
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      setTimeout(() => {
+        document
+          .getElementById("company-input")
+          ?.focus({ preventScroll: true });
+      }, 100);
     }
   };
 
@@ -5332,15 +5348,15 @@ export default function App() {
     },
     2: {
       title: "ES回答の作成",
-      text: "質問内容と回答を入力します。文字数制限の管理やAI機能、タグによる分類が利用できます。",
+      text: "質問内容と回答を入力します。制限文字数やAI機能、タグによる分類が利用できます。",
     },
     3: {
       title: "質問の追加",
-      text: "複数の設問がある場合は、ここから入力枠を追加することができます。",
+      text: "複数の設問がある場合は、ここから追加することができます。",
     },
     4: {
       title: "保存して完了",
-      text: "入力が終わったら保存します。後から何度でも再開・編集が可能です。",
+      text: "入力が完了したら保存しましょう。何度でも再開や編集が可能です。",
     },
   };
 
@@ -5399,10 +5415,26 @@ export default function App() {
       }, 400);
     }
   };
+
+  const handleCloseFeatureUnlockTooltip = (e) => {
+    if (e) e.stopPropagation();
+    setShowFeatureUnlockTooltip(false);
+    updateTutorialProgress({ hasSeenFeatureUnlockTooltip: true });
+  };
+
   const [entries, setEntries] = useState([]);
   const [drafts, setDrafts] = useState([]);
   const [view, setView] = useState("list");
   const [viewMode, setViewMode] = useState("company");
+
+  useEffect(() => {
+    if (
+      showFeatureUnlockTooltip &&
+      (view !== "list" || viewMode !== "company")
+    ) {
+      handleCloseFeatureUnlockTooltip();
+    }
+  }, [view, viewMode, showFeatureUnlockTooltip]);
   const [editingId, setEditingId] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -6735,6 +6767,17 @@ export default function App() {
           } else {
             setActivityLog({});
           }
+
+          updateTutorialProgress({
+            hasSeenWelcome: true,
+            hasClickedNewEntry: true,
+            hasSeenFormTutorial: true,
+            hasCreatedFirstData: true,
+            hasSeenFeatureUnlockTooltip: true,
+          });
+          setIsWelcomeModalOpen(false);
+          setShowNewEntryTooltip(false);
+          setShowFeatureUnlockTooltip(false);
         }
       } catch (error) {
         console.error(error);
@@ -6835,6 +6878,38 @@ export default function App() {
     });
   };
 
+  const hasData =
+    entries.length > 0 ||
+    drafts.length > 0 ||
+    Object.keys(companyData).length > 0;
+
+  const showAllFeatures = hasData || tutorialProgress.hasCreatedFirstData;
+
+  useEffect(() => {
+    if (
+      view === "list" &&
+      hasData &&
+      (!tutorialProgress.hasClickedNewEntry ||
+        !tutorialProgress.hasCreatedFirstData)
+    ) {
+      updateTutorialProgress({
+        hasClickedNewEntry: true,
+        hasSeenFormTutorial: true,
+        hasCreatedFirstData: true,
+      });
+      setShowNewEntryTooltip(false);
+      if (!tutorialProgress.hasSeenFeatureUnlockTooltip) {
+        setShowFeatureUnlockTooltip(true);
+      }
+    }
+  }, [
+    view,
+    hasData,
+    tutorialProgress.hasClickedNewEntry,
+    tutorialProgress.hasCreatedFirstData,
+    tutorialProgress.hasSeenFeatureUnlockTooltip,
+  ]);
+
   // --- Render ---
   return (
     <div
@@ -6861,7 +6936,7 @@ export default function App() {
         }
       }}
     >
-      <header className="bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-0 z-50 px-4 py-3 shadow-sm shrink-0">
+      <header className="bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-0 z-50 px-4 py-3 shadow-sm shrink-0 relative">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
           <div className="w-full sm:w-auto flex justify-between items-center">
             <div
@@ -6940,13 +7015,17 @@ export default function App() {
               </div>
 
               <div className="flex items-center gap-1 ml-auto shrink-0">
-                <button
-                  onClick={startNewMemo}
-                  className="bg-orange-500 hover:bg-orange-600 text-white p-2 rounded-lg sm:px-4 flex items-center gap-1.5 shadow-md transition-all active:scale-95 ml-2 shrink-0"
-                >
-                  <StickyNote size={18} />
-                  <span className="hidden md:inline font-medium">メモ作成</span>
-                </button>
+                {showAllFeatures && (
+                  <button
+                    onClick={startNewMemo}
+                    className="bg-orange-500 hover:bg-orange-600 text-white p-2 rounded-lg sm:px-4 flex items-center gap-1.5 shadow-md transition-all active:scale-95 ml-2 shrink-0"
+                  >
+                    <StickyNote size={18} />
+                    <span className="hidden md:inline font-medium">
+                      メモ作成
+                    </span>
+                  </button>
+                )}
 
                 <div className="relative flex items-center">
                   <button
@@ -7057,52 +7136,56 @@ export default function App() {
               </button>
             ))}
 
-            <div className="w-px h-6 bg-slate-300 mx-1 shrink-0"></div>
+            {showAllFeatures && (
+              <>
+                <div className="w-px h-6 bg-slate-300 mx-1 shrink-0"></div>
 
-            <button
-              onClick={() => {
-                setViewMode("company_data");
-                scrollToTop("smooth");
-              }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap border ${
-                viewMode === "company_data"
-                  ? "bg-indigo-600 text-white shadow-sm"
-                  : "bg-white text-slate-500 border border-slate-200 hover:bg-slate-50"
-              }`}
-            >
-              <Database size={14} />
-              企業データ
-            </button>
+                <button
+                  onClick={() => {
+                    setViewMode("company_data");
+                    scrollToTop("smooth");
+                  }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap border ${
+                    viewMode === "company_data"
+                      ? "bg-indigo-600 text-white shadow-sm"
+                      : "bg-white text-slate-500 border border-slate-200 hover:bg-slate-50"
+                  }`}
+                >
+                  <Database size={14} />
+                  企業データ
+                </button>
 
-            <button
-              onClick={() => {
-                setViewMode("calendar");
-                scrollToTop("smooth");
-              }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap border ${
-                viewMode === "calendar"
-                  ? "bg-indigo-600 text-white shadow-sm"
-                  : "bg-white text-slate-500 border border-slate-200 hover:bg-slate-50"
-              }`}
-            >
-              <Calendar size={14} />
-              カレンダー
-            </button>
+                <button
+                  onClick={() => {
+                    setViewMode("calendar");
+                    scrollToTop("smooth");
+                  }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap border ${
+                    viewMode === "calendar"
+                      ? "bg-indigo-600 text-white shadow-sm"
+                      : "bg-white text-slate-500 border border-slate-200 hover:bg-slate-50"
+                  }`}
+                >
+                  <Calendar size={14} />
+                  カレンダー
+                </button>
 
-            <button
-              onClick={() => {
-                setViewMode("statistics");
-                scrollToTop("smooth");
-              }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap border ${
-                viewMode === "statistics"
-                  ? "bg-indigo-600 text-white shadow-sm"
-                  : "bg-white text-slate-500 border border-slate-200 hover:bg-slate-50"
-              }`}
-            >
-              <BarChart3 size={14} />
-              統計・分析
-            </button>
+                <button
+                  onClick={() => {
+                    setViewMode("statistics");
+                    scrollToTop("smooth");
+                  }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap border ${
+                    viewMode === "statistics"
+                      ? "bg-indigo-600 text-white shadow-sm"
+                      : "bg-white text-slate-500 border border-slate-200 hover:bg-slate-50"
+                  }`}
+                >
+                  <BarChart3 size={14} />
+                  統計・分析
+                </button>
+              </>
+            )}
           </div>
         )}
       </header>
@@ -7185,21 +7268,40 @@ export default function App() {
                       <div className="text-center text-slate-400 py-10">
                         エントリーシートがありません。
                         <br />
-                        右上のアップロードボタンからJSONを読み込むか、新規作成してください。
+                        新規作成するか、右上のアップロードボタンからJSONを読み込んでください。
                       </div>
                     )}
-                    {processedCompanyEntries.map((entry) => {
+                    {processedCompanyEntries.map((entry, index) => {
                       const cData = companyData[entry.company] || {};
                       return (
-                        <ESEntryDisplay
-                          key={entry.id}
-                          entry={{ ...entry, industry: cData.industry }}
-                          onEdit={startEdit}
-                          onDelete={handleDelete}
-                          companyUrl={cData.myPageUrl}
-                          highlight={searchQuery}
-                          appSettings={appSettings}
-                        />
+                        <div key={entry.id} className="relative">
+                          <ESEntryDisplay
+                            entry={{ ...entry, industry: cData.industry }}
+                            onEdit={startEdit}
+                            onDelete={handleDelete}
+                            companyUrl={cData.myPageUrl}
+                            highlight={searchQuery}
+                            appSettings={appSettings}
+                          />
+                          {index === 0 && showFeatureUnlockTooltip && (
+                            <div className="absolute top-full left-1/2 -translate-x-1/2 mt-3 w-max bg-white border border-slate-200 rounded-xl shadow-xl p-4 z-[100] animate-in fade-in slide-in-from-top-2 duration-500 cursor-default">
+                              <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-white border-t border-l border-slate-200 transform rotate-45"></div>
+                              <button
+                                onClick={handleCloseFeatureUnlockTooltip}
+                                className="absolute top-2 right-2 z-20 text-slate-400 hover:text-slate-600 p-1 transition-colors"
+                              >
+                                <X size={14} />
+                              </button>
+                              <div className="relative z-10 pr-4 pt-0.5">
+                                <p className="text-sm font-bold text-slate-700 leading-relaxed text-center whitespace-nowrap">
+                                  素晴らしいです！
+                                  <br />
+                                  この画面で確認できるようになりました！
+                                </p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       );
                     })}
                   </div>
@@ -8009,6 +8111,7 @@ export default function App() {
                         </label>
                         <div className="relative mt-1">
                           <input
+                            id="company-input"
                             className="w-full pl-3 pr-16 py-2 border rounded-lg outline-none focus:border-indigo-500"
                             value={formData.company}
                             autoFocus={!editingId && formTutorialStep !== 1}
@@ -8246,7 +8349,11 @@ export default function App() {
                                 </div>
 
                                 <div
-                                  className={`flex items-center gap-3 overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] shrink-0 ml-auto pointer-events-auto ${
+                                  className={`flex items-center gap-3 overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] shrink-0 ml-auto ${
+                                    formTutorialStep > 0
+                                      ? "pointer-events-none"
+                                      : "pointer-events-auto"
+                                  } ${
                                     isActive
                                       ? "max-w-[400px] opacity-100 translate-x-0"
                                       : "max-w-0 opacity-0 translate-x-4"
