@@ -86,6 +86,8 @@ const DEFAULT_TUTORIAL_STATE = {
   hasCreatedFirstData: false,
   hasSeenFeatureUnlockTooltip: false,
   hasSeenCompanyDataTutorial: false,
+  hasCreatedFirstMemo: false,
+  hasSeenMemoTooltip: false,
 };
 
 const COMPLETED_STATUSES = ["提出済", "採用", "不採用"];
@@ -5237,9 +5239,7 @@ const WelcomeModal = ({ isOpen, onClose }) => {
         </h2>
 
         <p className="text-sm text-slate-600 text-center mb-6 leading-relaxed">
-          就職活動におけるエントリーシートを一元管理し、
-          <br />
-          作成を効率化するためのツールです。
+          就職活動におけるエントリーシートを一元管理し、作成を効率化するためのツールです。
         </p>
 
         <div className="w-full bg-slate-50 rounded-xl p-5 mb-8">
@@ -5327,6 +5327,19 @@ export default function App() {
       );
     },
   );
+
+  const [showMemoTooltip, setShowMemoTooltip] = useState(() => {
+    return (
+      tutorialProgress.hasCreatedFirstMemo &&
+      !tutorialProgress.hasSeenMemoTooltip
+    );
+  });
+
+  const handleCloseMemoTooltip = (e) => {
+    if (e) e.stopPropagation();
+    setShowMemoTooltip(false);
+    updateTutorialProgress({ hasSeenMemoTooltip: true });
+  };
 
   const handleNextFormTutorial = () => {
     if (formTutorialStep < 4) {
@@ -5437,6 +5450,23 @@ export default function App() {
       handleCloseFeatureUnlockTooltip();
     }
   }, [view, viewMode, showFeatureUnlockTooltip]);
+
+  useEffect(() => {
+    if (showMemoTooltip && (view !== "list" || viewMode !== "drafts")) {
+      handleCloseMemoTooltip();
+    }
+  }, [view, viewMode, showMemoTooltip]);
+
+  useEffect(() => {
+    if (drafts.length > 0 && !tutorialProgress.hasCreatedFirstMemo) {
+      updateTutorialProgress({
+        hasCreatedFirstMemo: true,
+        hasSeenMemoTooltip: true,
+      });
+      setShowMemoTooltip(false);
+    }
+  }, [drafts.length, tutorialProgress.hasCreatedFirstMemo]);
+
   const [editingId, setEditingId] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -6257,6 +6287,7 @@ export default function App() {
         );
         if (!isConfirmed) return;
       }
+      setViewMode("drafts");
       resetForm(behavior);
       return;
     }
@@ -6309,6 +6340,11 @@ export default function App() {
         return [newDraft, ...prev];
       }
     });
+
+    if (!tutorialProgress.hasCreatedFirstMemo) {
+      updateTutorialProgress({ hasCreatedFirstMemo: true });
+      setShowMemoTooltip(true);
+    }
 
     setToast("保存しました");
     setTimeout(() => setToast(null), 3000);
@@ -6483,6 +6519,9 @@ export default function App() {
         });
       }
 
+      setToast("保存しました");
+      setTimeout(() => setToast(null), 3000);
+
       if (closeAfterSave) {
         resetForm();
       } else {
@@ -6490,9 +6529,6 @@ export default function App() {
         const newFormState = { ...entryData };
         setFormData(newFormState);
         setInitialFormState(JSON.parse(JSON.stringify(newFormState)));
-
-        setToast("保存しました");
-        setTimeout(() => setToast(null), 3000);
       }
     } catch (error) {
       console.error(error);
@@ -7262,15 +7298,34 @@ export default function App() {
                         );
                       }
 
-                      return filteredDrafts.map((draft) => (
-                        <DraftDisplay
-                          key={draft.id}
-                          draft={draft}
-                          onEdit={startEdit}
-                          onDelete={handleDelete}
-                          highlight={searchQuery}
-                          appSettings={appSettings}
-                        />
+                      return filteredDrafts.map((draft, index) => (
+                        <div key={draft.id} className="relative">
+                          <DraftDisplay
+                            draft={draft}
+                            onEdit={startEdit}
+                            onDelete={handleDelete}
+                            highlight={searchQuery}
+                            appSettings={appSettings}
+                          />
+                          {index === 0 && showMemoTooltip && (
+                            <div className="absolute top-full left-1/2 -translate-x-1/2 mt-3 w-max bg-white border border-slate-200 rounded-xl shadow-xl p-4 z-[100] animate-in fade-in slide-in-from-top-2 duration-500 cursor-default">
+                              <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-white border-t border-l border-slate-200 transform rotate-45"></div>
+                              <button
+                                onClick={handleCloseMemoTooltip}
+                                className="absolute top-2 right-2 z-20 text-slate-400 hover:text-slate-600 p-1 transition-colors"
+                              >
+                                <X size={14} />
+                              </button>
+                              <div className="relative z-10 pr-4 pt-0.5">
+                                <p className="text-sm font-bold text-slate-700 leading-relaxed text-center whitespace-nowrap">
+                                  メモはエントリーシートとは別に保存されます！
+                                  <br />
+                                  左上の「メモ」タブからいつでも確認や編集ができます。
+                                </p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       ));
                     })()}
                   </div>
