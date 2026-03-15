@@ -85,6 +85,7 @@ const DEFAULT_TUTORIAL_STATE = {
   hasSeenFormTutorial: false,
   hasCreatedFirstData: false,
   hasSeenFeatureUnlockTooltip: false,
+  hasSeenCompanyDataTutorial: false,
 };
 
 const COMPLETED_STATUSES = ["提出済", "採用", "不採用"];
@@ -120,7 +121,7 @@ const COMPANY_DATA_COLUMNS = [
   { id: "startingSalary", label: "初任給", minWidth: "100px" },
   { id: "annualHoliday", label: "年間休日", minWidth: "100px" },
   { id: "selectionFlow", label: "選考フロー", minWidth: "350px" },
-  { id: "idNumber", label: "ID番号", minWidth: "100px" },
+  { id: "idNumber", label: "マイページID番号", minWidth: "100px" },
   { id: "note", label: "備考", minWidth: "200px" },
 ];
 
@@ -833,10 +834,10 @@ const CalendarView = ({ entries, onEdit, onAdd }) => {
           {isColumnSelectorOpen && (
             <>
               <div
-                className="fixed inset-0 z-10"
+                className="fixed inset-0 z-30"
                 onClick={() => setIsColumnSelectorOpen(false)}
               />
-              <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-slate-200 rounded-lg shadow-lg z-20 p-2 animate-in fade-in zoom-in-95 duration-200">
+              <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-slate-200 rounded-lg shadow-lg z-40 p-2 animate-in fade-in zoom-in-95 duration-200">
                 <div className="text-xs font-bold text-slate-500 px-2 py-1 mb-1 border-b border-slate-100">
                   表示する項目を選択
                 </div>
@@ -3553,26 +3554,6 @@ const SettingsModal = ({
           </button>
         </div>
         <div className="p-6 space-y-6 overflow-y-auto">
-          {/* API Key Settings */}
-          <div>
-            <h4 className="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
-              <Key size={16} /> APIキー設定
-            </h4>
-            <p className="text-xs text-slate-500 mb-2 leading-relaxed">
-              Gemini
-              APIキーを入力してください。キーはブラウザにのみ保存されます。
-            </p>
-            <input
-              type="password"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              placeholder="AIzaSy..."
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all font-mono text-sm"
-            />
-          </div>
-
-          <hr className="border-slate-100" />
-
           {/* Grammar Highlighting Settings */}
           <div>
             <h4 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
@@ -3681,12 +3662,32 @@ const SettingsModal = ({
                       一覧画面にも適用する
                     </span>
                     <span className="block text-xs text-slate-500 mt-1 leading-relaxed">
-                      リスト表示や参照パネルでも、校正箇所をハイライトします。
+                      リスト表示や参照パネルでも、校正箇所を警告します。
                     </span>
                   </div>
                 </label>
               </div>
             </div>
+          </div>
+
+          <hr className="border-slate-100" />
+
+          {/* API Key Settings */}
+          <div>
+            <h4 className="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+              <Key size={16} /> APIキー設定
+            </h4>
+            <p className="text-xs text-slate-500 mb-2 leading-relaxed">
+              Gemini
+              APIキーを入力してください。キーはブラウザにのみ保存されます。
+            </p>
+            <input
+              type="password"
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              placeholder="AIzaSy..."
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all font-mono text-sm"
+            />
           </div>
 
           <hr className="border-slate-100" />
@@ -3773,7 +3774,7 @@ const SettingsModal = ({
                   プロンプト出力モードを利用する
                 </span>
                 <span className="block text-xs text-slate-500 mt-1 leading-relaxed">
-                  有効にすると、APIキーが設定されている場合に、生成AIへのプロンプトを送信せずに出力する機能が利用できるようになります。
+                  APIキーが設定されている場合、AIへのプロンプトを送信せずに出力する機能が利用できるようになります。
                 </span>
               </div>
             </label>
@@ -3796,7 +3797,7 @@ const SettingsModal = ({
                   思考中にモデル名を表示する
                 </span>
                 <span className="block text-xs text-slate-500 mt-1 leading-relaxed">
-                  有効にすると、AIの思考中に利用しているモデル名を表示します。
+                  AIの思考中に利用しているモデル名を表示します。
                 </span>
               </div>
             </label>
@@ -3818,15 +3819,15 @@ const SettingsModal = ({
               />
               <div className="flex-1">
                 <span className="block text-sm font-bold text-slate-700">
-                  ブラウザにデータを保存する
+                  オートセーブを有効にする
                 </span>
                 <span className="block text-xs text-slate-500 mt-1 leading-relaxed">
-                  有効にすると、入力したデータがブラウザ(localStorage)に自動的に保存され、次回起動時に復元されます。
+                  入力されたデータを自動でブラウザに保存します。セキュリティ保護のため、共用PCなどではチェックを入れないでください。
                 </span>
                 {!autoSave && (
                   <span className="block text-xs text-amber-600 mt-1.5 flex items-center gap-1 font-medium">
                     <AlertTriangle size={12} />
-                    OFFの場合、ブラウザを閉じるとデータは消えます。
+                    OFFの場合、ブラウザを閉じるとデータは削除されます。
                   </span>
                 )}
                 {autoSave && (
@@ -4202,6 +4203,7 @@ const AIAssistant = ({
   showPromptMode = true,
   showModelName = false,
   isActive = true,
+  appSettings,
 }) => {
   const hasApiKey = localStorage.getItem("GEMINI_API_KEY");
   const [loading, setLoading] = useState(false);
@@ -4675,7 +4677,7 @@ ${userPrompt.replace(/^[ \t]+/gm, "")}`;
         entries={allEntries}
         onSelect={handleSelectReferences}
         currentQuestion={question}
-        appSettings={undefined}
+        appSettings={appSettings}
         excludedUniqueId={entryId && qaId ? `${entryId}_${qaId}` : null}
       />
     </div>
@@ -5632,8 +5634,21 @@ export default function App() {
           setEntries(migratedEntries);
           setDrafts(loadedDrafts);
           setCompanyData(loadedCompanyData);
-          if (hasMigration) {
-            console.log("Migrated industry data to companyData");
+
+          const hasLoadedData =
+            migratedEntries.length > 0 ||
+            loadedDrafts.length > 0 ||
+            Object.keys(loadedCompanyData).length > 0;
+
+          if (hasLoadedData) {
+            updateTutorialProgress({
+              hasClickedNewEntry: true,
+              hasSeenFormTutorial: true,
+              hasCreatedFirstData: true,
+              hasSeenFeatureUnlockTooltip: true,
+            });
+            setShowFeatureUnlockTooltip(false);
+            setShowNewEntryTooltip(false);
           }
 
           if (parsed.activityLog) {
@@ -7841,10 +7856,10 @@ export default function App() {
                         {isColumnSelectorOpen && (
                           <>
                             <div
-                              className="fixed inset-0 z-10"
+                              className="fixed inset-0 z-30"
                               onClick={() => setIsColumnSelectorOpen(false)}
                             />
-                            <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-slate-200 rounded-lg shadow-lg z-20 p-2 animate-in fade-in zoom-in-95 duration-200">
+                            <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-slate-200 rounded-lg shadow-lg z-40 p-2 animate-in fade-in zoom-in-95 duration-200">
                               <div className="text-xs font-bold text-slate-500 px-2 py-1 mb-1 border-b border-slate-100">
                                 表示する項目を選択
                               </div>
@@ -7873,6 +7888,36 @@ export default function App() {
                         )}
                       </div>
                     </div>
+
+                    {!tutorialProgress.hasSeenCompanyDataTutorial && (
+                      <div className="m-4 p-4 bg-indigo-50 border border-indigo-100 rounded-xl relative animate-in slide-in-from-top-2">
+                        <button
+                          onClick={() =>
+                            updateTutorialProgress({
+                              hasSeenCompanyDataTutorial: true,
+                            })
+                          }
+                          className="absolute top-3 right-3 text-indigo-400 hover:text-indigo-600 transition-colors"
+                        >
+                          <X size={18} />
+                        </button>
+                        <div className="flex gap-3">
+                          <div className="mt-0.5 text-indigo-600 shrink-0">
+                            <Info size={20} />
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-bold text-indigo-900 mb-1">
+                              ここでは企業データを管理することができます
+                            </h4>
+                            <p className="text-xs text-indigo-700 leading-relaxed">
+                              ES作成時に自動で追加され、企業の詳細な情報は編集ボタンで選択して変更することができます。
+                              <br />
+                              次回以降はここに登録されている企業名をESに入力することで、企業データを紐づけることができます。
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
                     <div className="overflow-x-auto pb-2">
                       <table className="w-full text-sm text-left border-collapse">
@@ -8529,6 +8574,7 @@ export default function App() {
                                   showPromptMode={appSettings.showPromptMode}
                                   showModelName={appSettings.showModelName}
                                   isActive={isActive}
+                                  appSettings={appSettings}
                                 />
                               </div>
 
