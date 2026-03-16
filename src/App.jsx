@@ -1029,21 +1029,21 @@ const CalendarView = ({ entries, onEdit, onAdd }) => {
       {(selectedDateDetails || isClosing) && (
         <>
           <style>{`
-        @keyframes slideUpSmooth {
-          from { transform: translateY(100%); opacity: 0; }
-          to { transform: translateY(0); opacity: 1; }
-        }
-        @keyframes slideDownSmooth {
-          from { transform: translateY(0); opacity: 1; }
-          to { transform: translateY(100%); opacity: 0; }
-        }
-        .animate-slide-up-smooth {
-          animation: slideUpSmooth 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-        }
-        .animate-slide-down-smooth {
-          animation: slideDownSmooth 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-        }
-      `}</style>
+            @keyframes slideUpSmooth {
+              from { transform: translateY(100%); opacity: 0; }
+              to { transform: translateY(0); opacity: 1; }
+            }
+            @keyframes slideDownSmooth {
+              from { transform: translateY(0); opacity: 1; }
+              to { transform: translateY(100%); opacity: 0; }
+            }
+            .animate-slide-up-smooth {
+              animation: slideUpSmooth 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            }
+            .animate-slide-down-smooth {
+              animation: slideDownSmooth 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            }
+          `}</style>
           <div className="fixed bottom-0 left-4 right-4 sm:left-8 sm:right-8 md:left-1/2 md:w-full md:max-w-3xl md:-translate-x-1/2 z-50">
             <div
               className={`max-h-[min(60vh,500px)] w-full bg-white rounded-t-[32px] shadow-[0_-15px_50px_-10px_rgba(0,0,0,0.15)] border border-slate-200 border-b-0 flex flex-col transition-all duration-300 ease-in-out ${isClosing ? "animate-slide-down-smooth" : "animate-slide-up-smooth"}`}
@@ -8226,6 +8226,11 @@ export default function App() {
                           企業名 <span className="text-red-500">*</span>
                         </label>
                         <div className="relative mt-1">
+                          <style>{`
+                            #company-input::-webkit-calendar-picker-indicator {
+                              display: none !important;
+                            }
+                          `}</style>
                           <input
                             id="company-input"
                             className="w-full pl-3 pr-16 py-2 border rounded-lg outline-none focus:border-indigo-500"
@@ -8245,7 +8250,15 @@ export default function App() {
                               });
                             }}
                             placeholder="例: 〇〇株式会社"
+                            list="es-company-suggestions"
                           />
+                          <datalist id="es-company-suggestions">
+                            {companyNames
+                              .filter((name) => name !== formData.company)
+                              .map((name) => (
+                                <option key={name} value={name} />
+                              ))}
+                          </datalist>
                           <div className="absolute right-1 top-1/2 -translate-y-1/2 flex gap-1">
                             {formData.recruitmentUrl && (
                               <a
