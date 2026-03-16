@@ -5054,12 +5054,26 @@ const DraftEditor = ({
 
   const handleTitleChange = (e) => {
     const val = e.target.value;
-    const isCompanySelect = companyNames.includes(val);
+    const inputType = e.nativeEvent.inputType;
+
+    const isTyping =
+      inputType === "insertText" ||
+      inputType === "insertCompositionText" ||
+      inputType === "deleteContentBackward" ||
+      inputType === "deleteContentForward";
+
     let newTitle = val;
 
-    if (isCompanySelect) {
+    if (!isTyping && companyNames.includes(val)) {
       const now = new Date();
       newTitle = `${now.getMonth() + 1}月${now.getDate()}日の${val}のメモ`;
+
+      setTimeout(() => {
+        const nextInput = document.querySelector(
+          'input[placeholder="質問・項目"]',
+        );
+        if (nextInput) nextInput.focus();
+      }, 0);
     }
     onChange({ ...data, title: newTitle });
   };
@@ -5123,9 +5137,11 @@ const DraftEditor = ({
               list="company-list-suggestions"
             />
             <datalist id="company-list-suggestions">
-              {companyNames.map((name) => (
-                <option key={name} value={name} />
-              ))}
+              {companyNames
+                .filter((name) => name !== data.title)
+                .map((name) => (
+                  <option key={name} value={name} />
+                ))}
             </datalist>
           </div>
           <div className="flex items-center gap-2">
