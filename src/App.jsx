@@ -8435,7 +8435,7 @@ export default function App() {
                                 setActiveQAId(qa.id);
                               }}
                               className={`relative rounded-xl border transition-all duration-500 ease-in-out px-4 pt-2 pb-3 ${
-                                activeTagDropdownId === qa.id ? "z-50" : "z-10"
+                                activeTagDropdownId === qa.id ? "z-40" : "z-10"
                               } ${
                                 isActive
                                   ? "bg-slate-50 shadow-sm border-indigo-200 ring-1 ring-indigo-200"
