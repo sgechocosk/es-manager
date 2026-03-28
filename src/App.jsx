@@ -7356,7 +7356,7 @@ export default function App() {
 
                 {/* View: Company Group */}
                 {viewMode === "company" && (
-                  <div className="grid gap-6">
+                  <div className="space-y-6">
                     {processedCompanyEntries.length === 0 && (
                       <div className="text-center text-slate-400 py-10">
                         エントリーシートがありません。
