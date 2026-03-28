@@ -7271,7 +7271,7 @@ export default function App() {
             isRefPanelOpen && !isMemoMode ? "mr-0 lg:mr-96" : "mr-0"
           }`}
         >
-          <div className="max-w-5xl mx-auto pb-20">
+          <div className="max-w-5xl mx-auto">
             {view === "list" ? (
               <div className="space-y-8">
                 {/* View: Drafts */}
@@ -7402,7 +7402,7 @@ export default function App() {
 
                 {/* View: Status Group */}
                 {viewMode === "status" && (
-                  <div className="pb-24 relative">
+                  <div className="relative">
                     {Object.keys(entriesByStatus).length > 0 && (
                       <div
                         onMouseEnter={() => {
@@ -7514,7 +7514,7 @@ export default function App() {
                           <div
                             key={status}
                             id={`status-section-${status}`}
-                            className={`bg-slate-50/50 rounded-xl border border-slate-200 scroll-mt-40 sm:scroll-mt-32 transition-all duration-300 ease-in-out px-4 ${
+                            className={`bg-slate-50/50 rounded-xl border border-slate-200 scroll-mt-40 sm:scroll-mt-32 transition-all duration-300 ease-in-out px-4 last:mb-0 ${
                               !isCollapsed ? "py-4 mb-8" : "py-3 mb-3"
                             }`}
                           >
@@ -7588,73 +7588,7 @@ export default function App() {
                           <div
                             key={status}
                             id={`status-section-${status}`}
-                            className={`bg-slate-50/50 rounded-xl border border-slate-200 scroll-mt-40 sm:scroll-mt-32 transition-all duration-300 ease-in-out px-4 ${
-                              !isCollapsed ? "py-4 mb-8" : "py-3 mb-3"
-                            }`}
-                          >
-                            <div
-                              className={`flex items-center justify-between transition-[margin] duration-300 ease-in-out ${!isCollapsed ? "mb-4" : "mb-0"}`}
-                            >
-                              <h3 className="text-sm font-bold text-slate-600 px-1 flex items-center gap-2">
-                                {status}
-                                <span className="text-xs text-slate-400 font-normal">
-                                  {entries.length}社
-                                </span>
-                              </h3>
-                              <button
-                                onClick={() => toggleStatusCollapse(status)}
-                                className="text-slate-400 hover:text-slate-600 px-1 transition-transform"
-                              >
-                                {isCollapsed ? (
-                                  <ChevronDown size={18} />
-                                ) : (
-                                  <ChevronUp size={18} />
-                                )}
-                              </button>
-                            </div>
-                            {!isCollapsed && (
-                              <div className="space-y-6">
-                                {entries.map((entry) => {
-                                  const cData =
-                                    companyData[entry.company] || {};
-                                  return (
-                                    <ESEntryDisplay
-                                      key={entry.id}
-                                      entry={{
-                                        ...entry,
-                                        industry: cData.industry,
-                                      }}
-                                      onEdit={startEdit}
-                                      onDelete={handleDelete}
-                                      companyUrl={cData.myPageUrl}
-                                      appSettings={appSettings}
-                                    />
-                                  );
-                                })}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    {Object.keys(entriesByStatus)
-                      .filter(
-                        (s) =>
-                          ![
-                            "未提出",
-                            "作成中",
-                            "提出済",
-                            "採用",
-                            "不採用",
-                          ].includes(s),
-                      )
-                      .map((status) => {
-                        const entries = entriesByStatus[status];
-                        const isCollapsed = collapsedStatuses[status];
-                        return (
-                          <div
-                            key={status}
-                            id={`status-section-${status}`}
-                            className={`bg-slate-50/50 rounded-xl border border-slate-200 scroll-mt-40 sm:scroll-mt-32 transition-all duration-300 ease-in-out px-4 ${
+                            className={`bg-slate-50/50 rounded-xl border border-slate-200 scroll-mt-40 sm:scroll-mt-32 transition-all duration-300 ease-in-out px-4 last:mb-0 ${
                               !isCollapsed ? "py-4 mb-8" : "py-3 mb-3"
                             }`}
                           >
@@ -7732,7 +7666,7 @@ export default function App() {
 
                 {/* View: Tag Group */}
                 {viewMode === "tag" && (
-                  <div className="pb-24 relative">
+                  <div className="relative">
                     {Object.keys(tagGroups).length > 0 && (
                       <div
                         onMouseEnter={() => {
@@ -7825,7 +7759,7 @@ export default function App() {
                         <div
                           key={tagName}
                           id={`tag-section-${tagName}`}
-                          className={`bg-slate-50/50 rounded-xl border border-slate-200 scroll-mt-40 sm:scroll-mt-32 transition-all duration-300 ease-in-out px-4 ${
+                          className={`bg-slate-50/50 rounded-xl border border-slate-200 scroll-mt-40 sm:scroll-mt-32 transition-all duration-300 ease-in-out px-4 last:mb-0 ${
                             !isCollapsed ? "py-4 mb-8" : "py-3 mb-3"
                           }`}
                         >
