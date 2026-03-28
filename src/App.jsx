@@ -8403,6 +8403,7 @@ export default function App() {
                                       文字数:
                                     </span>
                                     <input
+                                      id={`charLimit-input-${qa.id}`}
                                       type="text"
                                       className="w-16 text-right text-xs bg-white border border-slate-200 rounded px-1 py-0.5 focus:border-indigo-500 outline-none placeholder-slate-300"
                                       placeholder="なし"
@@ -8601,7 +8602,21 @@ export default function App() {
                                     }`}
                                   >
                                     <div
-                                      className={`text-right text-[10px] font-mono whitespace-nowrap ${
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setActiveQAId(qa.id);
+                                        setTimeout(() => {
+                                          const inputEl =
+                                            document.getElementById(
+                                              `charLimit-input-${qa.id}`,
+                                            );
+                                          if (inputEl) {
+                                            inputEl.focus();
+                                            inputEl.select();
+                                          }
+                                        }, 100);
+                                      }}
+                                      className={`text-right text-[10px] font-mono whitespace-nowrap cursor-pointer hover:text-indigo-500 hover:bg-slate-100 px-1.5 py-0.5 rounded transition-colors ${
                                         qa.charLimit &&
                                         qa.answer.length > Number(qa.charLimit)
                                           ? "text-rose-500 font-bold"
