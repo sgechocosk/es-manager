@@ -8137,7 +8137,7 @@ export default function App() {
                   <div className="p-6 space-y-4">
                     <div
                       data-tutorial="1"
-                      className={`grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 transition-all duration-500 ${formTutorialStep === 1 ? "relative z-[101] bg-white p-4 rounded-xl shadow-lg pointer-events-none -mx-4" : ""}`}
+                      className={`grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 min-w-0 transition-all duration-500 ${formTutorialStep === 1 ? "relative z-[101] bg-white p-4 rounded-xl shadow-lg pointer-events-none -mx-4" : ""}`}
                     >
                       <div>
                         <label className="text-xs font-bold text-slate-500">
@@ -8301,13 +8301,13 @@ export default function App() {
                           placeholder="例: 本選考、インターン"
                         />
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <label className="text-xs font-bold text-slate-500">
                           提出期限
                         </label>
                         <input
                           type="datetime-local"
-                          className="w-full px-3 py-2 border rounded-lg mt-1 outline-none focus:border-indigo-500"
+                          className="w-full min-w-0 max-w-full px-3 py-2 border rounded-lg mt-1 outline-none focus:border-indigo-500"
                           value={formData.deadline}
                           onChange={(e) =>
                             setFormData({

@@ -11,6 +11,22 @@ body {
   background-color: #ffffff;
 }
 
+input[type="datetime-local"],
+input[type="date"],
+input[type="time"] {
+  min-width: 0 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box;
+  appearance: none;
+}
+
+input[type="datetime-local"]::-webkit-datetime-edit,
+input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper,
+input[type="datetime-local"]::-webkit-datetime-edit-text {
+  min-width: 0 !important;
+}
+
 #root {
   height: 100%;
 }
