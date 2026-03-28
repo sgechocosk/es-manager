@@ -5900,8 +5900,6 @@ export default function App() {
       const timer = setTimeout(() => {
         const element = document.getElementById(`qa-item-${activeQAId}`);
         if (element) {
-          element.scrollIntoView({ behavior: "smooth", block: "center" });
-
           const activeEl = document.activeElement;
           const isAlreadyFocusedInside = element.contains(activeEl);
 
