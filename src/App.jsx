@@ -6714,6 +6714,25 @@ export default function App() {
     scrollToTop();
   };
 
+  const handleNavInteractionStart = () => {
+    if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+    setIsMobileNavVisible(true);
+  };
+
+  const handleNavInteractionEnd = () => {
+    if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+    scrollTimeoutRef.current = setTimeout(() => {
+      setIsMobileNavVisible(false);
+    }, 4000);
+  };
+
+  const mobileNavEventHandlers = {
+    onMouseEnter: handleNavInteractionStart,
+    onTouchStart: handleNavInteractionStart,
+    onMouseLeave: handleNavInteractionEnd,
+    onTouchEnd: handleNavInteractionEnd,
+  };
+
   // --- Handlers: File IO ---
   const handleExport = async (e) => {
     const exportData = {
@@ -7405,30 +7424,7 @@ export default function App() {
                   <div className="relative">
                     {Object.keys(entriesByStatus).length > 0 && (
                       <div
-                        onMouseEnter={() => {
-                          if (scrollTimeoutRef.current)
-                            clearTimeout(scrollTimeoutRef.current);
-                          setIsMobileNavVisible(true);
-                        }}
-                        onMouseLeave={() => {
-                          if (scrollTimeoutRef.current)
-                            clearTimeout(scrollTimeoutRef.current);
-                          scrollTimeoutRef.current = setTimeout(() => {
-                            setIsMobileNavVisible(false);
-                          }, 4000);
-                        }}
-                        onTouchStart={() => {
-                          if (scrollTimeoutRef.current)
-                            clearTimeout(scrollTimeoutRef.current);
-                          setIsMobileNavVisible(true);
-                        }}
-                        onTouchEnd={() => {
-                          if (scrollTimeoutRef.current)
-                            clearTimeout(scrollTimeoutRef.current);
-                          scrollTimeoutRef.current = setTimeout(() => {
-                            setIsMobileNavVisible(false);
-                          }, 4000);
-                        }}
+                        {...mobileNavEventHandlers}
                         className={`fixed bottom-5 left-1/2 -translate-x-1/2 z-50 w-auto max-w-[95%] sm:max-w-2xl transition-all duration-500 ease-in-out sm:duration-150 ${
                           isMobileNavVisible
                             ? "translate-y-0 opacity-100 pointer-events-auto"
@@ -7669,30 +7665,7 @@ export default function App() {
                   <div className="relative">
                     {Object.keys(tagGroups).length > 0 && (
                       <div
-                        onMouseEnter={() => {
-                          if (scrollTimeoutRef.current)
-                            clearTimeout(scrollTimeoutRef.current);
-                          setIsMobileNavVisible(true);
-                        }}
-                        onMouseLeave={() => {
-                          if (scrollTimeoutRef.current)
-                            clearTimeout(scrollTimeoutRef.current);
-                          scrollTimeoutRef.current = setTimeout(() => {
-                            setIsMobileNavVisible(false);
-                          }, 4000);
-                        }}
-                        onTouchStart={() => {
-                          if (scrollTimeoutRef.current)
-                            clearTimeout(scrollTimeoutRef.current);
-                          setIsMobileNavVisible(true);
-                        }}
-                        onTouchEnd={() => {
-                          if (scrollTimeoutRef.current)
-                            clearTimeout(scrollTimeoutRef.current);
-                          scrollTimeoutRef.current = setTimeout(() => {
-                            setIsMobileNavVisible(false);
-                          }, 4000);
-                        }}
+                        {...mobileNavEventHandlers}
                         className={`fixed bottom-5 left-1/2 -translate-x-1/2 z-50 w-auto max-w-[95%] sm:max-w-2xl transition-all duration-500 ease-in-out sm:duration-150 ${
                           isMobileNavVisible
                             ? "translate-y-0 opacity-100 pointer-events-auto"
