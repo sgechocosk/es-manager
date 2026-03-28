@@ -5363,7 +5363,7 @@ export default function App() {
     } else {
       setFormTutorialStep(0);
       updateTutorialProgress({ hasSeenFormTutorial: true });
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      scrollToTop("smooth");
       setTimeout(() => {
         document
           .getElementById("company-input")
@@ -5562,10 +5562,11 @@ export default function App() {
   const scrollEndTimerRef = useRef(null);
   const lastScrollY = useRef(0);
   const isAutoScrolling = useRef(false);
+  const mainRef = useRef(null);
 
   useEffect(() => {
-    const handleScroll = () => {
-      const currentScrollY = window.scrollY;
+    const handleScroll = (e) => {
+      const currentScrollY = e.target.scrollTop;
 
       if (currentScrollY < 50) {
         setIsMobileNavVisible(true);
@@ -5598,14 +5599,17 @@ export default function App() {
       lastScrollY.current = currentScrollY;
     };
 
-    window.addEventListener("scroll", handleScroll, { passive: true });
+    const mainEl = mainRef.current;
+    if (mainEl) {
+      mainEl.addEventListener("scroll", handleScroll, { passive: true });
+    }
 
     scrollTimeoutRef.current = setTimeout(() => {
       setIsMobileNavVisible(false);
     }, 4000);
 
     return () => {
-      window.removeEventListener("scroll", handleScroll);
+      if (mainEl) mainEl.removeEventListener("scroll", handleScroll);
       if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
     };
   }, []);
@@ -5998,7 +6002,9 @@ export default function App() {
   };
 
   const scrollToTop = (behavior = "auto") => {
-    window.scrollTo({ top: 0, behavior: behavior });
+    if (mainRef.current) {
+      mainRef.current.scrollTo({ top: 0, behavior: behavior });
+    }
   };
 
   const companyNames = useMemo(() => {
@@ -6980,7 +6986,7 @@ export default function App() {
   // --- Render ---
   return (
     <div
-      className="min-h-screen bg-slate-50 text-slate-800 font-sans flex flex-col"
+      className="h-full bg-slate-50 text-slate-800 font-sans flex flex-col overflow-hidden"
       onMouseDown={(e) => {
         isMouseDownGlobal.current = true;
         const isIgnoredArea = e.target.closest(
@@ -7260,7 +7266,8 @@ export default function App() {
       {/* Main Container */}
       <div className="flex flex-1 overflow-hidden relative">
         <main
-          className={`flex-1 overflow-y-auto p-4 sm:p-6 transition-all duration-300 ease-in-out ${
+          ref={mainRef}
+          className={`flex-1 overflow-y-auto overscroll-y-contain bg-slate-50 p-4 sm:p-6 transition-all duration-300 ease-in-out ${
             isRefPanelOpen && !isMemoMode ? "mr-0 lg:mr-96" : "mr-0"
           }`}
         >
@@ -7460,20 +7467,19 @@ export default function App() {
                                       setIsMobileNavVisible(true);
 
                                       if (isFirst) {
-                                        window.scrollTo({
-                                          top: 0,
-                                          behavior: "smooth",
-                                        });
+                                        scrollToTop("smooth");
                                       } else {
                                         const el = document.getElementById(
                                           `status-section-${status}`,
                                         );
-                                        if (el) {
+                                        if (el && mainRef.current) {
+                                          const mainEl = mainRef.current;
                                           const y =
-                                            el.getBoundingClientRect().top +
-                                            window.scrollY -
-                                            120;
-                                          window.scrollTo({
+                                            el.getBoundingClientRect().top -
+                                            mainEl.getBoundingClientRect().top +
+                                            mainEl.scrollTop -
+                                            20;
+                                          mainEl.scrollTo({
                                             top: y,
                                             behavior: "smooth",
                                           });
@@ -7775,20 +7781,19 @@ export default function App() {
                                     setIsMobileNavVisible(true);
 
                                     if (isFirst) {
-                                      window.scrollTo({
-                                        top: 0,
-                                        behavior: "smooth",
-                                      });
+                                      scrollToTop("smooth");
                                     } else {
                                       const el = document.getElementById(
                                         `tag-section-${tagName}`,
                                       );
-                                      if (el) {
+                                      if (el && mainRef.current) {
+                                        const mainEl = mainRef.current;
                                         const y =
-                                          el.getBoundingClientRect().top +
-                                          window.scrollY -
-                                          120;
-                                        window.scrollTo({
+                                          el.getBoundingClientRect().top -
+                                          mainEl.getBoundingClientRect().top +
+                                          mainEl.scrollTop -
+                                          20;
+                                        mainEl.scrollTo({
                                           top: y,
                                           behavior: "smooth",
                                         });
