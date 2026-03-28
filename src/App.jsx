@@ -5558,6 +5558,8 @@ export default function App() {
   const mouseDownLocation = useRef(null);
   const isMouseDownGlobal = useRef(false);
 
+  const shouldScrollToQARef = useRef(false);
+
   const scrollTimeoutRef = useRef(null);
   const scrollEndTimerRef = useRef(null);
   const lastScrollY = useRef(0);
@@ -5900,6 +5902,11 @@ export default function App() {
       const timer = setTimeout(() => {
         const element = document.getElementById(`qa-item-${activeQAId}`);
         if (element) {
+          if (shouldScrollToQARef.current) {
+            element.scrollIntoView({ behavior: "smooth", block: "center" });
+            shouldScrollToQARef.current = false;
+          }
+
           const activeEl = document.activeElement;
           const isAlreadyFocusedInside = element.contains(activeEl);
 
@@ -6642,6 +6649,7 @@ export default function App() {
       setInitialFormState(JSON.parse(JSON.stringify(editState)));
       if (qaId) {
         setActiveQAId(qaId);
+        shouldScrollToQARef.current = true;
       } else {
         setActiveQAId(null);
       }
