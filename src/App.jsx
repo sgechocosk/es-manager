@@ -480,7 +480,7 @@ const HighlightText = ({
         result.push(
           <span
             key={i}
-            className={`${currentStyle} rounded-sm px-0.5 box-decoration-clone`}
+            className={`${currentStyle} rounded-sm box-decoration-clone`}
           >
             {currentStr}
           </span>,
@@ -497,7 +497,7 @@ const HighlightText = ({
     result.push(
       <span
         key="last"
-        className={`${currentStyle} rounded-sm px-0.5 box-decoration-clone`}
+        className={`${currentStyle} rounded-sm box-decoration-clone`}
       >
         {currentStr}
       </span>,
