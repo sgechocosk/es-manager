@@ -401,6 +401,8 @@ const HighlightText = ({
 }) => {
   if (!text) return <>{text}</>;
 
+  const textStr = text.toString();
+
   const searchTerms = highlight
     ? highlight
         .toLowerCase()
@@ -427,60 +429,84 @@ const HighlightText = ({
   }
 
   if (searchTerms.length === 0 && checkPatterns.length === 0) {
-    return <>{text}</>;
+    return <>{textStr}</>;
   }
 
-  const searchRegexSource =
-    searchTerms.length > 0
-      ? `(${searchTerms
-          .map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
-          .join("|")})`
-      : null;
+  const styles = Array(textStr.length).fill(null);
 
-  const allSources = [];
-  if (searchRegexSource) allSources.push(searchRegexSource);
-  checkPatterns.forEach((p) => allSources.push(`(${p.regex.source})`));
+  checkPatterns.forEach(({ regex, color }) => {
+    const r = new RegExp(
+      regex.source,
+      regex.flags.includes("g") ? regex.flags : regex.flags + "g",
+    );
+    let match;
+    while ((match = r.exec(textStr)) !== null) {
+      const start = match.index;
+      const end = start + match[0].length;
+      for (let i = start; i < end; i++) {
+        if (!styles[i]) {
+          styles[i] = color;
+        }
+      }
+      if (match.index === r.lastIndex) r.lastIndex++;
+    }
+  });
 
-  if (allSources.length === 0) return <>{text}</>;
+  if (searchTerms.length > 0) {
+    const searchRegexSource = `(${searchTerms
+      .map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+      .join("|")})`;
+    const searchRegex = new RegExp(searchRegexSource, "gi");
+    let match;
+    while ((match = searchRegex.exec(textStr)) !== null) {
+      const start = match.index;
+      const end = start + match[0].length;
+      for (let i = start; i < end; i++) {
+        styles[i] = "bg-yellow-200 text-slate-900";
+      }
+      if (match.index === searchRegex.lastIndex) searchRegex.lastIndex++;
+    }
+  }
 
-  const combinedRegex = new RegExp(allSources.join("|"), "gi");
-  const parts = text.toString().split(combinedRegex);
+  const result = [];
+  let currentStyle = styles[0];
+  let currentStr = textStr[0];
 
-  return (
-    <>
-      {parts
-        .filter((part) => part !== undefined)
-        .map((part, i) => {
-          if (!part) return null;
+  for (let i = 1; i < textStr.length; i++) {
+    if (styles[i] === currentStyle) {
+      currentStr += textStr[i];
+    } else {
+      if (currentStyle) {
+        result.push(
+          <span
+            key={i}
+            className={`${currentStyle} rounded-sm px-0.5 box-decoration-clone`}
+          >
+            {currentStr}
+          </span>,
+        );
+      } else {
+        result.push(<span key={i}>{currentStr}</span>);
+      }
+      currentStyle = styles[i];
+      currentStr = textStr[i];
+    }
+  }
 
-          const isSearchMatch = searchTerms.some(
-            (t) => t.toLowerCase() === part.toLowerCase(),
-          );
-          if (isSearchMatch) {
-            return (
-              <span
-                key={i}
-                className="bg-yellow-200 text-slate-900 px-0.5 rounded-sm box-decoration-clone"
-              >
-                {part}
-              </span>
-            );
-          }
+  if (currentStyle) {
+    result.push(
+      <span
+        key="last"
+        className={`${currentStyle} rounded-sm px-0.5 box-decoration-clone`}
+      >
+        {currentStr}
+      </span>,
+    );
+  } else {
+    result.push(<span key="last">{currentStr}</span>);
+  }
 
-          for (const cp of checkPatterns) {
-            if (new RegExp(cp.regex.source, "i").test(part)) {
-              return (
-                <span key={i} className={`${cp.color} rounded-sm px-0.5`}>
-                  {part}
-                </span>
-              );
-            }
-          }
-
-          return <span key={i}>{part}</span>;
-        })}
-    </>
-  );
+  return <>{result}</>;
 };
 
 // --- Statistics Components ---
