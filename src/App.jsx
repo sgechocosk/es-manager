@@ -4477,8 +4477,8 @@ ${userPrompt.replace(/^[ \t]+/gm, "")}`;
       : "AI生成結果";
 
   const containerClass = isPromptMode
-    ? "mt-3 bg-white rounded-xl border-2 shadow-sm overflow-hidden animate-in slide-in-from-top-2 border-emerald-100"
-    : "mt-3 bg-white rounded-xl border-2 shadow-sm overflow-hidden animate-in slide-in-from-top-2 border-indigo-100";
+    ? "mt-3 bg-white rounded-xl border shadow-sm overflow-hidden animate-in slide-in-from-top-2 border-emerald-100"
+    : "mt-3 bg-white rounded-xl border shadow-sm overflow-hidden animate-in slide-in-from-top-2 border-indigo-100";
 
   const headerClass = isPromptMode
     ? "px-4 py-2 border-b flex justify-between items-center bg-emerald-50/50 border-emerald-100"
@@ -4619,7 +4619,7 @@ ${userPrompt.replace(/^[ \t]+/gm, "")}`;
 
           {!isCompact && (
             <>
-              <div className="p-4 text-sm text-slate-700 leading-relaxed whitespace-pre-wrap bg-white font-sans">
+              <div className="p-3 text-sm text-slate-700 leading-relaxed whitespace-pre-wrap bg-white font-sans">
                 {result}
               </div>
               <div className={footerClass}>
