@@ -6336,7 +6336,7 @@ export default function App() {
 
       if (isDirty) {
         const isConfirmed = window.confirm(
-          "編集中のメモは保存されていません。\n一覧画面に戻るとデータは失われますが、よろしいですか?",
+          "編集中のメモは保存されていません。\n一覧画面に戻るとデータは失われますが、よろしいですか？",
         );
         if (!isConfirmed) return;
       }
@@ -6361,13 +6361,25 @@ export default function App() {
 
       if (isDirty) {
         const isConfirmed = window.confirm(
-          "編集中のデータは保存されていません。\n一覧画面に戻るとデータは失われますが、よろしいですか?",
+          "編集中のデータは保存されていません。\n一覧画面に戻るとデータは失われますが、よろしいですか？",
         );
         if (!isConfirmed) return;
       }
       resetForm(behavior);
     } else {
       resetForm(behavior);
+    }
+  };
+
+  const handleLogoClick = () => {
+    if (view === "list") {
+      if (appSettings.autoSave) {
+        window.location.reload();
+      } else {
+        handleCancel("smooth");
+      }
+    } else {
+      handleCancel("auto");
     }
   };
 
@@ -6592,14 +6604,14 @@ export default function App() {
   const handleDelete = (id) => {
     const isDraft = id.toString().startsWith("draft_");
     if (isDraft) {
-      if (!confirm("このメモを削除しますか?\n(この操作は取り消せません。)"))
+      if (!confirm("このメモを削除しますか？\n(この操作は取り消せません。)"))
         return;
       setDrafts((prev) => prev.filter((d) => d.id !== id));
       if (isMemoMode) resetForm();
     } else {
       if (
         !confirm(
-          "この企業のエントリーシートを削除しますか?\n(企業データは残ります)",
+          "この企業のエントリーシートを削除しますか？\n(企業データは残ります)",
         )
       )
         return;
@@ -6610,7 +6622,7 @@ export default function App() {
   const handleDeleteCompanyData = (companyName) => {
     if (
       confirm(
-        `${companyName}のデータを削除しますか?\n(この操作は取り消せません。)`,
+        `${companyName}のデータを削除しますか？\n(この操作は取り消せません。)`,
       )
     ) {
       setCompanyData((prev) => {
@@ -6848,7 +6860,7 @@ export default function App() {
 
         if (
           confirm(
-            "現在のデータを破棄して、ファイルを読み込みますか?\n(未保存のデータは失われます)",
+            "現在のデータを破棄して、ファイルを読み込みますか？\n(未保存のデータは失われます)",
           )
         ) {
           let migratedData = { ...dataToLoad };
@@ -7065,7 +7077,7 @@ export default function App() {
           <div className="w-full sm:w-auto flex justify-between items-center">
             <div
               className="flex items-center gap-2 cursor-pointer"
-              onClick={() => handleCancel(view === "list" ? "smooth" : "auto")}
+              onClick={handleLogoClick}
             >
               <img
                 src="/favicon.png"
