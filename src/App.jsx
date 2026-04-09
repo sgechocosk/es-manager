@@ -5783,6 +5783,8 @@ export default function App() {
     } else {
       localStorage.removeItem(STORAGE_KEY_DATA);
       localStorage.removeItem(STORAGE_KEY_ACTIVITY_LOG);
+      lastSavedDataStr.current = "";
+      lastSavedLogStr.current = "";
     }
   }, [
     entries,
