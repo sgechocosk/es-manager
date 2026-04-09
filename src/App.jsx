@@ -4,6 +4,7 @@ import React, {
   useLayoutEffect,
   useMemo,
   useRef,
+  startTransition,
 } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -4606,7 +4607,7 @@ ${userPrompt.replace(/^[ \t]+/gm, "")}`;
 
       {loading && (
         <div className="mt-3 p-4 bg-slate-50 rounded-xl border border-slate-200 flex items-center gap-3 text-sm text-slate-500 animate-pulse">
-          <Loader2 size={18} className="animate-spin text-indigo-500" />
+          <Loader2 size={18} className="always-spin text-indigo-500" />
           <span>
             {isPromptMode
               ? "プロンプトを生成中..."
@@ -5336,6 +5337,9 @@ const DEFAULT_FORM_DATA = {
 };
 
 export default function App() {
+  // --- Loading State ---
+  const [isLoading, setIsLoading] = useState(true);
+
   // --- Tutorial State ---
   const [tutorialProgress, setTutorialProgress] = useState(() => {
     const saved = localStorage.getItem(STORAGE_KEY_TUTORIAL);
@@ -5668,85 +5672,97 @@ export default function App() {
 
     setAppSettings(initialSettings);
 
-    if (initialSettings.autoSave) {
-      const savedDataJson = localStorage.getItem(STORAGE_KEY_DATA);
-      const savedActivityLog = localStorage.getItem(STORAGE_KEY_ACTIVITY_LOG);
-      if (savedDataJson) {
-        try {
-          const parsed = JSON.parse(savedDataJson);
+    const finishInitialization = () => {
+      startTransition(() => {
+        setIsInitialized(true);
+        setIsLoading(false);
+      });
+    };
 
-          let loadedEntries = [];
-          if (parsed && Array.isArray(parsed.entries)) {
-            loadedEntries = parsed.entries;
-          }
+    const loadFromWorker = (savedDataJson, savedActivityLog) => {
+      const worker = new Worker(
+        new URL("./workers/dataLoaderWorker.js", import.meta.url),
+        { type: "module" },
+      );
+      let isCanceled = false;
 
-          let loadedDrafts = [];
-          if (parsed && Array.isArray(parsed.drafts)) {
-            loadedDrafts = parsed.drafts;
-          }
+      const cleanup = () => {
+        isCanceled = true;
+        worker.terminate();
+      };
 
-          let loadedCompanyData = {};
-          if (parsed && parsed.companyUrls) {
-            Object.entries(parsed.companyUrls).forEach(([name, val]) => {
-              loadedCompanyData[name] = normalizeCompanyData(val);
-            });
-          } else if (parsed && parsed.companyData) {
-            loadedCompanyData = parsed.companyData;
-          }
+      worker.onmessage = (event) => {
+        if (isCanceled) return;
+        const { result } = event.data;
 
-          let hasMigration = false;
-          const migratedEntries = loadedEntries.map((entry) => {
-            if (entry.industry && entry.company) {
-              const currentData =
-                loadedCompanyData[entry.company] || normalizeCompanyData({});
-              if (!currentData.industry) {
-                currentData.industry = entry.industry;
-                loadedCompanyData[entry.company] = currentData;
-                hasMigration = true;
-              }
-              return { ...entry, industry: "" };
-            }
-            return entry;
-          });
-
-          setEntries(migratedEntries);
-          setDrafts(loadedDrafts);
-          setCompanyData(loadedCompanyData);
+        if (result && !result.parseError) {
+          const {
+            loadedEntries,
+            loadedDrafts,
+            loadedCompanyData,
+            activityLog,
+          } = result;
 
           const hasLoadedData =
-            migratedEntries.length > 0 ||
+            loadedEntries.length > 0 ||
             loadedDrafts.length > 0 ||
             Object.keys(loadedCompanyData).length > 0;
 
-          if (hasLoadedData) {
-            updateTutorialProgress({
-              hasClickedNewEntry: true,
-              hasSeenFormTutorial: true,
-              hasCreatedFirstData: true,
-              hasSeenFeatureUnlockTooltip: true,
-            });
-            setShowFeatureUnlockTooltip(false);
-            setShowNewEntryTooltip(false);
-          }
+          startTransition(() => {
+            setEntries(loadedEntries);
+            setDrafts(loadedDrafts);
+            setCompanyData(loadedCompanyData);
+            setActivityLog(activityLog || {});
 
-          if (parsed.activityLog) {
-            setActivityLog(migrateActivityLog(parsed.activityLog));
-          }
-        } catch (e) {
-          console.error("Failed to parse auto-saved data", e);
-        }
-      }
+            if (hasLoadedData) {
+              updateTutorialProgress({
+                hasClickedNewEntry: true,
+                hasSeenFormTutorial: true,
+                hasCreatedFirstData: true,
+                hasSeenFeatureUnlockTooltip: true,
+              });
+              setShowFeatureUnlockTooltip(false);
+              setShowNewEntryTooltip(false);
+            }
 
-      if (savedActivityLog) {
-        try {
-          const parsedLog = JSON.parse(savedActivityLog);
-          setActivityLog(migrateActivityLog(parsedLog));
-        } catch (e) {
-          console.error("Failed to parse activity log", e);
+            setIsInitialized(true);
+            setIsLoading(false);
+          });
+        } else {
+          if (result && result.parseError) {
+            console.error(
+              "Failed to parse saved data in worker",
+              result.errorMessage,
+            );
+          }
+          finishInitialization();
         }
+
+        cleanup();
+      };
+
+      worker.onerror = (error) => {
+        console.error("Data loader worker error", error);
+        cleanup();
+        finishInitialization();
+      };
+
+      worker.postMessage({ savedDataJson, savedActivityLog });
+      return cleanup;
+    };
+
+    if (initialSettings.autoSave) {
+      const savedDataJson = localStorage.getItem(STORAGE_KEY_DATA);
+      const savedActivityLog = localStorage.getItem(STORAGE_KEY_ACTIVITY_LOG);
+
+      if (savedDataJson || savedActivityLog) {
+        const cleanup = loadFromWorker(savedDataJson, savedActivityLog);
+        return cleanup;
       }
     }
-    setIsInitialized(true);
+
+    finishInitialization();
+    return undefined;
   }, []);
 
   useEffect(() => {
@@ -5904,6 +5920,7 @@ export default function App() {
       e.returnValue = message;
       return message;
     };
+
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [
@@ -7049,6 +7066,17 @@ export default function App() {
   ]);
 
   // --- Render ---
+  if (isLoading) {
+    return (
+      <div className="h-full bg-slate-50 text-slate-800 font-sans flex flex-col overflow-hidden items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 size={48} className="always-spin text-indigo-600" />
+          <p className="text-lg font-bold text-slate-600">読み込み中...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       className="h-full bg-slate-50 text-slate-800 font-sans flex flex-col overflow-hidden"

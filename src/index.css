@@ -4,6 +4,19 @@
   color-scheme: light;
 }
 
+@keyframes spin-always {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.always-spin {
+  animation: spin-always 1s linear infinite;
+}
+
 body {
   margin: 0;
   height: 100dvh;
