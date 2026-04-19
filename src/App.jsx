@@ -2833,7 +2833,7 @@ const DiffViewer = ({ oldText, newText }) => {
   }, [oldText, newText]);
 
   return (
-    <div className="p-6 border border-slate-200 rounded-lg bg-[#f9fafb] text-slate-800 min-h-[150px] whitespace-pre-wrap break-all leading-[1.8] text-base">
+    <div className="p-3 border border-slate-200 rounded-lg bg-[#f9fafb] text-slate-800 min-h-[150px] whitespace-pre-wrap break-all leading-[1.8] text-base">
       {diffResult.map((item, index) => {
         if (item.type === "error") {
           return (
@@ -4945,7 +4945,7 @@ const QAEditor = ({
   isMouseDownGlobal,
   totalQAs,
 }) => {
-  const [viewMode, setViewMode] = useState("tabA");
+  const [viewMode, setViewMode] = useState("main");
   const isComparisonMode = qa.answers && qa.answers.length > 1;
 
   const handleCreateAlternative = () => {
@@ -4953,7 +4953,7 @@ const QAEditor = ({
       answers: [qa.answer || "", ""],
       answer: undefined,
     });
-    setViewMode("tabB");
+    setViewMode("sub");
   };
 
   const handleSwapTabs = () => {
@@ -4973,8 +4973,13 @@ const QAEditor = ({
   };
 
   const currentText = isComparisonMode
-    ? (viewMode === "tabB" ? qa.answers[1] : qa.answers[0]) || ""
+    ? (viewMode === "sub" ? qa.answers[1] : qa.answers[0]) || ""
     : qa.answer || "";
+
+  const displayLength =
+    isComparisonMode && viewMode === "diff"
+      ? (qa.answers[1] || "").length
+      : currentText.length;
 
   return (
     <div
@@ -5123,51 +5128,54 @@ const QAEditor = ({
 
       <div className="mb-1">
         {isComparisonMode && (
-          <div className="flex items-center gap-1 mb-2 bg-slate-100/50 p-1 rounded-lg border border-slate-200 w-fit">
-            <button
-              onClick={() => setViewMode("tabA")}
-              className={`px-3 py-1 text-xs font-bold rounded-md transition-colors ${viewMode === "tabA" ? "bg-white shadow-sm text-indigo-600" : "text-slate-500 hover:bg-slate-200"}`}
-            >
-              タブA
-            </button>
-            <button
-              onClick={handleSwapTabs}
-              className="p-1 text-slate-400 hover:text-indigo-600 rounded"
-              title="A案とB案を入れ替え"
-            >
-              <ArrowLeftRight size={14} />
-            </button>
-            <button
-              onClick={() => setViewMode("tabB")}
-              className={`px-3 py-1 text-xs font-bold rounded-md transition-colors ${viewMode === "tabB" ? "bg-white shadow-sm text-indigo-600" : "text-slate-500 hover:bg-slate-200"}`}
-            >
-              タブB
-            </button>
-            <div className="w-px h-4 bg-slate-300 mx-1" />
-            <button
-              onClick={() => setViewMode("parallel")}
-              className={`p-1.5 rounded-md transition-colors ${viewMode === "parallel" ? "bg-white shadow-sm text-indigo-600" : "text-slate-400 hover:bg-slate-200"}`}
-              title="並行表示"
-            >
-              <SplitSquareHorizontal size={14} />
-            </button>
-            <button
-              onClick={() => setViewMode("diff")}
-              className={`p-1.5 rounded-md transition-colors ${viewMode === "diff" ? "bg-white shadow-sm text-indigo-600" : "text-slate-400 hover:bg-slate-200"}`}
-              title="差分表示"
-            >
-              <GitCompare size={14} />
-            </button>
+          <div className="flex items-end justify-between mb-0 px-2 z-10 relative w-full">
+            <div className="flex items-end gap-0.5">
+              <button
+                onClick={() => setViewMode("main")}
+                className={`px-3 py-1.5 text-xs font-bold border border-b-0 rounded-t-lg transition-colors ${viewMode === "main" ? "bg-white text-indigo-600 border-slate-300 relative z-10 -mb-px pt-2" : "bg-slate-100/50 text-slate-500 border-slate-200 hover:bg-slate-100"}`}
+              >
+                メイン案
+              </button>
+              <button
+                onClick={handleSwapTabs}
+                className="px-1 py-1.5 text-slate-400 hover:text-indigo-600 mb-1"
+              >
+                <ArrowLeftRight size={14} />
+              </button>
+              <button
+                onClick={() => setViewMode("sub")}
+                className={`px-3 py-1.5 text-xs font-bold border border-b-0 rounded-t-lg transition-colors ${viewMode === "sub" ? "bg-white text-indigo-600 border-slate-300 relative z-10 -mb-px pt-2" : "bg-slate-100/50 text-slate-500 border-slate-200 hover:bg-slate-100"}`}
+              >
+                サブ案
+              </button>
+            </div>
+
+            <div className="flex items-end gap-0.5">
+              <button
+                onClick={() => setViewMode("parallel")}
+                className={`hidden sm:block px-2 py-1.5 border border-b-0 rounded-t-lg transition-colors ${viewMode === "parallel" ? "bg-white text-indigo-600 border-slate-300 relative z-10 -mb-px pt-2" : "bg-slate-100/50 text-slate-400 border-slate-200 hover:bg-slate-100"}`}
+                title="並行表示"
+              >
+                <SplitSquareHorizontal size={14} />
+              </button>
+              <button
+                onClick={() => setViewMode("diff")}
+                className={`px-2 py-1.5 border border-b-0 rounded-t-lg transition-colors ${viewMode === "diff" ? "bg-white text-indigo-600 border-slate-300 relative z-10 -mb-px pt-2" : "bg-slate-100/50 text-slate-400 border-slate-200 hover:bg-slate-100"}`}
+                title="差分表示"
+              >
+                <GitCompare size={14} />
+              </button>
+            </div>
           </div>
         )}
 
-        {(!isComparisonMode || viewMode === "tabA" || viewMode === "tabB") && (
+        {(!isComparisonMode || viewMode === "main" || viewMode === "sub") && (
           <AutoResizeTextarea
             value={currentText}
             onChange={(e) =>
               handleAnswerChange(
                 e.target.value,
-                isComparisonMode ? (viewMode === "tabA" ? 0 : 1) : null,
+                isComparisonMode ? (viewMode === "main" ? 0 : 1) : null,
               )
             }
             onFocus={() => {
@@ -5182,11 +5190,8 @@ const QAEditor = ({
         )}
 
         {isComparisonMode && viewMode === "parallel" && (
-          <div className="flex gap-2">
+          <div className="flex">
             <div className="flex-1 border-r border-slate-200 pr-2">
-              <div className="text-[10px] font-bold text-slate-400 mb-1">
-                タブA
-              </div>
               <AutoResizeTextarea
                 value={qa.answers[0] || ""}
                 onChange={(e) => handleAnswerChange(e.target.value, 0)}
@@ -5200,9 +5205,6 @@ const QAEditor = ({
               />
             </div>
             <div className="flex-1 pl-2">
-              <div className="text-[10px] font-bold text-slate-400 mb-1">
-                タブB
-              </div>
               <AutoResizeTextarea
                 value={qa.answers[1] || ""}
                 onChange={(e) => handleAnswerChange(e.target.value, 1)}
@@ -5243,19 +5245,50 @@ const QAEditor = ({
               )}
 
               <div className="flex gap-2 items-center">
-                <span className="text-[10px] font-mono text-slate-500 bg-slate-200 px-2 py-0.5 rounded-full">
-                  {currentText.length}文字
-                </span>
-                {qa.charLimit && (
-                  <span
-                    className={`text-[10px] font-mono px-2 py-0.5 rounded-full ${
-                      currentText.length > Number(qa.charLimit)
-                        ? "bg-rose-100 text-rose-600"
-                        : "bg-slate-100 text-slate-500"
-                    }`}
-                  >
-                    上限: {qa.charLimit}
-                  </span>
+                {isComparisonMode && viewMode === "parallel" ? (
+                  <>
+                    <div className="flex gap-2 items-center border-r border-slate-300 pr-2">
+                      <span className="text-[10px] font-mono text-slate-500 bg-slate-200 px-2 py-0.5 rounded-full">
+                        メイン案: {(qa.answers[0] || "").length}文字
+                      </span>
+                    </div>
+                    <div className="flex gap-2 items-center pl-1">
+                      <span className="text-[10px] font-mono text-slate-500 bg-slate-200 px-2 py-0.5 rounded-full">
+                        サブ案: {(qa.answers[1] || "").length}文字
+                      </span>
+                      {qa.charLimit && (
+                        <span
+                          className={`text-[10px] font-mono px-2 py-0.5 rounded-full ${
+                            (qa.answers[1] || "").length > Number(qa.charLimit)
+                              ? "bg-rose-100 text-rose-600"
+                              : "bg-slate-100 text-slate-500"
+                          }`}
+                        >
+                          上限: {qa.charLimit}
+                        </span>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-[10px] font-mono text-slate-500 bg-slate-200 px-2 py-0.5 rounded-full">
+                      {isComparisonMode && viewMode === "diff"
+                        ? `サブ案: ${displayLength}`
+                        : displayLength}
+                      文字
+                    </span>
+                    {qa.charLimit && (
+                      <span
+                        className={`text-[10px] font-mono px-2 py-0.5 rounded-full ${
+                          displayLength > Number(qa.charLimit)
+                            ? "bg-rose-100 text-rose-600"
+                            : "bg-slate-100 text-slate-500"
+                        }`}
+                      >
+                        上限: {qa.charLimit}
+                      </span>
+                    )}
+                  </>
                 )}
               </div>
             </div>
@@ -5273,7 +5306,7 @@ const QAEditor = ({
           onApply={(text) =>
             handleAnswerChange(
               text,
-              isComparisonMode ? (viewMode === "tabA" ? 0 : 1) : null,
+              isComparisonMode ? (viewMode === "main" ? 0 : 1) : null,
             )
           }
           allEntries={enrichedEntries}
@@ -5325,12 +5358,12 @@ const QAEditor = ({
                 }, 100);
               }}
               className={`text-right text-[10px] font-mono whitespace-nowrap cursor-pointer hover:text-indigo-500 hover:bg-slate-100 px-1.5 py-0.5 rounded transition-colors ${
-                qa.charLimit && currentText.length > Number(qa.charLimit)
+                qa.charLimit && displayLength > Number(qa.charLimit)
                   ? "text-rose-500 font-bold"
                   : "text-slate-400"
               }`}
             >
-              {currentText.length}文字
+              {displayLength}文字
               {qa.charLimit && ` / 上限: ${qa.charLimit}`}
             </div>
           </div>
