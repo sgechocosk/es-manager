@@ -32,6 +32,7 @@ import {
   Tags,
   ArrowUp,
   ArrowDown,
+  ArrowLeftRight,
   ChevronUp,
   ChevronDown,
   Save,
@@ -55,6 +56,8 @@ import {
   CheckCircle2,
   Activity,
   Info,
+  SplitSquareHorizontal,
+  GitCompare,
 } from "lucide-react";
 import {
   BarChart,
@@ -201,6 +204,10 @@ const splitTags = (tagInput) => {
   return tagInput.split(/[,\s、，]+/).filter((t) => t.length > 0);
 };
 
+const getActiveAnswer = (qa) => {
+  return qa.answers && qa.answers.length > 0 ? qa.answers[0] : qa.answer || "";
+};
+
 const getCurrentJSTTime = () => {
   const date = new Date();
   const jstDate = new Date(
@@ -253,14 +260,22 @@ const migrateActivityLog = (raw) => {
 const sanitizeEntry = (entry) => {
   const now = getCurrentJSTTime();
   const rawQas = Array.isArray(entry.qas) ? entry.qas : [];
-  const sanitizedQas = rawQas.map((qa) => ({
-    id: qa.id || Date.now() + Math.random(),
-    question: qa.question || "",
-    answer: qa.answer || "",
-    charLimit: qa.charLimit || "",
-    note: qa.note || "",
-    tags: splitTags(qa.tags),
-  }));
+  const sanitizedQas = rawQas.map((qa) => {
+    const cleanQa = {
+      id: qa.id || Date.now() + Math.random(),
+      question: qa.question || "",
+      charLimit: qa.charLimit || "",
+      note: qa.note || "",
+      tags: splitTags(qa.tags),
+    };
+
+    if (qa.answers && qa.answers.length > 1) {
+      cleanQa.answers = qa.answers;
+    } else {
+      cleanQa.answer = qa.answer || (qa.answers && qa.answers[0]) || "";
+    }
+    return cleanQa;
+  });
 
   const completedStatuses = new Set(COMPLETED_STATUSES);
   const completedAtValue = entry.completedAt
@@ -2755,6 +2770,105 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
   );
 };
 
+// --- Diff Utilities & Components ---
+const calculateDiff = (oldText, newText) => {
+  const m = oldText.length;
+  const n = newText.length;
+  if (m * n > 9000000) throw new Error("Text too long");
+
+  const dp = new Array(m + 1);
+  for (let i = 0; i <= m; i++) dp[i] = new Int32Array(n + 1);
+
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      if (oldText[i - 1] === newText[j - 1]) {
+        dp[i][j] = dp[i - 1][j - 1] + 1;
+      } else {
+        dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+      }
+    }
+  }
+
+  let i = m,
+    j = n;
+  const result = [];
+  while (i > 0 || j > 0) {
+    if (i > 0 && j > 0 && oldText[i - 1] === newText[j - 1]) {
+      result.push({ type: "common", value: oldText[i - 1] });
+      i--;
+      j--;
+    } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
+      result.push({ type: "add", value: newText[j - 1] });
+      j--;
+    } else if (i > 0 && (j === 0 || dp[i][j - 1] < dp[i - 1][j])) {
+      result.push({ type: "remove", value: oldText[i - 1] });
+      i--;
+    }
+  }
+  result.reverse();
+
+  const merged = [];
+  for (const item of result) {
+    if (merged.length > 0 && merged[merged.length - 1].type === item.type) {
+      merged[merged.length - 1].value += item.value;
+    } else {
+      merged.push(item);
+    }
+  }
+  return merged;
+};
+
+const DiffViewer = ({ oldText, newText }) => {
+  const diffResult = useMemo(() => {
+    try {
+      return calculateDiff(oldText || "", newText || "");
+    } catch (e) {
+      return [
+        {
+          type: "error",
+          value: "テキストが長すぎるため、差分を計算できません。",
+        },
+      ];
+    }
+  }, [oldText, newText]);
+
+  return (
+    <div className="p-6 border border-slate-200 rounded-lg bg-[#f9fafb] text-slate-800 min-h-[150px] whitespace-pre-wrap break-all leading-[1.8] text-base">
+      {diffResult.map((item, index) => {
+        if (item.type === "error") {
+          return (
+            <span key={index} className="text-rose-500 font-bold">
+              {item.value}
+            </span>
+          );
+        }
+        if (item.value === "") return null;
+
+        if (item.type === "add") {
+          return (
+            <span
+              key={index}
+              className="bg-[#dcfce3] text-[#166534] px-[2px] py-[1px]"
+            >
+              {item.value}
+            </span>
+          );
+        } else if (item.type === "remove") {
+          return (
+            <span
+              key={index}
+              className="bg-[#fee2e2] text-[#991b1b] line-through decoration-[#991b1b] px-[2px] py-[1px]"
+            >
+              {item.value}
+            </span>
+          );
+        }
+        return <span key={index}>{item.value}</span>;
+      })}
+    </div>
+  );
+};
+
 // --- Components ---
 const AutoResizeTextarea = ({
   value,
@@ -3321,11 +3435,13 @@ const ReferenceSidebar = ({
       if (editingId && entry.id === editingId) return;
       if (entry.qas) {
         entry.qas.forEach((qa) => {
-          if (!qa.answer || !qa.answer.trim()) return;
+          const ans = getActiveAnswer(qa);
+          if (!ans || !ans.trim()) return;
+
           allItems.push({
             uniqueId: `${entry.id}_${qa.id}`,
             question: qa.question,
-            answer: qa.answer,
+            answer: ans,
             company: entry.company,
             selectionType: entry.selectionType,
             industry: entry.industry || "",
@@ -3924,12 +4040,13 @@ const ReferenceSelectorModal = ({
     entries.forEach((entry) => {
       if (entry.qas) {
         entry.qas.forEach((qa) => {
-          if (!qa.answer || !qa.answer.trim()) return;
+          const ans = getActiveAnswer(qa);
+          if (!ans || !ans.trim()) return;
 
           items.push({
             uniqueId: `${entry.id}_${qa.id}`,
             question: qa.question,
-            answer: qa.answer,
+            answer: ans,
             company: entry.company,
             industry: entry.industry || "",
             selectionType: entry.selectionType || "",
@@ -4808,6 +4925,466 @@ const QAItemDisplay = ({
   </div>
 );
 
+const QAEditor = ({
+  qa,
+  idx,
+  isActive,
+  formTutorialStep,
+  activeTagDropdownId,
+  setActiveTagDropdownId,
+  setActiveQAId,
+  insertQA,
+  moveQA,
+  removeQA,
+  updateQA,
+  appSettings,
+  formData,
+  enrichedEntries,
+  editingId,
+  existingTags,
+  isMouseDownGlobal,
+  totalQAs,
+}) => {
+  const [viewMode, setViewMode] = useState("tabA");
+  const isComparisonMode = qa.answers && qa.answers.length > 1;
+
+  const handleCreateAlternative = () => {
+    updateQA(qa.id, {
+      answers: [qa.answer || "", ""],
+      answer: undefined,
+    });
+    setViewMode("tabB");
+  };
+
+  const handleSwapTabs = () => {
+    if (!isComparisonMode) return;
+    const newAnswers = [qa.answers[1], qa.answers[0]];
+    updateQA(qa.id, { answers: newAnswers });
+  };
+
+  const handleAnswerChange = (text, index = null) => {
+    if (isComparisonMode && index !== null) {
+      const newAnswers = [...qa.answers];
+      newAnswers[index] = text;
+      updateQA(qa.id, { answers: newAnswers });
+    } else {
+      updateQA(qa.id, { answer: text });
+    }
+  };
+
+  const currentText = isComparisonMode
+    ? (viewMode === "tabB" ? qa.answers[1] : qa.answers[0]) || ""
+    : qa.answer || "";
+
+  return (
+    <div
+      key={qa.id}
+      id={`qa-item-${qa.id}`}
+      data-tutorial={idx === 0 ? "2" : undefined}
+      onClick={(e) => {
+        e.stopPropagation();
+        setActiveQAId(qa.id);
+      }}
+      className={`relative rounded-xl border transition-all duration-500 ease-in-out px-4 pt-2 pb-3 ${
+        activeTagDropdownId === qa.id ? "z-40" : "z-10"
+      } ${
+        isActive
+          ? "bg-slate-50 shadow-sm border-indigo-200 ring-1 ring-indigo-200"
+          : `bg-white border-slate-200 hover:border-indigo-300 cursor-pointer hover:opacity-100 ${
+              activeTagDropdownId === qa.id ? "opacity-100" : "opacity-90"
+            }`
+      } ${
+        formTutorialStep === 2 && idx === 0
+          ? "z-[101] bg-white shadow-lg pointer-events-none"
+          : ""
+      }`}
+    >
+      {idx === 0 && (
+        <div
+          onClick={(e) => {
+            e.stopPropagation();
+            insertQA(0);
+          }}
+          className="absolute bottom-full left-1/2 -translate-x-1/2 w-1/3 h-6 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity z-50 cursor-pointer group/insert"
+        >
+          <div className="w-full h-0.5 bg-indigo-400 relative flex items-center justify-center group-hover/insert:h-1 group-hover/insert:bg-indigo-500 transition-all">
+            <div className="bg-indigo-500 text-white rounded-full p-0.5 absolute shadow-sm transform group-hover/insert:scale-110 transition-transform">
+              <Plus size={14} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="relative z-10 flex items-center justify-between min-h-[32px] pointer-events-none">
+        <div
+          className={`text-xs font-bold transition-colors duration-300 shrink-0 ${
+            isActive ? "text-indigo-600" : "text-slate-400"
+          }`}
+        >
+          Q{idx + 1}
+        </div>
+
+        <div
+          className={`flex items-center gap-3 overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] shrink-0 ml-auto ${
+            formTutorialStep > 0 ? "pointer-events-none" : "pointer-events-auto"
+          } ${
+            isActive
+              ? "max-w-[400px] opacity-100 translate-x-0"
+              : "max-w-0 opacity-0 translate-x-4"
+          }`}
+        >
+          <div className="flex items-center gap-1 min-w-max">
+            <span className="text-[10px] text-slate-400 hidden sm:inline">
+              文字数:
+            </span>
+            <input
+              id={`charLimit-input-${qa.id}`}
+              type="text"
+              className="w-16 text-right text-xs bg-white border border-slate-200 rounded px-1 py-0.5 focus:border-indigo-500 outline-none placeholder-slate-300"
+              placeholder="なし"
+              value={qa.charLimit || ""}
+              onChange={(e) => updateQA(qa.id, "charLimit", e.target.value)}
+            />
+          </div>
+
+          <div className="flex items-center gap-1 min-w-max">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                moveQA(idx, "up");
+              }}
+              disabled={idx === 0}
+              className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+            >
+              <ArrowUp size={16} />
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                moveQA(idx, "down");
+              }}
+              disabled={idx === totalQAs - 1}
+              className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+            >
+              <ArrowDown size={16} />
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                removeQA(qa.id);
+              }}
+              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div
+        className={`transition-all duration-300 ease-in-out ${isActive ? "mt-0" : "-mt-9.5"}`}
+      >
+        <div className="pt-2 pb-1">
+          <input
+            className={`w-full bg-transparent outline-none transition-all duration-300 ease-in-out ${
+              isActive
+                ? "font-bold text-slate-800 placeholder-slate-300 border-b border-indigo-300 text-base py-2 pl-0"
+                : "font-bold text-slate-700 placeholder-slate-300 border-b border-transparent text-sm py-1 pl-8 truncate"
+            }`}
+            placeholder="質問内容"
+            value={qa.question}
+            onFocus={() => {
+              if (!isMouseDownGlobal.current) setActiveQAId(qa.id);
+            }}
+            onChange={(e) => updateQA(qa.id, "question", e.target.value)}
+            autoFocus={isActive && !qa.question}
+          />
+        </div>
+      </div>
+
+      <div
+        className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${
+          isActive ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+        }`}
+      >
+        <div className="overflow-hidden">
+          <div className="mb-3 pt-1">
+            <input
+              className="w-full text-xs px-3 py-2 bg-slate-50/50 border rounded-md outline-none placeholder-slate-400 focus:bg-white focus:border-indigo-500 transition-colors"
+              placeholder="補足事項や前提条件"
+              value={qa.note || ""}
+              onFocus={() => setActiveQAId(qa.id)}
+              onChange={(e) => updateQA(qa.id, "note", e.target.value)}
+              tabIndex={isActive ? 0 : -1}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="mb-1">
+        {isComparisonMode && (
+          <div className="flex items-center gap-1 mb-2 bg-slate-100/50 p-1 rounded-lg border border-slate-200 w-fit">
+            <button
+              onClick={() => setViewMode("tabA")}
+              className={`px-3 py-1 text-xs font-bold rounded-md transition-colors ${viewMode === "tabA" ? "bg-white shadow-sm text-indigo-600" : "text-slate-500 hover:bg-slate-200"}`}
+            >
+              タブA
+            </button>
+            <button
+              onClick={handleSwapTabs}
+              className="p-1 text-slate-400 hover:text-indigo-600 rounded"
+              title="A案とB案を入れ替え"
+            >
+              <ArrowLeftRight size={14} />
+            </button>
+            <button
+              onClick={() => setViewMode("tabB")}
+              className={`px-3 py-1 text-xs font-bold rounded-md transition-colors ${viewMode === "tabB" ? "bg-white shadow-sm text-indigo-600" : "text-slate-500 hover:bg-slate-200"}`}
+            >
+              タブB
+            </button>
+            <div className="w-px h-4 bg-slate-300 mx-1" />
+            <button
+              onClick={() => setViewMode("parallel")}
+              className={`p-1.5 rounded-md transition-colors ${viewMode === "parallel" ? "bg-white shadow-sm text-indigo-600" : "text-slate-400 hover:bg-slate-200"}`}
+              title="並行表示"
+            >
+              <SplitSquareHorizontal size={14} />
+            </button>
+            <button
+              onClick={() => setViewMode("diff")}
+              className={`p-1.5 rounded-md transition-colors ${viewMode === "diff" ? "bg-white shadow-sm text-indigo-600" : "text-slate-400 hover:bg-slate-200"}`}
+              title="差分表示"
+            >
+              <GitCompare size={14} />
+            </button>
+          </div>
+        )}
+
+        {(!isComparisonMode || viewMode === "tabA" || viewMode === "tabB") && (
+          <AutoResizeTextarea
+            value={currentText}
+            onChange={(e) =>
+              handleAnswerChange(
+                e.target.value,
+                isComparisonMode ? (viewMode === "tabA" ? 0 : 1) : null,
+              )
+            }
+            onFocus={() => {
+              if (!isMouseDownGlobal.current) setActiveQAId(qa.id);
+            }}
+            placeholder="回答"
+            isActive={isActive}
+            charLimit={qa.charLimit}
+            writingStyle={appSettings.writingStyle}
+            checkNgWords={appSettings.checkNgWords}
+          />
+        )}
+
+        {isComparisonMode && viewMode === "parallel" && (
+          <div className="flex gap-2">
+            <div className="flex-1 border-r border-slate-200 pr-2">
+              <div className="text-[10px] font-bold text-slate-400 mb-1">
+                タブA
+              </div>
+              <AutoResizeTextarea
+                value={qa.answers[0] || ""}
+                onChange={(e) => handleAnswerChange(e.target.value, 0)}
+                onFocus={() => {
+                  if (!isMouseDownGlobal.current) setActiveQAId(qa.id);
+                }}
+                isActive={isActive}
+                charLimit={qa.charLimit}
+                writingStyle={appSettings.writingStyle}
+                checkNgWords={appSettings.checkNgWords}
+              />
+            </div>
+            <div className="flex-1 pl-2">
+              <div className="text-[10px] font-bold text-slate-400 mb-1">
+                タブB
+              </div>
+              <AutoResizeTextarea
+                value={qa.answers[1] || ""}
+                onChange={(e) => handleAnswerChange(e.target.value, 1)}
+                onFocus={() => {
+                  if (!isMouseDownGlobal.current) setActiveQAId(qa.id);
+                }}
+                isActive={isActive}
+                charLimit={qa.charLimit}
+                writingStyle={appSettings.writingStyle}
+                checkNgWords={appSettings.checkNgWords}
+              />
+            </div>
+          </div>
+        )}
+
+        {isComparisonMode && viewMode === "diff" && (
+          <DiffViewer oldText={qa.answers[0]} newText={qa.answers[1]} />
+        )}
+
+        <div
+          className={`grid transition-[grid-template-rows,opacity] duration-300 ease-in-out ${
+            isActive
+              ? "grid-rows-[1fr] opacity-100"
+              : "grid-rows-[0fr] opacity-0"
+          }`}
+        >
+          <div className="overflow-hidden">
+            <div className="flex justify-between items-center mt-1">
+              {!isComparisonMode ? (
+                <button
+                  onClick={handleCreateAlternative}
+                  className="text-[10px] font-bold text-indigo-600 hover:bg-indigo-50 px-2 py-1 rounded transition-colors flex items-center gap-1 border border-indigo-100"
+                >
+                  <Plus size={10} /> 別案を作成
+                </button>
+              ) : (
+                <div />
+              )}
+
+              <div className="flex gap-2 items-center">
+                <span className="text-[10px] font-mono text-slate-500 bg-slate-200 px-2 py-0.5 rounded-full">
+                  {currentText.length}文字
+                </span>
+                {qa.charLimit && (
+                  <span
+                    className={`text-[10px] font-mono px-2 py-0.5 rounded-full ${
+                      currentText.length > Number(qa.charLimit)
+                        ? "bg-rose-100 text-rose-600"
+                        : "bg-slate-100 text-slate-500"
+                    }`}
+                  >
+                    上限: {qa.charLimit}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <AIAssistant
+          question={qa.question}
+          answer={currentText}
+          charLimit={qa.charLimit}
+          company={formData.company}
+          industry={formData.industry}
+          selectionType={formData.selectionType}
+          note={qa.note}
+          onApply={(text) =>
+            handleAnswerChange(
+              text,
+              isComparisonMode ? (viewMode === "tabA" ? 0 : 1) : null,
+            )
+          }
+          allEntries={enrichedEntries}
+          entryId={editingId}
+          qaId={qa.id}
+          writingStyle={appSettings.writingStyle}
+          keepInstruction={appSettings.keepInstruction}
+          showPromptMode={appSettings.showPromptMode}
+          showModelName={appSettings.showModelName}
+          isActive={isActive}
+          appSettings={appSettings}
+        />
+      </div>
+
+      <div
+        className={`relative transition-all duration-300 ease-in-out ${isActive ? "mt-2" : "mt-3"}`}
+      >
+        <div className="flex justify-between items-center gap-2">
+          <input
+            className={`flex-1 transition-all duration-300 ease-in-out bg-white border border-slate-200 outline-none focus:border-indigo-500 placeholder-slate-300 ${
+              isActive
+                ? "text-xs px-3 py-2 rounded-md"
+                : "text-xs px-2 py-1 rounded"
+            }`}
+            placeholder="タグ (例: 自己PR、ガクチカ)"
+            value={qa.tags}
+            onClick={(e) => e.stopPropagation()}
+            onFocus={() => setActiveTagDropdownId(qa.id)}
+            onBlur={() => setActiveTagDropdownId(null)}
+            onChange={(e) => updateQA(qa.id, "tags", e.target.value)}
+          />
+          <div
+            className={`flex items-center justify-end overflow-hidden transition-all duration-300 ease-in-out shrink-0 ${
+              isActive ? "max-w-0 opacity-0" : "max-w-[150px] opacity-100"
+            }`}
+          >
+            <div
+              onClick={(e) => {
+                e.stopPropagation();
+                setActiveQAId(qa.id);
+                setTimeout(() => {
+                  const inputEl = document.getElementById(
+                    `charLimit-input-${qa.id}`,
+                  );
+                  if (inputEl) {
+                    inputEl.focus();
+                    inputEl.select();
+                  }
+                }, 100);
+              }}
+              className={`text-right text-[10px] font-mono whitespace-nowrap cursor-pointer hover:text-indigo-500 hover:bg-slate-100 px-1.5 py-0.5 rounded transition-colors ${
+                qa.charLimit && currentText.length > Number(qa.charLimit)
+                  ? "text-rose-500 font-bold"
+                  : "text-slate-400"
+              }`}
+            >
+              {currentText.length}文字
+              {qa.charLimit && ` / 上限: ${qa.charLimit}`}
+            </div>
+          </div>
+        </div>
+        {activeTagDropdownId === qa.id &&
+          (() => {
+            const currentTags = splitTags(qa.tags);
+            const availableTags = existingTags.filter(
+              (t) => !currentTags.includes(t),
+            );
+            if (availableTags.length === 0) return null;
+            return (
+              <div className="absolute z-50 left-0 top-full mt-1 w-full bg-white border border-slate-200 shadow-xl rounded-lg p-3 flex flex-wrap gap-1.5 max-h-48 overflow-y-auto animate-in fade-in zoom-in-95">
+                <div className="w-full text-[10px] font-bold text-slate-400 mb-1 border-b border-slate-100 pb-1">
+                  過去に利用したタグ
+                </div>
+                {availableTags.map((tag) => (
+                  <button
+                    key={tag}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const newTags = qa.tags ? `${qa.tags}, ${tag}` : tag;
+                      updateQA(qa.id, "tags", newTags);
+                    }}
+                    className="text-[10px] px-2.5 py-1 bg-slate-50 text-slate-600 rounded-full hover:bg-indigo-50 hover:text-indigo-600 border border-slate-200 hover:border-indigo-200 transition-colors shadow-sm"
+                  >
+                    {tag}
+                  </button>
+                ))}
+              </div>
+            );
+          })()}
+      </div>
+
+      {idx !== totalQAs - 1 && (
+        <div
+          onClick={(e) => {
+            e.stopPropagation();
+            insertQA(idx + 1);
+          }}
+          className="absolute top-full left-1/2 -translate-x-1/2 w-1/3 h-6 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity z-50 cursor-pointer group/insert"
+        >
+          <div className="w-full h-0.5 bg-indigo-400 relative flex items-center justify-center group-hover/insert:h-1 group-hover/insert:bg-indigo-500 transition-all">
+            <div className="bg-indigo-500 text-white rounded-full p-0.5 absolute shadow-sm transform group-hover/insert:scale-110 transition-transform">
+              <Plus size={14} />
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const ESEntryDisplay = ({
   entry,
   onEdit,
@@ -4920,7 +5497,7 @@ const ESEntryDisplay = ({
                   >
                     <Edit2 size={14} />
                   </button>
-                  <CopyButton text={qa.answer} />
+                  <CopyButton text={getActiveAnswer(qa)} />
                 </div>
               </div>
 
@@ -4932,7 +5509,7 @@ const ESEntryDisplay = ({
 
               <p className="text-sm text-slate-600 whitespace-pre-wrap leading-7 mb-3 pl-6">
                 <HighlightText
-                  text={qa.answer}
+                  text={getActiveAnswer(qa)}
                   highlight={highlight}
                   writingStyle={
                     appSettings?.showChecksInList
@@ -4964,7 +5541,7 @@ const ESEntryDisplay = ({
                     ))}
                 </div>
                 <div className="text-[10px] font-mono text-slate-400 bg-slate-50 px-2 py-0.5 rounded">
-                  {(qa.answer || "").length}文字
+                  {(getActiveAnswer(qa) || "").length}文字
                 </div>
               </div>
             </div>
@@ -5333,7 +5910,16 @@ const DEFAULT_FORM_DATA = {
   selectionType: "",
   deadline: "",
   note: "",
-  qas: [{ id: 0, question: "", answer: "", tags: "", charLimit: "", note: "" }],
+  qas: [
+    {
+      id: 0,
+      question: "",
+      answer: "",
+      tags: "",
+      charLimit: "",
+      note: "",
+    },
+  ],
 };
 
 export default function App() {
@@ -6199,6 +6785,9 @@ export default function App() {
     enrichedEntries.forEach((entry) => {
       if (entry.qas) {
         entry.qas.forEach((qa) => {
+          const ans = getActiveAnswer(qa);
+          if (!ans || !ans.trim()) return;
+
           const tags = splitTags(qa.tags);
 
           const hasAllTags = tagTerms.every((term) =>
@@ -6212,7 +6801,7 @@ export default function App() {
             entry.selectionType,
             entry.status,
             qa.question,
-            qa.answer,
+            ans,
             tags.join(" "),
             hasCharSearch && qa.charLimit ? `${qa.charLimit}文字` : "",
           ]
@@ -6544,6 +7133,24 @@ export default function App() {
         console.warn("Comparison for metadata-only change failed", e);
       }
 
+      const optimizedQas = formData.qas.map((qa) => {
+        const newQa = { ...qa };
+        if (newQa.answers && newQa.answers.length > 1) {
+          if (newQa.answers[1].trim() === "") {
+            newQa.answer = newQa.answers[0];
+            delete newQa.answers;
+          } else {
+            delete newQa.answer;
+          }
+        } else {
+          if (newQa.answers && newQa.answers.length === 1) {
+            newQa.answer = newQa.answers[0];
+          }
+          delete newQa.answers;
+        }
+        return newQa;
+      });
+
       const entryData = {
         ...formData,
         id: currentId,
@@ -6551,6 +7158,7 @@ export default function App() {
         updatedAt: shouldBumpTimestamp
           ? nowUpdatedAt
           : oldEntry?.updatedAt || formData.updatedAt || getCurrentJSTTime(),
+        qas: optimizedQas,
       };
 
       const completedStatuses = new Set(["提出済", "採用", "不採用"]);
@@ -7002,10 +7610,24 @@ export default function App() {
     }
   };
 
-  const updateQA = (id, f, v) =>
+  const updateQA = (id, fieldOrObj, value) =>
     setFormData((p) => ({
       ...p,
-      qas: p.qas.map((q) => (q.id === id ? { ...q, [f]: v } : q)),
+      qas: p.qas.map((q) => {
+        if (q.id !== id) return q;
+
+        if (typeof fieldOrObj === "object") {
+          const updated = { ...q, ...fieldOrObj };
+          Object.keys(fieldOrObj).forEach((key) => {
+            if (fieldOrObj[key] === undefined) {
+              delete updated[key];
+            }
+          });
+          return updated;
+        }
+
+        return { ...q, [fieldOrObj]: value };
+      }),
     }));
 
   // --- Company Data Calculation ---
@@ -8412,351 +9034,27 @@ export default function App() {
                             (formTutorialStep === 2 && idx === 0);
 
                           return (
-                            <div
+                            <QAEditor
                               key={qa.id}
-                              id={`qa-item-${qa.id}`}
-                              data-tutorial={idx === 0 ? "2" : undefined}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setActiveQAId(qa.id);
-                              }}
-                              className={`relative rounded-xl border transition-all duration-500 ease-in-out px-4 pt-2 pb-3 ${
-                                activeTagDropdownId === qa.id ? "z-40" : "z-10"
-                              } ${
-                                isActive
-                                  ? "bg-slate-50 shadow-sm border-indigo-200 ring-1 ring-indigo-200"
-                                  : `bg-white border-slate-200 hover:border-indigo-300 cursor-pointer hover:opacity-100 ${
-                                      activeTagDropdownId === qa.id
-                                        ? "opacity-100"
-                                        : "opacity-90"
-                                    }`
-                              } ${
-                                formTutorialStep === 2 && idx === 0
-                                  ? "z-[101] bg-white shadow-lg pointer-events-none"
-                                  : ""
-                              }`}
-                            >
-                              {idx === 0 && (
-                                <div
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    insertQA(0);
-                                  }}
-                                  className="absolute bottom-full left-1/2 -translate-x-1/2 w-1/3 h-6 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity z-50 cursor-pointer group/insert"
-                                >
-                                  <div className="w-full h-0.5 bg-indigo-400 relative flex items-center justify-center group-hover/insert:h-1 group-hover/insert:bg-indigo-500 transition-all">
-                                    <div className="bg-indigo-500 text-white rounded-full p-0.5 absolute shadow-sm transform group-hover/insert:scale-110 transition-transform">
-                                      <Plus size={14} />
-                                    </div>
-                                  </div>
-                                </div>
-                              )}
-
-                              <div className="relative z-10 flex items-center justify-between min-h-[32px] pointer-events-none">
-                                <div
-                                  className={`text-xs font-bold transition-colors duration-300 shrink-0 ${
-                                    isActive
-                                      ? "text-indigo-600"
-                                      : "text-slate-400"
-                                  }`}
-                                >
-                                  Q{idx + 1}
-                                </div>
-
-                                <div
-                                  className={`flex items-center gap-3 overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] shrink-0 ml-auto ${
-                                    formTutorialStep > 0
-                                      ? "pointer-events-none"
-                                      : "pointer-events-auto"
-                                  } ${
-                                    isActive
-                                      ? "max-w-[400px] opacity-100 translate-x-0"
-                                      : "max-w-0 opacity-0 translate-x-4"
-                                  }`}
-                                >
-                                  <div className="flex items-center gap-1 min-w-max">
-                                    <span className="text-[10px] text-slate-400 hidden sm:inline">
-                                      文字数:
-                                    </span>
-                                    <input
-                                      id={`charLimit-input-${qa.id}`}
-                                      type="text"
-                                      className="w-16 text-right text-xs bg-white border border-slate-200 rounded px-1 py-0.5 focus:border-indigo-500 outline-none placeholder-slate-300"
-                                      placeholder="なし"
-                                      value={qa.charLimit || ""}
-                                      onChange={(e) =>
-                                        updateQA(
-                                          qa.id,
-                                          "charLimit",
-                                          e.target.value,
-                                        )
-                                      }
-                                    />
-                                  </div>
-
-                                  <div className="flex items-center gap-1 min-w-max">
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        moveQA(idx, "up");
-                                      }}
-                                      disabled={idx === 0}
-                                      className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
-                                      title="質問を上に移動"
-                                    >
-                                      <ArrowUp size={16} />
-                                    </button>
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        moveQA(idx, "down");
-                                      }}
-                                      disabled={idx === formData.qas.length - 1}
-                                      className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
-                                      title="質問を下に移動"
-                                    >
-                                      <ArrowDown size={16} />
-                                    </button>
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        removeQA(qa.id);
-                                      }}
-                                      title="質問を削除"
-                                      className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors"
-                                    >
-                                      <X size={16} />
-                                    </button>
-                                  </div>
-                                </div>
-                              </div>
-
-                              <div
-                                className={`transition-all duration-300 ease-in-out ${
-                                  isActive ? "mt-0" : "-mt-9.5"
-                                }`}
-                              >
-                                <div className="pt-2 pb-1">
-                                  <input
-                                    className={`w-full bg-transparent outline-none transition-all duration-300 ease-in-out ${
-                                      isActive
-                                        ? "font-bold text-slate-800 placeholder-slate-300 border-b border-indigo-300 text-base py-2 pl-0"
-                                        : "font-bold text-slate-700 placeholder-slate-300 border-b border-transparent text-sm py-1 pl-8 truncate"
-                                    }`}
-                                    placeholder="質問内容"
-                                    value={qa.question}
-                                    onFocus={() => {
-                                      if (!isMouseDownGlobal.current)
-                                        setActiveQAId(qa.id);
-                                    }}
-                                    onChange={(e) =>
-                                      updateQA(
-                                        qa.id,
-                                        "question",
-                                        e.target.value,
-                                      )
-                                    }
-                                    autoFocus={isActive && !qa.question}
-                                  />
-                                </div>
-                              </div>
-
-                              <div
-                                className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${
-                                  isActive
-                                    ? "grid-rows-[1fr]"
-                                    : "grid-rows-[0fr]"
-                                }`}
-                              >
-                                <div className="overflow-hidden">
-                                  <div className="mb-3 pt-1">
-                                    <input
-                                      className="w-full text-xs px-3 py-2 bg-slate-50/50 border rounded-md outline-none placeholder-slate-400 focus:bg-white focus:border-indigo-500 transition-colors"
-                                      placeholder="補足事項や前提条件"
-                                      value={qa.note || ""}
-                                      onFocus={() => setActiveQAId(qa.id)}
-                                      onChange={(e) =>
-                                        updateQA(qa.id, "note", e.target.value)
-                                      }
-                                      tabIndex={isActive ? 0 : -1}
-                                    />
-                                  </div>
-                                </div>
-                              </div>
-
-                              <div className="mb-1">
-                                <AutoResizeTextarea
-                                  value={qa.answer}
-                                  onChange={(e) =>
-                                    updateQA(qa.id, "answer", e.target.value)
-                                  }
-                                  onFocus={() => {
-                                    if (!isMouseDownGlobal.current)
-                                      setActiveQAId(qa.id);
-                                  }}
-                                  placeholder="回答"
-                                  isActive={isActive}
-                                  charLimit={qa.charLimit}
-                                  writingStyle={appSettings.writingStyle}
-                                  checkNgWords={appSettings.checkNgWords}
-                                />
-                                <div
-                                  className={`grid transition-[grid-template-rows,opacity] duration-300 ease-in-out ${
-                                    isActive
-                                      ? "grid-rows-[1fr] opacity-100"
-                                      : "grid-rows-[0fr] opacity-0"
-                                  }`}
-                                >
-                                  <div className="overflow-hidden">
-                                    <div className="text-right mt-1 flex justify-end gap-2 items-center">
-                                      <span className="text-[10px] font-mono text-slate-500 bg-slate-200 px-2 py-0.5 rounded-full">
-                                        {qa.answer.length}文字
-                                      </span>
-                                      {qa.charLimit && (
-                                        <span
-                                          className={`text-[10px] font-mono px-2 py-0.5 rounded-full ${
-                                            qa.answer.length > qa.charLimit
-                                              ? "bg-rose-100 text-rose-600"
-                                              : "bg-slate-100 text-slate-500"
-                                          }`}
-                                        >
-                                          上限: {qa.charLimit}
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-                                <AIAssistant
-                                  question={qa.question}
-                                  answer={qa.answer}
-                                  charLimit={qa.charLimit}
-                                  company={formData.company}
-                                  industry={formData.industry}
-                                  selectionType={formData.selectionType}
-                                  note={qa.note}
-                                  onApply={(text) =>
-                                    updateQA(qa.id, "answer", text)
-                                  }
-                                  allEntries={enrichedEntries}
-                                  entryId={editingId}
-                                  qaId={qa.id}
-                                  writingStyle={appSettings.writingStyle}
-                                  keepInstruction={appSettings.keepInstruction}
-                                  showPromptMode={appSettings.showPromptMode}
-                                  showModelName={appSettings.showModelName}
-                                  isActive={isActive}
-                                  appSettings={appSettings}
-                                />
-                              </div>
-
-                              <div
-                                className={`relative transition-all duration-300 ease-in-out ${isActive ? "mt-2" : "mt-3"}`}
-                              >
-                                <div className="flex justify-between items-center gap-2">
-                                  <input
-                                    className={`flex-1 transition-all duration-300 ease-in-out bg-white border border-slate-200 outline-none focus:border-indigo-500 placeholder-slate-300 ${
-                                      isActive
-                                        ? "text-xs px-3 py-2 rounded-md"
-                                        : "text-xs px-2 py-1 rounded"
-                                    }`}
-                                    placeholder="タグ (例: 自己PR、ガクチカ)"
-                                    value={qa.tags}
-                                    onClick={(e) => e.stopPropagation()}
-                                    onFocus={() => {
-                                      setActiveTagDropdownId(qa.id);
-                                    }}
-                                    onBlur={() => setActiveTagDropdownId(null)}
-                                    onChange={(e) =>
-                                      updateQA(qa.id, "tags", e.target.value)
-                                    }
-                                  />
-                                  <div
-                                    className={`flex items-center justify-end overflow-hidden transition-all duration-300 ease-in-out shrink-0 ${
-                                      isActive
-                                        ? "max-w-0 opacity-0"
-                                        : "max-w-[150px] opacity-100"
-                                    }`}
-                                  >
-                                    <div
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setActiveQAId(qa.id);
-                                        setTimeout(() => {
-                                          const inputEl =
-                                            document.getElementById(
-                                              `charLimit-input-${qa.id}`,
-                                            );
-                                          if (inputEl) {
-                                            inputEl.focus();
-                                            inputEl.select();
-                                          }
-                                        }, 100);
-                                      }}
-                                      className={`text-right text-[10px] font-mono whitespace-nowrap cursor-pointer hover:text-indigo-500 hover:bg-slate-100 px-1.5 py-0.5 rounded transition-colors ${
-                                        qa.charLimit &&
-                                        qa.answer.length > Number(qa.charLimit)
-                                          ? "text-rose-500 font-bold"
-                                          : "text-slate-400"
-                                      }`}
-                                    >
-                                      {qa.answer.length}文字
-                                      {qa.charLimit &&
-                                        ` / 上限: ${qa.charLimit}`}
-                                    </div>
-                                  </div>
-                                </div>
-                                {activeTagDropdownId === qa.id &&
-                                  (() => {
-                                    const currentTags = splitTags(qa.tags);
-                                    const availableTags = existingTags.filter(
-                                      (t) => !currentTags.includes(t),
-                                    );
-                                    if (availableTags.length === 0) return null;
-                                    return (
-                                      <div className="absolute z-50 left-0 top-full mt-1 w-full bg-white border border-slate-200 shadow-xl rounded-lg p-3 flex flex-wrap gap-1.5 max-h-48 overflow-y-auto animate-in fade-in zoom-in-95">
-                                        <div className="w-full text-[10px] font-bold text-slate-400 mb-1 border-b border-slate-100 pb-1">
-                                          過去に利用したタグ
-                                        </div>
-                                        {availableTags.map((tag) => (
-                                          <button
-                                            key={tag}
-                                            onMouseDown={(e) =>
-                                              e.preventDefault()
-                                            }
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              handleTagClick(
-                                                qa.id,
-                                                qa.tags,
-                                                tag,
-                                              );
-                                            }}
-                                            className="text-[10px] px-2.5 py-1 bg-slate-50 text-slate-600 rounded-full hover:bg-indigo-50 hover:text-indigo-600 border border-slate-200 hover:border-indigo-200 transition-colors shadow-sm"
-                                          >
-                                            {tag}
-                                          </button>
-                                        ))}
-                                      </div>
-                                    );
-                                  })()}
-                              </div>
-
-                              {idx !== formData.qas.length - 1 && (
-                                <div
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    insertQA(idx + 1);
-                                  }}
-                                  className="absolute top-full left-1/2 -translate-x-1/2 w-1/3 h-6 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity z-50 cursor-pointer group/insert"
-                                >
-                                  <div className="w-full h-0.5 bg-indigo-400 relative flex items-center justify-center group-hover/insert:h-1 group-hover/insert:bg-indigo-500 transition-all">
-                                    <div className="bg-indigo-500 text-white rounded-full p-0.5 absolute shadow-sm transform group-hover/insert:scale-110 transition-transform">
-                                      <Plus size={14} />
-                                    </div>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
+                              qa={qa}
+                              idx={idx}
+                              isActive={isActive}
+                              formTutorialStep={formTutorialStep}
+                              activeTagDropdownId={activeTagDropdownId}
+                              setActiveTagDropdownId={setActiveTagDropdownId}
+                              setActiveQAId={setActiveQAId}
+                              insertQA={insertQA}
+                              moveQA={moveQA}
+                              removeQA={removeQA}
+                              updateQA={updateQA}
+                              appSettings={appSettings}
+                              formData={formData}
+                              enrichedEntries={enrichedEntries}
+                              editingId={editingId}
+                              existingTags={existingTags}
+                              isMouseDownGlobal={isMouseDownGlobal}
+                              totalQAs={formData.qas.length}
+                            />
                           );
                         })}
                       </div>
