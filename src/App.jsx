@@ -3012,13 +3012,14 @@ const StatusBadge = ({ status }) => {
   );
 };
 
-const CopyButton = ({ text }) => {
+const CopyButton = ({ text, ctrlText }) => {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async (e) => {
     e.stopPropagation();
+    const copyText = (e.ctrlKey || e.metaKey) && ctrlText ? ctrlText : text;
     try {
-      await navigator.clipboard.writeText(text);
+      await navigator.clipboard.writeText(copyText);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (error) {
@@ -3574,7 +3575,10 @@ const ReferenceSidebar = ({
                 </p>
               </div>
               <div className="shrink-0">
-                <CopyButton text={item.answer} />
+                <CopyButton
+                  text={item.answer}
+                  ctrlText={`Q.${item.question} ${item.charLimit ? `(${item.charLimit}文字)` : ""}\n　${item.answer}`}
+                />
               </div>
             </div>
 
@@ -4884,7 +4888,10 @@ const QAItemDisplay = ({
           )}
         </h3>
       </div>
-      <CopyButton text={qa.answer} />
+      <CopyButton
+        text={qa.answer}
+        ctrlText={`Q.${qa.question} ${qa.charLimit ? `(${qa.charLimit}文字)` : ""}\n　${qa.answer}`}
+      />
     </div>
 
     {qa.note && (
@@ -5530,7 +5537,10 @@ const ESEntryDisplay = ({
                   >
                     <Edit2 size={14} />
                   </button>
-                  <CopyButton text={getActiveAnswer(qa)} />
+                  <CopyButton
+                    text={getActiveAnswer(qa)}
+                    ctrlText={`Q.${qa.question} ${qa.charLimit ? `(${qa.charLimit}文字)` : ""}\n　${getActiveAnswer(qa)}`}
+                  />
                 </div>
               </div>
 
@@ -5628,7 +5638,10 @@ const DraftDisplay = ({ draft, onEdit, onDelete, highlight, appSettings }) => {
                   <HighlightText text={item.question} highlight={highlight} />
                 </h3>
               </div>
-              <CopyButton text={item.answer} />
+              <CopyButton
+                text={item.answer}
+                ctrlText={`Q.${item.question}\n${item.answer}`}
+              />
             </div>
 
             <p className="text-sm text-slate-600 whitespace-pre-wrap leading-7 pl-6">
