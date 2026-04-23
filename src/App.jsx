@@ -4367,6 +4367,10 @@ const AIAssistant = ({
   const [isPromptMode, setIsPromptMode] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
 
+  const [selectedAction, setSelectedAction] = useState("refine");
+  const [isResultVisible, setIsResultVisible] = useState(false);
+  const [isInitialUIVisible, setIsInitialUIVisible] = useState(true);
+
   if (!hasApiKey) return null;
 
   const handleCopyPrompt = async () => {
@@ -4379,15 +4383,25 @@ const AIAssistant = ({
     }
   };
 
+  const handleSubmitAction = () => {
+    if (selectedAction === "generate") {
+      setIsRefModalOpen(true);
+    } else {
+      handleAction(selectedAction);
+    }
+  };
+
   const handleAction = async (actionType, directRefs = null) => {
     if ((actionType === "refine" || actionType === "feedback") && !answer)
       return;
 
+    setIsInitialUIVisible(false);
     setLoading(true);
     setMode(actionType);
     setResult("");
     setCurrentModel("");
     setIsCompact(false);
+    setIsResultVisible(false);
 
     const styleInstruction =
       writingStyle === "keigo"
@@ -4558,14 +4572,10 @@ ${commonConstraints}`;
     }
 
     if (isPromptMode) {
-      const fullPrompt = `[systemPrompt]
-${systemPrompt.replace(/^[ \t]+/gm, "")}
-
-[userPrompt]
-${userPrompt.replace(/^[ \t]+/gm, "")}`;
-
+      const fullPrompt = `[systemPrompt]\n${systemPrompt.replace(/^[ \t]+/gm, "")}\n\n[userPrompt]\n${userPrompt.replace(/^[ \t]+/gm, "")}`;
       setResult(fullPrompt);
       setLoading(false);
+      setIsResultVisible(true);
       return;
     }
 
@@ -4576,6 +4586,7 @@ ${userPrompt.replace(/^[ \t]+/gm, "")}`;
     );
     setResult(aiText);
     setLoading(false);
+    setIsResultVisible(true);
   };
 
   const handleSelectReferences = (refs) => {
@@ -4585,22 +4596,28 @@ ${userPrompt.replace(/^[ \t]+/gm, "")}`;
   };
 
   const close = () => {
-    let shouldClear = true;
-    if (keepInstruction === "always" || keepInstruction === true) {
-      shouldClear = false;
-    } else if (keepInstruction === "clear_on_success") {
-      if (isPromptMode || isError) {
-        shouldClear = false;
-      }
-    }
+    setIsResultVisible(false);
 
-    setResult("");
-    setMode(null);
-    if (shouldClear) {
-      setInstruction("");
-    }
-    setSelectedRefs([]);
-    setIsCopied(false);
+    setIsInitialUIVisible(true);
+
+    setTimeout(() => {
+      let shouldClear = true;
+      if (keepInstruction === "always" || keepInstruction === true) {
+        shouldClear = false;
+      } else if (keepInstruction === "clear_on_success") {
+        if (isPromptMode || isError) {
+          shouldClear = false;
+        }
+      }
+
+      setResult("");
+      setMode(null);
+      if (shouldClear) {
+        setInstruction("");
+      }
+      setSelectedRefs([]);
+      setIsCopied(false);
+    }, 300);
   };
 
   const isError =
@@ -4609,7 +4626,6 @@ ${userPrompt.replace(/^[ \t]+/gm, "")}`;
       result.startsWith("APIキー") ||
       result.startsWith("AIからの"));
 
-  const themeColor = isPromptMode ? "emerald" : "indigo";
   const ThemeIcon = isPromptMode
     ? MessageSquareCode
     : mode === "feedback"
@@ -4617,7 +4633,6 @@ ${userPrompt.replace(/^[ \t]+/gm, "")}`;
       : mode === "generate"
         ? BookOpen
         : Sparkles;
-
   const titleText = isPromptMode
     ? "生成プロンプト (外部AI用)"
     : mode === "feedback"
@@ -4625,8 +4640,8 @@ ${userPrompt.replace(/^[ \t]+/gm, "")}`;
       : "AI生成結果";
 
   const containerClass = isPromptMode
-    ? "mt-3 bg-white rounded-xl border shadow-sm overflow-hidden animate-in slide-in-from-top-2 border-emerald-100"
-    : "mt-3 bg-white rounded-xl border shadow-sm overflow-hidden animate-in slide-in-from-top-2 border-indigo-100";
+    ? "bg-white rounded-xl border shadow-sm overflow-hidden border-emerald-100"
+    : "bg-white rounded-xl border shadow-sm overflow-hidden border-indigo-100";
 
   const headerClass = isPromptMode
     ? "px-4 py-2 border-b flex justify-between items-center bg-emerald-50/50 border-emerald-100"
@@ -4637,14 +4652,14 @@ ${userPrompt.replace(/^[ \t]+/gm, "")}`;
     : "flex items-center gap-2 text-sm font-bold text-indigo-800";
 
   const footerClass = isPromptMode
-    ? "p-3 bg-slate-50 border-t flex justify-between items-center border-emerald-50"
-    : "p-3 bg-slate-50 border-t flex justify-between items-center border-indigo-50";
+    ? "px-4 py-1 bg-slate-50 border-t flex justify-between items-center border-emerald-50"
+    : "px-4 py-1 bg-slate-50 border-t flex justify-between items-center border-indigo-50";
 
   return (
     <div className="mt-2" onClick={(e) => e.stopPropagation()}>
       <div
         className={`grid transition-[grid-template-rows,opacity,margin] duration-300 ease-in-out ${
-          !mode && isActive
+          isInitialUIVisible && isActive
             ? "grid-rows-[1fr] opacity-100 mt-2"
             : "grid-rows-[0fr] opacity-0 mt-0"
         }`}
@@ -4661,29 +4676,26 @@ ${userPrompt.replace(/^[ \t]+/gm, "")}`;
                 tabIndex={isActive ? 0 : -1}
               />
             </div>
-            <button
-              onClick={() => handleAction("refine")}
-              disabled={!answer || !isActive}
-              className="flex items-center gap-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded-lg shadow-sm transition-colors disabled:opacity-50"
-              tabIndex={isActive ? 0 : -1}
-            >
-              <Sparkles size={12} /> 推敲
-            </button>
-            <button
-              onClick={() => handleAction("feedback")}
-              disabled={!answer || !isActive}
-              className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 px-3 py-1.5 rounded-lg border border-emerald-200 transition-colors disabled:opacity-50"
-              tabIndex={isActive ? 0 : -1}
-            >
-              <Bot size={14} /> FB
-            </button>
-            <button
-              onClick={() => setIsRefModalOpen(true)}
+
+            <select
+              value={selectedAction}
+              onChange={(e) => setSelectedAction(e.target.value)}
               disabled={!isActive}
-              className="flex items-center gap-1.5 text-xs font-bold text-indigo-700 bg-indigo-100 hover:bg-indigo-200 px-3 py-1.5 rounded-lg border border-indigo-200 transition-colors"
+              className="text-xs font-bold text-slate-700 bg-white border border-slate-200 px-2 py-1.5 rounded-lg outline-none focus:border-indigo-400 transition-colors"
               tabIndex={isActive ? 0 : -1}
             >
-              <BookOpen size={12} /> 統合
+              <option value="refine">推敲</option>
+              <option value="feedback">フィードバック</option>
+              <option value="generate">統合</option>
+            </select>
+
+            <button
+              onClick={handleSubmitAction}
+              disabled={(!answer && selectedAction !== "generate") || !isActive}
+              className="flex items-center gap-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-4 py-1.5 rounded-lg shadow-sm transition-colors disabled:opacity-50"
+              tabIndex={isActive ? 0 : -1}
+            >
+              <Zap size={14} /> 送信
             </button>
 
             {showPromptMode && (
@@ -4726,100 +4738,113 @@ ${userPrompt.replace(/^[ \t]+/gm, "")}`;
         </div>
       </div>
 
-      {loading && (
-        <div className="mt-3 p-4 bg-slate-50 rounded-xl border border-slate-200 flex items-center gap-3 text-sm text-slate-500 animate-pulse">
-          <Loader2 size={18} className="always-spin text-indigo-500" />
-          <span>
-            {isPromptMode
-              ? "プロンプトを生成中..."
-              : `AIが思考中... ${showModelName && currentModel ? `(${currentModel})` : ""}`}
-          </span>
-        </div>
-      )}
-
-      {result && !loading && (
-        <div className={containerClass}>
-          <div className={headerClass}>
-            <div className={titleColorClass}>
-              <ThemeIcon size={16} />
-              {titleText}
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setIsCompact(!isCompact)}
-                className="text-slate-400 hover:text-slate-600 px-1 transition-transform"
-              >
-                {isCompact ? (
-                  <ChevronDown size={18} />
-                ) : (
-                  <ChevronUp size={18} />
-                )}
-              </button>
-              <button
-                onClick={close}
-                title="閉じる"
-                className="text-slate-400 hover:text-slate-600"
-              >
-                <X size={18} />
-              </button>
-            </div>
+      <div
+        className={`grid transition-[grid-template-rows,opacity,margin] duration-300 ease-in-out ${
+          loading
+            ? "grid-rows-[1fr] opacity-100 mt-3"
+            : "grid-rows-[0fr] opacity-0 mt-0"
+        }`}
+      >
+        <div className="overflow-hidden">
+          <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 flex items-center gap-3 text-sm text-slate-500 animate-pulse">
+            <Loader2 size={18} className="always-spin text-indigo-500" />
+            <span>
+              {isPromptMode
+                ? "プロンプトを生成中..."
+                : `AIが思考中... ${showModelName && currentModel ? `(${currentModel})` : ""}`}
+            </span>
           </div>
+        </div>
+      </div>
 
-          {!isCompact && (
-            <>
-              <div className="p-3 text-sm text-slate-700 leading-relaxed whitespace-pre-wrap bg-white font-sans">
-                {result}
-              </div>
-              <div className={footerClass}>
-                <div className="text-xs font-mono text-slate-500 pl-1">
-                  {mode !== "feedback" &&
-                    !isError &&
-                    !(
-                      isPromptMode &&
-                      (mode === "refine" || mode === "generate")
-                    ) &&
-                    `${result.length}文字`}
+      <div
+        className={`grid transition-[grid-template-rows,opacity,margin] duration-300 ease-in-out ${
+          isResultVisible
+            ? "grid-rows-[1fr] opacity-100 mt-3"
+            : "grid-rows-[0fr] opacity-0 mt-0"
+        }`}
+      >
+        <div className="overflow-hidden">
+          {result && (
+            <div className={containerClass}>
+              <div className={headerClass}>
+                <div className={titleColorClass}>
+                  <ThemeIcon size={16} />
+                  {titleText}
                 </div>
-                <div className="flex gap-2">
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setIsCompact(!isCompact)}
+                    className="text-slate-400 hover:text-slate-600 px-1 transition-transform"
+                  >
+                    {isCompact ? (
+                      <ChevronDown size={18} />
+                    ) : (
+                      <ChevronUp size={18} />
+                    )}
+                  </button>
                   <button
                     onClick={close}
-                    className="px-3 py-1.5 text-xs font-bold text-slate-500 hover:bg-slate-200 rounded-md transition-colors"
+                    title="閉じる"
+                    className="text-slate-400 hover:text-slate-600"
                   >
-                    閉じる
+                    <X size={18} />
                   </button>
-
-                  {isPromptMode ? (
-                    <button
-                      onClick={handleCopyPrompt}
-                      className={`px-3 py-1.5 text-xs font-bold text-white rounded-md shadow-sm flex items-center gap-1.5 transition-colors ${
-                        isCopied
-                          ? "bg-emerald-700"
-                          : "bg-emerald-600 hover:bg-emerald-700"
-                      }`}
-                    >
-                      {isCopied ? <Check size={14} /> : <Copy size={14} />}
-                      {isCopied ? "コピー完了" : "コピー"}
-                    </button>
-                  ) : (
-                    mode !== "feedback" &&
-                    !isError && (
-                      <button
-                        onClick={() => {
-                          onApply(result);
-                          close();
-                        }}
-                        className="px-3 py-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-md shadow-sm flex items-center gap-1.5 transition-colors"
-                      >
-                        <Check size={14} /> 反映する
-                      </button>
-                    )
-                  )}
                 </div>
               </div>
-            </>
+
+              {!isCompact && (
+                <>
+                  <div className="p-3 text-sm text-slate-700 leading-relaxed whitespace-pre-wrap bg-white font-sans">
+                    {result}
+                  </div>
+                  <div className={footerClass}>
+                    <div className="text-xs font-mono text-slate-500 pl-1">
+                      {mode !== "feedback" &&
+                        !isError &&
+                        !(
+                          isPromptMode &&
+                          (mode === "refine" || mode === "generate")
+                        ) &&
+                        `${result.length}文字`}
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={close}
+                        className="px-3 py-1.5 text-xs font-bold text-slate-500 hover:bg-slate-200 rounded-md transition-colors"
+                      >
+                        閉じる
+                      </button>
+                      {isPromptMode ? (
+                        <button
+                          onClick={handleCopyPrompt}
+                          className={`px-3 py-1.5 text-xs font-bold text-white rounded-md shadow-sm flex items-center gap-1.5 transition-colors ${isCopied ? "bg-emerald-700" : "bg-emerald-600 hover:bg-emerald-700"}`}
+                        >
+                          {isCopied ? <Check size={14} /> : <Copy size={14} />}
+                          {isCopied ? "コピー完了" : "コピー"}
+                        </button>
+                      ) : (
+                        mode !== "feedback" &&
+                        !isError && (
+                          <button
+                            onClick={() => {
+                              onApply(result);
+                              close();
+                            }}
+                            className="px-3 py-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-md shadow-sm flex items-center gap-1.5 transition-colors"
+                          >
+                            <Check size={14} /> 反映する
+                          </button>
+                        )
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
           )}
         </div>
-      )}
+      </div>
 
       <ReferenceSelectorModal
         isOpen={isRefModalOpen}
