@@ -4926,7 +4926,7 @@ const QAItemDisplay = ({
           ))}
       </div>
       <div className="text-[10px] font-mono text-slate-400 bg-slate-50 px-2 py-0.5 rounded">
-        {qa.answer.length}文字
+        {(qa.answer || "").length}文字
       </div>
     </div>
   </div>
@@ -6865,6 +6865,7 @@ export default function App() {
           if (isMatch && isNotExcluded) {
             allItems.push({
               ...qa,
+              answer: ans,
               tagsArray: tags,
               companyName: entry.company || "名称未設定",
               status: entry.status || "未設定",
