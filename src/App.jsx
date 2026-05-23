@@ -94,7 +94,20 @@ const DEFAULT_TUTORIAL_STATE = {
   hasSeenMemoTooltip: false,
 };
 
-const COMPLETED_STATUSES = ["提出済", "採用", "不採用"];
+const ES_STATUSES = ["未提出", "作成中", "提出済", "通過", "不通過", "保留"];
+
+/** 旧ステータス名 → 新名（二重読み取り期間用。将来ここを削除すればよい） */
+const LEGACY_ES_STATUS_ALIASES = {
+  採用: "通過",
+  不採用: "不通過",
+};
+
+const normalizeEsStatus = (status) => {
+  if (!status) return "未提出";
+  return LEGACY_ES_STATUS_ALIASES[status] ?? status;
+};
+
+const COMPLETED_STATUSES = ["提出済", "通過", "不通過"];
 
 const STYLE_PATTERNS = {
   keigo: {
@@ -145,10 +158,10 @@ const CHART_COLORS = {
 };
 
 const ANALYTICS_STATUS_GROUPS = {
-  success: ["採用"],
-  failure: ["不採用"],
-  pending: ["未提出", "作成中"],
-  completed: ["提出済", "採用", "不採用"],
+  success: ["通過"],
+  failure: ["不通過"],
+  pending: ["未提出", "作成中", "保留"],
+  completed: ["提出済", "通過", "不通過"],
 };
 
 const parseSalary = (value) => {
@@ -277,10 +290,11 @@ const sanitizeEntry = (entry) => {
     return cleanQa;
   });
 
+  const status = normalizeEsStatus(entry.status);
   const completedStatuses = new Set(COMPLETED_STATUSES);
   const completedAtValue = entry.completedAt
     ? entry.completedAt
-    : completedStatuses.has(entry.status)
+    : completedStatuses.has(status)
       ? entry.updatedAt || now
       : null;
 
@@ -289,7 +303,7 @@ const sanitizeEntry = (entry) => {
       entry.id ||
       `entry_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
     company: entry.company || "名称未設定",
-    status: entry.status || "未提出",
+    status,
     selectionType: entry.selectionType || "",
     deadline: entry.deadline || "",
     note: entry.note || "",
@@ -404,6 +418,9 @@ const STATUS_COLORS = {
   未提出: "bg-gray-100 text-gray-600",
   作成中: "bg-blue-100 text-blue-600",
   提出済: "bg-emerald-100 text-emerald-600",
+  通過: "bg-amber-100 text-amber-700",
+  不通過: "bg-rose-50 text-rose-400",
+  保留: "bg-slate-100 text-slate-500",
   採用: "bg-amber-100 text-amber-700",
   不採用: "bg-rose-50 text-rose-400",
 };
@@ -1118,11 +1135,9 @@ const CalendarView = ({ entries, onEdit, onAdd }) => {
                           "bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100";
                         typeLabel = "期限";
 
-                        const isCompleted = [
-                          "提出済",
-                          "採用",
-                          "不採用",
-                        ].includes(entry.status);
+                        const isCompleted = COMPLETED_STATUSES.includes(
+                          normalizeEsStatus(entry.status),
+                        );
 
                         if (isCompleted) {
                           timeLeftStr = "提出済";
@@ -1249,9 +1264,7 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
     const selectionCounts = {};
     const charBins = Array(9).fill(0);
     const statusCharStats = {};
-    ["未提出", "作成中", "提出済", "採用", "不採用"].forEach(
-      (s) => (statusCharStats[s] = { sum: 0, count: 0 }),
-    );
+    ES_STATUSES.forEach((s) => (statusCharStats[s] = { sum: 0, count: 0 }));
     const industryCounts = {};
 
     const entryCharList = [];
@@ -1263,9 +1276,9 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
     let maxCharQA = { question: "-", chars: 0, answer: "", company: "-" };
     let minCharQA = { question: "-", chars: 999999, answer: "", company: "-" };
 
-    const prodTimeStats = { 採用: [], 不採用: [], 提出済: [] };
-    const marginStats = { 採用: [], 不採用: [], 提出済: [] };
-    const charRateStats = { 採用: [], 不採用: [], 提出済: [] };
+    const prodTimeStats = { 通過: [], 不通過: [], 提出済: [] };
+    const marginStats = { 通過: [], 不通過: [], 提出済: [] };
+    const charRateStats = { 通過: [], 不通過: [], 提出済: [] };
     const scatterData = [];
     let yearlyMarginSum = 0;
     let yearlyMarginCount = 0;
@@ -1287,10 +1300,10 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
       totalEntries++;
       if (entry.company) uniqueCompanies.add(entry.company);
 
-      const isCompleted = ANALYTICS_STATUS_GROUPS.completed.includes(
-        entry.status,
-      );
-      const isSuccess = entry.status === "採用";
+      const entryStatus = normalizeEsStatus(entry.status);
+      const isCompleted =
+        ANALYTICS_STATUS_GROUPS.completed.includes(entryStatus);
+      const isSuccess = entryStatus === "通過";
 
       if (isCompleted) completedCount++;
 
@@ -1314,8 +1327,8 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
         const end = new Date(entry.completedAt);
         const hours = Math.max(0, (end - start) / (1000 * 60 * 60));
 
-        if (prodTimeStats[entry.status]) {
-          prodTimeStats[entry.status].push(hours);
+        if (prodTimeStats[entryStatus]) {
+          prodTimeStats[entryStatus].push(hours);
         }
 
         if (entry.deadline) {
@@ -1323,8 +1336,8 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
           const startMargin = (dead - start) / (1000 * 60 * 60 * 24);
           const submitMargin = (dead - end) / (1000 * 60 * 60 * 24);
 
-          if (marginStats[entry.status]) {
-            marginStats[entry.status].push(submitMargin);
+          if (marginStats[entryStatus]) {
+            marginStats[entryStatus].push(submitMargin);
           }
 
           yearlyMarginSum += submitMargin;
@@ -1334,7 +1347,7 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
             scatterData.push({
               x: parseFloat(startMargin.toFixed(1)),
               y: parseFloat(hours.toFixed(1)),
-              status: entry.status,
+              status: entryStatus,
               company: entry.company,
             });
           }
@@ -1389,7 +1402,7 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
           const binIdx = Math.min(Math.floor(len / 100), 8);
           charBins[binIdx]++;
 
-          const stat = entry.status || "未提出";
+          const stat = entryStatus;
           if (!statusCharStats[stat])
             statusCharStats[stat] = { sum: 0, count: 0 };
           statusCharStats[stat].sum += len;
@@ -1430,12 +1443,12 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
       }
       if (
         isCompleted &&
-        charRateStats[entry.status] &&
+        charRateStats[entryStatus] &&
         entryCharRates.length > 0
       ) {
         const avgRate =
           entryCharRates.reduce((a, b) => a + b, 0) / entryCharRates.length;
-        charRateStats[entry.status].push(avgRate);
+        charRateStats[entryStatus].push(avgRate);
       }
 
       if (isCompleted && entryTotalChars > 0) {
@@ -2627,7 +2640,7 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
-        <ChartCard title="制作所要時間と採用の関係">
+        <ChartCard title="制作所要時間と通過の関係">
           {stats.charts.prodTimeChartData.length > 0 ? (
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
@@ -2655,7 +2668,7 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
           )}
         </ChartCard>
 
-        <ChartCard title="提出余裕日数と採用の関係">
+        <ChartCard title="提出余裕日数と通過の関係">
           {stats.charts.marginChartData.length > 0 ? (
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
@@ -2683,7 +2696,7 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
           )}
         </ChartCard>
 
-        <ChartCard title="文字数充足率と採用の関係">
+        <ChartCard title="文字数充足率と通過の関係">
           {stats.charts.charRateChartData.length > 0 ? (
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
@@ -2738,16 +2751,16 @@ const StatisticsView = ({ entries, companyData, activityLog }) => {
                   <Tooltip cursor={{ strokeDasharray: "3 3" }} />
                   <Legend />
                   <Scatter
-                    name="採用"
+                    name="通過"
                     data={stats.charts.scatterChartData.filter(
-                      (d) => d.status === "採用",
+                      (d) => d.status === "通過",
                     )}
                     fill={CHART_COLORS.warning}
                   />
                   <Scatter
-                    name="不採用"
+                    name="不通過"
                     data={stats.charts.scatterChartData.filter(
-                      (d) => d.status === "不採用",
+                      (d) => d.status === "不通過",
                     )}
                     fill={CHART_COLORS.danger}
                   />
@@ -3002,12 +3015,14 @@ const AutoResizeTextarea = ({
 };
 
 const StatusBadge = ({ status }) => {
-  const colorClass = STATUS_COLORS[status] || STATUS_COLORS["未提出"];
+  const displayStatus = normalizeEsStatus(status);
+  const colorClass =
+    STATUS_COLORS[displayStatus] || STATUS_COLORS["未提出"];
   return (
     <span
       className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wide border border-transparent whitespace-nowrap ${colorClass}`}
     >
-      {status || "未提出"}
+      {displayStatus}
     </span>
   );
 };
@@ -6366,7 +6381,7 @@ export default function App() {
             Object.keys(loadedCompanyData).length > 0;
 
           startTransition(() => {
-            setEntries(loadedEntries);
+            setEntries(loadedEntries.map((e) => sanitizeEntry(e)));
             setDrafts(loadedDrafts);
             setCompanyData(loadedCompanyData);
             setActivityLog(activityLog || {});
@@ -6508,7 +6523,7 @@ export default function App() {
           };
           lastSavedDataStr.current = JSON.stringify(coreData);
 
-          setEntries(loadedEntries);
+          setEntries(loadedEntries.map((e) => sanitizeEntry(e)));
           setDrafts(loadedDrafts);
           setCompanyData(loadedCompanyData);
         } catch (error) {
@@ -6952,7 +6967,7 @@ export default function App() {
   const entriesByStatus = useMemo(() => {
     const groups = {};
     processedCompanyEntries.forEach((entry) => {
-      const status = entry.status || "未設定";
+      const status = normalizeEsStatus(entry.status) || "未設定";
       if (!groups[status]) groups[status] = [];
       groups[status].push(entry);
     });
@@ -7233,10 +7248,13 @@ export default function App() {
         qas: optimizedQas,
       };
 
-      const completedStatuses = new Set(["提出済", "採用", "不採用"]);
+      const completedStatuses = new Set(COMPLETED_STATUSES);
       const oldStatusIsCompleted =
-        oldEntry && completedStatuses.has(oldEntry.status);
-      const newStatusIsCompleted = completedStatuses.has(entryData.status);
+        oldEntry &&
+        completedStatuses.has(normalizeEsStatus(oldEntry.status));
+      const newStatusIsCompleted = completedStatuses.has(
+        normalizeEsStatus(entryData.status),
+      );
       if (oldStatusIsCompleted && !newStatusIsCompleted) {
         entryData.completedAt = null;
       }
@@ -7365,7 +7383,7 @@ export default function App() {
       const editState = {
         company: fullEntry.company,
         industry: cData.industry || "",
-        status: fullEntry.status || "未提出",
+        status: normalizeEsStatus(fullEntry.status),
         selectionType: fullEntry.selectionType || "",
         deadline: fullEntry.deadline || "",
         note: fullEntry.note || "",
@@ -8201,17 +8219,9 @@ export default function App() {
                       >
                         <div className="p-1.5 bg-white/80 backdrop-blur-md rounded-full shadow-lg border border-slate-200 overflow-hidden">
                           <div className="flex items-center justify-start gap-1 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-                            {["未提出", "作成中", "提出済", "採用", "不採用"]
-                              .concat(
+                            {ES_STATUSES.concat(
                                 Object.keys(entriesByStatus).filter(
-                                  (s) =>
-                                    ![
-                                      "未提出",
-                                      "作成中",
-                                      "提出済",
-                                      "採用",
-                                      "不採用",
-                                    ].includes(s),
+                                  (s) => !ES_STATUSES.includes(s),
                                 ),
                               )
                               .map((status, _, array) => {
@@ -8269,8 +8279,7 @@ export default function App() {
                         データはありません
                       </div>
                     )}
-                    {["未提出", "作成中", "提出済", "採用", "不採用"].map(
-                      (status) => {
+                    {ES_STATUSES.map((status) => {
                         const entries = entriesByStatus[status];
                         if (!entries || entries.length === 0) return null;
                         const isCollapsed = collapsedStatuses[status];
@@ -8332,19 +8341,9 @@ export default function App() {
                             </div>
                           </div>
                         );
-                      },
-                    )}
+                    })}
                     {Object.keys(entriesByStatus)
-                      .filter(
-                        (s) =>
-                          ![
-                            "未提出",
-                            "作成中",
-                            "提出済",
-                            "採用",
-                            "不採用",
-                          ].includes(s),
-                      )
+                      .filter((s) => !ES_STATUSES.includes(s))
                       .map((status) => {
                         const entries = entriesByStatus[status];
                         const isCollapsed = collapsedStatuses[status];
@@ -9017,16 +9016,15 @@ export default function App() {
                           value={formData.status}
                           onChange={(e) => {
                             const newStatus = e.target.value;
-                            const completedStatuses = new Set([
-                              "提出済",
-                              "採用",
-                              "不採用",
-                            ]);
-                            const currentIsCompleted = completedStatuses.has(
-                              formData.status,
+                            const completedStatuses = new Set(
+                              COMPLETED_STATUSES,
                             );
-                            const newIsCompleted =
-                              completedStatuses.has(newStatus);
+                            const currentIsCompleted = completedStatuses.has(
+                              normalizeEsStatus(formData.status),
+                            );
+                            const newIsCompleted = completedStatuses.has(
+                              normalizeEsStatus(newStatus),
+                            );
 
                             if (currentIsCompleted && !newIsCompleted) {
                               if (window.confirm("提出を取り消しますか？")) {
@@ -9037,13 +9035,11 @@ export default function App() {
                             }
                           }}
                         >
-                          {["未提出", "作成中", "提出済", "採用", "不採用"].map(
-                            (s) => (
-                              <option key={s} value={s}>
-                                {s}
-                              </option>
-                            ),
-                          )}
+                          {ES_STATUSES.map((s) => (
+                            <option key={s} value={s}>
+                              {s}
+                            </option>
+                          ))}
                         </select>
                       </div>
                       <div>
