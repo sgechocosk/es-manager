@@ -4,6 +4,8 @@ import React, {
   useLayoutEffect,
   useMemo,
   useRef,
+  useCallback,
+  memo,
   startTransition,
 } from "react";
 import { createPortal } from "react-dom";
@@ -82,6 +84,52 @@ const STORAGE_KEY_VIEW_SETTINGS = "ES_MANAGER_VIEW_SETTINGS";
 const STORAGE_KEY_ACTIVITY_LOG = "ES_MANAGER_ACTIVITY_LOG";
 const STORAGE_KEY_TUTORIAL = "ES_MANAGER_TUTORIAL";
 const HEADER_HEIGHT = "57px";
+const SEARCH_DEBOUNCE_MS = 200;
+const AUTOSAVE_DEBOUNCE_MS = 500;
+const LIST_RENDER_BATCH = 40;
+
+const useDebouncedValue = (value, delay) => {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(timer);
+  }, [value, delay]);
+  return debounced;
+};
+
+const parseSearchTerms = (searchQuery) => {
+  const rawTerms = (searchQuery || "")
+    .toLowerCase()
+    .replace(/＃/g, "#")
+    .split(/[\s\u3000]+/)
+    .filter((t) => t.length > 0);
+  return {
+    rawTerms,
+    hasCharSearch: rawTerms.some((t) => t.includes("文字")),
+    tagTerms: rawTerms.filter((t) => t.startsWith("#")).map((t) => t.slice(1)),
+    positiveTerms: rawTerms.filter(
+      (t) => !t.startsWith("-") && !t.startsWith("#"),
+    ),
+    negativeTerms: rawTerms
+      .filter((t) => t.startsWith("-"))
+      .map((t) => t.slice(1)),
+  };
+};
+
+const matchesSearchContext = (
+  combinedText,
+  { tagTerms, positiveTerms, negativeTerms },
+  tagsArr = [],
+) => {
+  const hasAllTags = tagTerms.every((term) =>
+    tagsArr.some((tag) => tag.toLowerCase().includes(term)),
+  );
+  if (!hasAllTags) return false;
+  const text = combinedText.toLowerCase();
+  const isMatch = positiveTerms.every((term) => text.includes(term));
+  const isNotExcluded = negativeTerms.every((term) => !text.includes(term));
+  return isMatch && isNotExcluded;
+};
 
 const DEFAULT_TUTORIAL_STATE = {
   hasSeenWelcome: false,
@@ -425,13 +473,13 @@ const STATUS_COLORS = {
   不採用: "bg-rose-50 text-rose-400",
 };
 
-const HighlightText = ({
+const HighlightText = memo(function HighlightText({
   text,
   highlight,
   writingStyle,
   checkNgWords,
   isTag,
-}) => {
+}) {
   if (!text) return <>{text}</>;
 
   const textStr = text.toString();
@@ -540,7 +588,7 @@ const HighlightText = ({
   }
 
   return <>{result}</>;
-};
+});
 
 // --- Statistics Components ---
 const StatCard = ({ icon: Icon, label, value, subValue, colorClass }) => (
@@ -579,10 +627,41 @@ const ChartCard = ({ title, children, height = "h-64", padding = "p-6" }) => (
   </div>
 );
 
-const EmptyState = ({ message = "データ不足" }) => (
-  <div className="h-full flex flex-col items-center justify-center text-slate-400">
+const EmptyState = ({
+  message = "表示に必要なデータがまだありません",
+  description,
+}) => (
+  <div className="h-full flex flex-col items-center justify-center text-slate-400 px-4 text-center">
     <Database size={24} className="mb-2 opacity-50" />
     <span className="text-xs font-bold">{message}</span>
+    {description && (
+      <span className="text-[10px] mt-1 text-slate-400">{description}</span>
+    )}
+  </div>
+);
+
+const ListEmptyMessage = ({
+  hasAnyData,
+  isFiltered,
+  emptyTitle,
+  emptyDescription,
+  filteredTitle = "検索条件に一致する項目がありません",
+  filteredDescription = "キーワードを変えてお試しください",
+}) => (
+  <div className="text-center text-slate-400 py-10 text-sm leading-relaxed">
+    {hasAnyData && isFiltered ? (
+      <>
+        <p className="font-bold">{filteredTitle}</p>
+        <p className="text-xs mt-2">{filteredDescription}</p>
+      </>
+    ) : (
+      <>
+        <p className="font-bold">{emptyTitle}</p>
+        {emptyDescription && (
+          <p className="text-xs mt-2 whitespace-pre-line">{emptyDescription}</p>
+        )}
+      </>
+    )}
   </div>
 );
 
@@ -812,45 +891,48 @@ const CalendarView = ({ entries, onEdit, onAdd }) => {
     .fill(null)
     .concat(Array.from({ length: daysInMonth }, (_, i) => i + 1));
 
-  const eventsMap = {};
-  entries.forEach((entry) => {
-    if (entry.deadline && visibleItems.includes("deadline")) {
-      const d = new Date(entry.deadline);
-      if (d.getFullYear() === year && d.getMonth() === month) {
-        const date = d.getDate();
-        if (!eventsMap[date]) eventsMap[date] = [];
-        eventsMap[date].push({
-          ...entry,
-          type: "deadline",
-          time: entry.deadline,
-        });
+  const eventsMap = useMemo(() => {
+    const map = {};
+    entries.forEach((entry) => {
+      if (entry.deadline && visibleItems.includes("deadline")) {
+        const d = new Date(entry.deadline);
+        if (d.getFullYear() === year && d.getMonth() === month) {
+          const date = d.getDate();
+          if (!map[date]) map[date] = [];
+          map[date].push({
+            ...entry,
+            type: "deadline",
+            time: entry.deadline,
+          });
+        }
       }
-    }
-    if (entry.createdAt && visibleItems.includes("createdAt")) {
-      const d = new Date(entry.createdAt);
-      if (d.getFullYear() === year && d.getMonth() === month) {
-        const date = d.getDate();
-        if (!eventsMap[date]) eventsMap[date] = [];
-        eventsMap[date].push({
-          ...entry,
-          type: "createdAt",
-          time: entry.createdAt,
-        });
+      if (entry.createdAt && visibleItems.includes("createdAt")) {
+        const d = new Date(entry.createdAt);
+        if (d.getFullYear() === year && d.getMonth() === month) {
+          const date = d.getDate();
+          if (!map[date]) map[date] = [];
+          map[date].push({
+            ...entry,
+            type: "createdAt",
+            time: entry.createdAt,
+          });
+        }
       }
-    }
-    if (entry.completedAt && visibleItems.includes("completedAt")) {
-      const d = new Date(entry.completedAt);
-      if (d.getFullYear() === year && d.getMonth() === month) {
-        const date = d.getDate();
-        if (!eventsMap[date]) eventsMap[date] = [];
-        eventsMap[date].push({
-          ...entry,
-          type: "completedAt",
-          time: entry.completedAt,
-        });
+      if (entry.completedAt && visibleItems.includes("completedAt")) {
+        const d = new Date(entry.completedAt);
+        if (d.getFullYear() === year && d.getMonth() === month) {
+          const date = d.getDate();
+          if (!map[date]) map[date] = [];
+          map[date].push({
+            ...entry,
+            type: "completedAt",
+            time: entry.completedAt,
+          });
+        }
       }
-    }
-  });
+    });
+    return map;
+  }, [entries, visibleItems, year, month]);
 
   const today = new Date();
   const isCurrentMonth =
@@ -3044,8 +3126,10 @@ const CopyButton = ({ text, ctrlText }) => {
 
   return (
     <button
+      type="button"
       onClick={handleCopy}
       title="クリップボードにコピー"
+      aria-label={copied ? "コピーしました" : "クリップボードにコピー"}
       className={`flex items-center gap-1.5 px-2 py-1 text-xs font-medium rounded-md transition-all duration-200 border ${
         copied
           ? "bg-emerald-50 text-emerald-600 border-emerald-200"
@@ -3053,7 +3137,7 @@ const CopyButton = ({ text, ctrlText }) => {
       }`}
     >
       {copied ? <Check size={12} /> : <Copy size={12} />}
-      {copied ? "Copied" : "Copy"}
+      {copied ? "コピーしました" : "コピー"}
     </button>
   );
 };
@@ -3437,6 +3521,7 @@ const ReferenceSidebar = ({
   appSettings,
 }) => {
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebouncedValue(search, SEARCH_DEBOUNCE_MS);
   const searchInputRef = useRef(null);
 
   useEffect(() => {
@@ -3444,6 +3529,8 @@ const ReferenceSidebar = ({
       searchInputRef.current.focus();
     }
   }, [isOpen]);
+
+  if (!isOpen) return null;
 
   const filteredQAs = useMemo(() => {
     let allItems = [];
@@ -3470,31 +3557,11 @@ const ReferenceSidebar = ({
       }
     });
 
-    if (!search) return allItems;
+    if (!debouncedSearch) return allItems;
 
-    const rawTerms = search
-      .toLowerCase()
-      .replace(/＃/g, "#")
-      .split(/[\s\u3000]+/)
-      .filter((t) => t.length > 0);
-    const hasCharSearch = rawTerms.some((t) => t.includes("文字"));
-
-    const tagTerms = rawTerms
-      .filter((t) => t.startsWith("#"))
-      .map((t) => t.slice(1));
-    const positiveTerms = rawTerms.filter(
-      (t) => !t.startsWith("-") && !t.startsWith("#"),
-    );
-    const negativeTerms = rawTerms
-      .filter((t) => t.startsWith("-"))
-      .map((t) => t.slice(1));
+    const terms = parseSearchTerms(debouncedSearch);
 
     return allItems.filter((item) => {
-      const hasAllTags = tagTerms.every((term) =>
-        item.tags.some((tag) => tag.toLowerCase().includes(term)),
-      );
-      if (!hasAllTags) return false;
-
       const text = [
         item.company,
         item.industry,
@@ -3503,39 +3570,42 @@ const ReferenceSidebar = ({
         item.question,
         item.answer,
         item.tags.join(" "),
-        hasCharSearch && item.charLimit ? `${item.charLimit}文字` : "",
+        terms.hasCharSearch && item.charLimit ? `${item.charLimit}文字` : "",
       ]
         .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
+        .join(" ");
 
-      const isMatch = positiveTerms.every((term) => text.includes(term));
-      const isNotExcluded = negativeTerms.every((term) => !text.includes(term));
-
-      return isMatch && isNotExcluded;
+      return matchesSearchContext(text, terms, item.tags);
     });
-  }, [entries, search, editingId]);
+  }, [entries, debouncedSearch, editingId]);
 
   return (
-    <aside
-      onClick={(e) => e.stopPropagation()}
-      className={`fixed right-0 w-full sm:w-96 bg-white shadow-2xl z-40 border-l border-slate-200 transform transition-transform duration-300 ease-in-out flex flex-col ${
-        isOpen ? "translate-x-0" : "translate-x-full"
-      }`}
-      style={{
-        top: HEADER_HEIGHT,
-        height: `calc(100vh - ${HEADER_HEIGHT})`,
-      }}
-    >
+    <>
+      <button
+        type="button"
+        className="fixed inset-0 z-30 bg-slate-900/30 lg:hidden"
+        aria-label="参照パネルを閉じる"
+        onClick={onClose}
+      />
+      <aside
+        onClick={(e) => e.stopPropagation()}
+        className="fixed right-0 w-full sm:w-96 bg-white shadow-2xl z-40 border-l border-slate-200 flex flex-col translate-x-0"
+        style={{
+          top: HEADER_HEIGHT,
+          height: `calc(100vh - ${HEADER_HEIGHT})`,
+        }}
+      >
       <div className="flex items-center justify-between p-4 border-b border-slate-100 bg-slate-50/80 backdrop-blur-sm shrink-0">
         <h3 className="font-bold text-slate-700 flex items-center gap-2">
           <BookOpen size={18} className="text-indigo-600" />
           ES参照
         </h3>
         <button
+          type="button"
           onClick={onClose}
           className="text-slate-400 hover:text-slate-600 p-1 rounded-md hover:bg-slate-200/50 transition-colors"
           title="閉じる"
+          aria-label="参照パネルを閉じる"
         >
           <PanelRightClose size={20} />
         </button>
@@ -3632,6 +3702,7 @@ const ReferenceSidebar = ({
         ))}
       </div>
     </aside>
+    </>
   );
 };
 
@@ -4386,7 +4457,14 @@ const AIAssistant = ({
   const [isResultVisible, setIsResultVisible] = useState(false);
   const [isInitialUIVisible, setIsInitialUIVisible] = useState(true);
 
-  if (!hasApiKey) return null;
+  if (!hasApiKey) {
+    if (!isActive) return null;
+    return (
+      <div className="mt-3 p-3 rounded-lg border border-dashed border-slate-200 bg-slate-50 text-xs text-slate-500 leading-relaxed">
+        AI機能を使うには、設定画面で Gemini API キーを登録してください。
+      </div>
+    );
+  }
 
   const handleCopyPrompt = async () => {
     try {
@@ -4701,7 +4779,7 @@ ${commonConstraints}`;
             >
               <option value="refine">推敲</option>
               <option value="feedback">フィードバック</option>
-              <option value="generate">統合</option>
+              <option value="generate">過去ESを統合</option>
             </select>
 
             <button
@@ -5057,7 +5135,7 @@ const QAEditor = ({
             e.stopPropagation();
             insertQA(0);
           }}
-          className="absolute bottom-full left-1/2 -translate-x-1/2 w-1/3 h-6 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity z-50 cursor-pointer group/insert"
+          className="absolute bottom-full left-1/2 -translate-x-1/2 w-1/3 h-6 flex items-center justify-center opacity-100 sm:opacity-0 sm:hover:opacity-100 transition-opacity z-50 cursor-pointer group/insert"
         >
           <div className="w-full h-0.5 bg-indigo-400 relative flex items-center justify-center group-hover/insert:h-1 group-hover/insert:bg-indigo-500 transition-all">
             <div className="bg-indigo-500 text-white rounded-full p-0.5 absolute shadow-sm transform group-hover/insert:scale-110 transition-transform">
@@ -5342,6 +5420,7 @@ const QAEditor = ({
           </div>
         </div>
 
+        {isActive && (
         <AIAssistant
           question={qa.question}
           answer={currentText}
@@ -5366,6 +5445,7 @@ const QAEditor = ({
           isActive={isActive}
           appSettings={appSettings}
         />
+        )}
       </div>
 
       <div
@@ -5541,7 +5621,7 @@ const ESEntryDisplay = ({
 
       {entry.note && (
         <div className="px-5 py-3 bg-amber-50/40 border-b border-slate-100 text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
-          <span className="font-bold text-amber-600/80 mr-2 text-xs">NOTE</span>
+          <span className="font-bold text-amber-600/80 mr-2 text-xs">備考</span>
           <HighlightText text={entry.note} highlight={highlight} />
         </div>
       )}
@@ -5553,7 +5633,7 @@ const ESEntryDisplay = ({
           </div>
         ) : (
           qas.map((qa, idx) => (
-            <div key={idx} className="p-5 hover:bg-white transition-colors">
+            <div key={qa.id || idx} className="p-5 hover:bg-white transition-colors">
               <div className="flex justify-between items-start gap-4 mb-2">
                 <div className="flex gap-2 flex-1">
                   <span className="text-indigo-600 font-black text-sm">Q.</span>
@@ -6187,6 +6267,11 @@ export default function App() {
 
   const [editingId, setEditingId] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearchQuery = useDebouncedValue(
+    searchQuery,
+    SEARCH_DEBOUNCE_MS,
+  );
+  const [listRenderLimit, setListRenderLimit] = useState(LIST_RENDER_BATCH);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isMemoMode, setIsMemoMode] = useState(false);
 
@@ -6241,6 +6326,13 @@ export default function App() {
   const [activityLog, setActivityLog] = useState({});
 
   const [toast, setToast] = useState(null);
+  const toastTimerRef = useRef(null);
+
+  const showToast = useCallback((message) => {
+    setToast(message);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setToast(null), 3000);
+  }, []);
 
   const lastSavedDataStr = useRef("");
   const lastSavedLogStr = useRef("");
@@ -6406,6 +6498,10 @@ export default function App() {
               "Failed to parse saved data in worker",
               result.errorMessage,
             );
+            setToast(
+              "保存データの読み込みに失敗しました。エクスポートしたJSONから復元してください。",
+            );
+            setTimeout(() => setToast(null), 6000);
           }
           finishInitialization();
         }
@@ -6415,6 +6511,10 @@ export default function App() {
 
       worker.onerror = (error) => {
         console.error("Data loader worker error", error);
+        setToast(
+          "データの読み込み中にエラーが発生しました。ページを再読み込みするか、JSONをインポートしてください。",
+        );
+        setTimeout(() => setToast(null), 6000);
         cleanup();
         finishInitialization();
       };
@@ -6440,7 +6540,15 @@ export default function App() {
   useEffect(() => {
     if (!isInitialized) return;
 
-    if (appSettings.autoSave) {
+    if (!appSettings.autoSave) {
+      localStorage.removeItem(STORAGE_KEY_DATA);
+      localStorage.removeItem(STORAGE_KEY_ACTIVITY_LOG);
+      lastSavedDataStr.current = "";
+      lastSavedLogStr.current = "";
+      return;
+    }
+
+    const timer = setTimeout(() => {
       const coreData = { entries, drafts, companyData };
       const currentDataStr = JSON.stringify(coreData);
       const currentLogStr = JSON.stringify(activityLog);
@@ -6457,23 +6565,35 @@ export default function App() {
         lastSavedLogStr.current = currentLogStr;
       }
 
-      if (shouldSaveData) {
-        const dataToSave = {
-          ...coreData,
-          activityLog,
-          updatedAt: getCurrentJSTTime(),
-        };
-        localStorage.setItem(STORAGE_KEY_DATA, JSON.stringify(dataToSave));
+      const persist = () => {
+        try {
+          if (shouldSaveData) {
+            const dataToSave = {
+              ...coreData,
+              activityLog,
+              updatedAt: getCurrentJSTTime(),
+            };
+            localStorage.setItem(STORAGE_KEY_DATA, JSON.stringify(dataToSave));
+          }
+          if (shouldSaveLog) {
+            localStorage.setItem(STORAGE_KEY_ACTIVITY_LOG, currentLogStr);
+          }
+        } catch (error) {
+          console.error("Auto-save failed", error);
+          showToast(
+            "自動保存に失敗しました。ストレージ容量を確認してください。",
+          );
+        }
+      };
+
+      if (typeof requestIdleCallback === "function") {
+        requestIdleCallback(persist, { timeout: 2000 });
+      } else {
+        persist();
       }
-      if (shouldSaveLog) {
-        localStorage.setItem(STORAGE_KEY_ACTIVITY_LOG, currentLogStr);
-      }
-    } else {
-      localStorage.removeItem(STORAGE_KEY_DATA);
-      localStorage.removeItem(STORAGE_KEY_ACTIVITY_LOG);
-      lastSavedDataStr.current = "";
-      lastSavedLogStr.current = "";
-    }
+    }, AUTOSAVE_DEBOUNCE_MS);
+
+    return () => clearTimeout(timer);
   }, [
     entries,
     drafts,
@@ -6481,6 +6601,7 @@ export default function App() {
     activityLog,
     appSettings.autoSave,
     isInitialized,
+    showToast,
   ]);
 
   // --- Effects: Sync across tabs ---
@@ -6553,37 +6674,64 @@ export default function App() {
     );
   }, [visibleColumns]);
 
+  const beforeUnloadStateRef = useRef({});
+  beforeUnloadStateRef.current = {
+    view,
+    isMemoMode,
+    initialFormState,
+    formData,
+    initialDraftState,
+    draftFormData,
+    appSettings,
+    entries,
+    drafts,
+    companyData,
+  };
+
   // --- Effects: BeforeUnload ---
   useEffect(() => {
     const handleBeforeUnload = (e) => {
+      const {
+        view: currentView,
+        isMemoMode: memoMode,
+        initialFormState: initForm,
+        formData: currentForm,
+        initialDraftState: initDraft,
+        draftFormData: currentDraft,
+        appSettings: settings,
+        entries: currentEntries,
+        drafts: currentDrafts,
+        companyData: currentCompanyData,
+      } = beforeUnloadStateRef.current;
+
       let isFormDirty = false;
-      if (view === "form" && !isMemoMode && initialFormState) {
+      if (currentView === "form" && !memoMode && initForm) {
         const currentJson = JSON.stringify({
-          ...formData,
-          qas: formData.qas.map(({ id, ...rest }) => rest),
+          ...currentForm,
+          qas: currentForm.qas.map(({ id, ...rest }) => rest),
         });
         const initialJson = JSON.stringify({
-          ...initialFormState,
-          qas: initialFormState.qas.map(({ id, ...rest }) => rest),
+          ...initForm,
+          qas: initForm.qas.map(({ id, ...rest }) => rest),
         });
         isFormDirty = currentJson !== initialJson;
       }
 
       let isDraftDirty = false;
-      if (view === "form" && isMemoMode && initialDraftState) {
+      if (currentView === "form" && memoMode && initDraft) {
         isDraftDirty =
-          JSON.stringify(draftFormData) !== JSON.stringify(initialDraftState);
+          JSON.stringify(currentDraft) !== JSON.stringify(initDraft);
       }
 
       const isEditingDirty = isFormDirty || isDraftDirty;
 
-      if (appSettings.autoSave) {
+      if (settings.autoSave) {
         if (!isEditingDirty) return;
       } else {
         const hasData =
-          entries.length > 0 ||
-          drafts.length > 0 ||
-          Object.keys(companyData).length > 0;
+          currentEntries.length > 0 ||
+          currentDrafts.length > 0 ||
+          Object.keys(currentCompanyData).length > 0;
         if (!hasData && !isEditingDirty) return;
       }
 
@@ -6595,18 +6743,7 @@ export default function App() {
 
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [
-    view,
-    entries,
-    drafts,
-    companyData,
-    formData,
-    draftFormData,
-    initialFormState,
-    initialDraftState,
-    appSettings.autoSave,
-    isMemoMode,
-  ]);
+  }, []);
 
   useEffect(() => {
     if (viewMode === "drafts" && drafts.length === 0) {
@@ -6761,63 +6898,56 @@ export default function App() {
     }));
   }, [entries, companyData]);
 
+  const hasAnyEntries = entries.length > 0;
+  const isListSearchActive = Boolean(debouncedSearchQuery.trim());
+
+  const filteredDrafts = useMemo(() => {
+    if (!debouncedSearchQuery) return drafts;
+    const terms = parseSearchTerms(debouncedSearchQuery);
+    return drafts.filter((draft) => {
+      const text = [
+        draft.title,
+        ...(draft.items || []).flatMap((item) => [item.question, item.answer]),
+      ]
+        .filter(Boolean)
+        .join(" ");
+      return matchesSearchContext(text, terms);
+    });
+  }, [drafts, debouncedSearchQuery]);
+
   const processedCompanyEntries = useMemo(() => {
     let result = enrichedEntries;
 
-    if (searchQuery) {
-      const rawTerms = searchQuery
-        .toLowerCase()
-        .replace(/＃/g, "#")
-        .split(/[\s\u3000]+/)
-        .filter((t) => t.length > 0);
-      const hasCharSearch = rawTerms.some((t) => t.includes("文字"));
-
-      const tagTerms = rawTerms
-        .filter((t) => t.startsWith("#"))
-        .map((t) => t.slice(1));
-      const positiveTerms = rawTerms.filter(
-        (t) => !t.startsWith("-") && !t.startsWith("#"),
-      );
-      const negativeTerms = rawTerms
-        .filter((t) => t.startsWith("-"))
-        .map((t) => t.slice(1));
+    if (debouncedSearchQuery) {
+      const terms = parseSearchTerms(debouncedSearchQuery);
 
       result = enrichedEntries
         .map((entry) => {
-          const entryBaseText =
-            `${entry.company} ${entry.industry} ${entry.selectionType} ${entry.status || ""}`.toLowerCase();
+          const entryBaseText = [
+            entry.company,
+            entry.industry,
+            entry.selectionType,
+            entry.status || "",
+          ]
+            .filter(Boolean)
+            .join(" ");
 
           const filteredQAs = (entry.qas || []).filter((qa) => {
             const tagsArr = Array.isArray(qa.tags)
               ? qa.tags
               : splitTags(qa.tags || "");
 
-            const hasAllTags = tagTerms.every((term) =>
-              tagsArr.some((tag) => tag.toLowerCase().includes(term)),
-            );
-            if (!hasAllTags) return false;
-
-            const charLimitText =
-              hasCharSearch && qa.charLimit ? `${qa.charLimit}文字` : "";
             const combinedText = [
               entryBaseText,
               qa.question,
               qa.answer,
               tagsArr.join(" "),
-              charLimitText,
+              terms.hasCharSearch && qa.charLimit ? `${qa.charLimit}文字` : "",
             ]
               .filter(Boolean)
-              .join(" ")
-              .toLowerCase();
+              .join(" ");
 
-            const isMatch = positiveTerms.every((term) =>
-              combinedText.includes(term),
-            );
-            const isNotExcluded = negativeTerms.every(
-              (term) => !combinedText.includes(term),
-            );
-
-            return isMatch && isNotExcluded;
+            return matchesSearchContext(combinedText, terms, tagsArr);
           });
 
           if (filteredQAs.length > 0) return { ...entry, qas: filteredQAs };
@@ -6827,8 +6957,8 @@ export default function App() {
     }
 
     return [...result].sort((a, b) => {
-      if (searchQuery) {
-        const q = searchQuery.toLowerCase();
+      if (debouncedSearchQuery) {
+        const q = debouncedSearchQuery.toLowerCase();
         const aHit = (a.company || "").toLowerCase().includes(q);
         const bHit = (b.company || "").toLowerCase().includes(q);
         if (aHit && !bHit) return -1;
@@ -6847,26 +6977,11 @@ export default function App() {
       }
       return (a.company || "").localeCompare(b.company || "", "ja");
     });
-  }, [enrichedEntries, searchQuery]);
+  }, [enrichedEntries, debouncedSearchQuery]);
 
   const flattenedQAs = useMemo(() => {
-    let allItems = [];
-    const rawTerms = searchQuery
-      .toLowerCase()
-      .replace(/＃/g, "#")
-      .split(/[\s\u3000]+/)
-      .filter((t) => t.length > 0);
-    const hasCharSearch = rawTerms.some((t) => t.includes("文字"));
-
-    const tagTerms = rawTerms
-      .filter((t) => t.startsWith("#"))
-      .map((t) => t.slice(1));
-    const positiveTerms = rawTerms.filter(
-      (t) => !t.startsWith("-") && !t.startsWith("#"),
-    );
-    const negativeTerms = rawTerms
-      .filter((t) => t.startsWith("-"))
-      .map((t) => t.slice(1));
+    const allItems = [];
+    const terms = parseSearchTerms(debouncedSearchQuery);
 
     enrichedEntries.forEach((entry) => {
       if (entry.qas) {
@@ -6876,11 +6991,6 @@ export default function App() {
 
           const tags = splitTags(qa.tags);
 
-          const hasAllTags = tagTerms.every((term) =>
-            tags.some((tag) => tag.toLowerCase().includes(term)),
-          );
-          if (!hasAllTags) return;
-
           const fullContext = [
             entry.company,
             entry.industry,
@@ -6889,26 +6999,21 @@ export default function App() {
             qa.question,
             ans,
             tags.join(" "),
-            hasCharSearch && qa.charLimit ? `${qa.charLimit}文字` : "",
+            terms.hasCharSearch && qa.charLimit ? `${qa.charLimit}文字` : "",
           ]
             .filter(Boolean)
-            .join(" ")
-            .toLowerCase();
+            .join(" ");
 
-          const isMatch = positiveTerms.every((term) =>
-            fullContext.includes(term),
-          );
-          const isNotExcluded = negativeTerms.every(
-            (term) => !fullContext.includes(term),
-          );
-
-          if (isMatch && isNotExcluded) {
+          if (
+            !debouncedSearchQuery ||
+            matchesSearchContext(fullContext, terms, tags)
+          ) {
             allItems.push({
               ...qa,
               answer: ans,
               tagsArray: tags,
-              companyName: entry.company || "名称未設定",
-              status: entry.status || "未設定",
+              companyName: entry.company || "（企業名なし）",
+              status: normalizeEsStatus(entry.status) || "未提出",
               selectionType: entry.selectionType,
               entryId: entry.id,
               updatedAt: entry.updatedAt,
@@ -6923,7 +7028,7 @@ export default function App() {
       const dateB = new Date(b.updatedAt || 0);
       return dateB - dateA;
     });
-  }, [enrichedEntries, searchQuery]);
+  }, [enrichedEntries, debouncedSearchQuery]);
 
   const tagGroups = useMemo(() => {
     const groups = {};
@@ -6941,8 +7046,8 @@ export default function App() {
     });
     return Object.keys(groups)
       .sort((a, b) => {
-        if (searchQuery) {
-          const q = searchQuery.toLowerCase();
+        if (debouncedSearchQuery) {
+          const q = debouncedSearchQuery.toLowerCase();
           const aHit = a.toLowerCase().includes(q);
           const bHit = b.toLowerCase().includes(q);
           if (aHit && !bHit) return -1;
@@ -7068,11 +7173,9 @@ export default function App() {
 
   const handleLogoClick = () => {
     if (view === "list") {
-      if (appSettings.autoSave) {
-        window.location.reload();
-      } else {
-        handleCancel("smooth");
-      }
+      scrollToTop("smooth");
+      setViewMode("company");
+      setSearchQuery("");
     } else {
       handleCancel("auto");
     }
@@ -7106,8 +7209,7 @@ export default function App() {
       setShowMemoTooltip(true);
     }
 
-    setToast("保存しました");
-    setTimeout(() => setToast(null), 3000);
+    showToast("保存しました");
 
     if (close) {
       setViewMode("drafts");
@@ -7301,8 +7403,7 @@ export default function App() {
         });
       }
 
-      setToast("保存しました");
-      setTimeout(() => setToast(null), 3000);
+      showToast("保存しました");
 
       if (closeAfterSave) {
         resetForm();
@@ -7487,12 +7588,19 @@ export default function App() {
     }, 4000);
   };
 
-  const mobileNavEventHandlers = {
-    onMouseEnter: handleNavInteractionStart,
-    onTouchStart: handleNavInteractionStart,
-    onMouseLeave: handleNavInteractionEnd,
-    onTouchEnd: handleNavInteractionEnd,
-  };
+  const mobileNavEventHandlers = useMemo(
+    () => ({
+      onMouseEnter: handleNavInteractionStart,
+      onTouchStart: handleNavInteractionStart,
+      onMouseLeave: handleNavInteractionEnd,
+      onTouchEnd: handleNavInteractionEnd,
+    }),
+    [],
+  );
+
+  useEffect(() => {
+    setListRenderLimit(LIST_RENDER_BATCH);
+  }, [viewMode, debouncedSearchQuery]);
 
   // --- Handlers: File IO ---
   const handleExport = async (e) => {
@@ -7860,20 +7968,24 @@ export default function App() {
                   placeholder="企業、質問、タグ、回答を検索..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
+                  aria-label="エントリーを検索"
                   className="w-full pl-9 pr-4 py-2 bg-slate-100 border border-transparent focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 rounded-xl text-sm transition-all outline-none"
                 />
               </div>
               <div className="flex gap-1 shrink-0">
                 <button
+                  type="button"
                   onClick={handleExport}
                   className="bg-white text-slate-600 border border-slate-200 p-2 rounded-lg hover:bg-slate-50 hover:text-indigo-600 transition-colors"
                   title="ダウンロード"
+                  aria-label="データをエクスポート"
                 >
                   <Download size={18} />
                 </button>
                 <label
                   className="bg-white text-slate-600 border border-slate-200 p-2 rounded-lg hover:bg-slate-50 hover:text-indigo-600 transition-colors cursor-pointer"
                   title="アップロード"
+                  aria-label="データをインポート"
                 >
                   <Upload size={18} />
                   <input
@@ -8082,80 +8194,45 @@ export default function App() {
                 {/* View: Drafts */}
                 {viewMode === "drafts" && drafts.length > 0 && (
                   <div className="space-y-6">
-                    {(() => {
-                      const filteredDrafts = drafts.filter((draft) => {
-                        if (!searchQuery) return true;
-
-                        const terms = searchQuery
-                          .toLowerCase()
-                          .split(/[\s\u3000]+/)
-                          .filter((t) => t.length > 0);
-                        const positiveTerms = terms.filter(
-                          (t) => !t.startsWith("-"),
-                        );
-                        const negativeTerms = terms
-                          .filter((t) => t.startsWith("-"))
-                          .map((t) => t.slice(1));
-
-                        const text = [
-                          draft.title,
-                          ...(draft.items || []).flatMap((item) => [
-                            item.question,
-                            item.answer,
-                          ]),
-                        ]
-                          .filter(Boolean)
-                          .join(" ")
-                          .toLowerCase();
-
-                        const isMatch = positiveTerms.every((term) =>
-                          text.includes(term),
-                        );
-                        const isNotExcluded = negativeTerms.every(
-                          (term) => !text.includes(term),
-                        );
-
-                        return isMatch && isNotExcluded;
-                      });
-
-                      if (filteredDrafts.length === 0) {
-                        return (
-                          <div className="text-center text-slate-400 py-10">
-                            該当するメモがありません
-                          </div>
-                        );
-                      }
-
-                      return filteredDrafts.map((draft, index) => (
+                    {filteredDrafts.length === 0 ? (
+                      <ListEmptyMessage
+                        hasAnyData={drafts.length > 0}
+                        isFiltered={isListSearchActive}
+                        emptyTitle="メモがありません"
+                        filteredTitle="該当するメモがありません"
+                      />
+                    ) : (
+                      filteredDrafts.map((draft, index) => (
                         <div key={draft.id} className="relative">
                           <DraftDisplay
                             draft={draft}
                             onEdit={startEdit}
                             onDelete={handleDelete}
-                            highlight={searchQuery}
+                            highlight={debouncedSearchQuery}
                             appSettings={appSettings}
                           />
                           {index === 0 && showMemoTooltip && (
-                            <div className="absolute top-full left-1/2 -translate-x-1/2 mt-3 w-max bg-white border border-slate-200 rounded-xl shadow-xl p-4 z-[100] animate-in fade-in slide-in-from-top-2 duration-500 cursor-default">
+                            <div className="absolute top-full left-1/2 -translate-x-1/2 mt-3 max-w-[min(100vw-2rem,20rem)] bg-white border border-slate-200 rounded-xl shadow-xl p-4 z-[100] animate-in fade-in slide-in-from-top-2 duration-500 cursor-default">
                               <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-white border-t border-l border-slate-200 transform rotate-45"></div>
                               <button
                                 onClick={handleCloseMemoTooltip}
                                 className="absolute top-2 right-2 z-20 text-slate-400 hover:text-slate-600 p-1 transition-colors"
+                                aria-label="ツールチップを閉じる"
                               >
                                 <X size={14} />
                               </button>
                               <div className="relative z-10 pr-4 pt-0.5">
-                                <p className="text-sm font-bold text-slate-700 leading-relaxed text-center whitespace-nowrap">
+                                <p className="text-sm font-bold text-slate-700 leading-relaxed text-center">
                                   メモはエントリーシートとは別に保存されます！
                                   <br />
-                                  左上の「メモ」タブからいつでも確認や編集ができます。
+                                  ヘッダーの「メモ」タブからいつでも確認や編集ができます。
                                 </p>
                               </div>
                             </div>
                           )}
                         </div>
-                      ));
-                    })()}
+                      ))
+                    )}
                   </div>
                 )}
 
@@ -8163,13 +8240,18 @@ export default function App() {
                 {viewMode === "company" && (
                   <div className="space-y-6">
                     {processedCompanyEntries.length === 0 && (
-                      <div className="text-center text-slate-400 py-10">
-                        エントリーシートがありません。
-                        <br />
-                        新規作成するか、右上のアップロードボタンからJSONを読み込んでください。
-                      </div>
+                      <ListEmptyMessage
+                        hasAnyData={hasAnyEntries}
+                        isFiltered={isListSearchActive}
+                        emptyTitle="エントリーシートがありません"
+                        emptyDescription={
+                          "新規作成するか、右上のアップロードボタンからJSONを読み込んでください。"
+                        }
+                      />
                     )}
-                    {processedCompanyEntries.map((entry, index) => {
+                    {processedCompanyEntries
+                      .slice(0, listRenderLimit)
+                      .map((entry, index) => {
                       const cData = companyData[entry.company] || {};
                       return (
                         <div key={entry.id} className="relative">
@@ -8178,7 +8260,7 @@ export default function App() {
                             onEdit={startEdit}
                             onDelete={handleDelete}
                             companyUrl={cData.myPageUrl}
-                            highlight={searchQuery}
+                            highlight={debouncedSearchQuery}
                             appSettings={appSettings}
                           />
                           {index === 0 && showFeatureUnlockTooltip && (
@@ -8202,6 +8284,18 @@ export default function App() {
                         </div>
                       );
                     })}
+                    {processedCompanyEntries.length > listRenderLimit && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setListRenderLimit((n) => n + LIST_RENDER_BATCH)
+                        }
+                        className="w-full py-3 text-sm font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-xl border border-indigo-100 transition-colors"
+                      >
+                        さらに表示（残り{" "}
+                        {processedCompanyEntries.length - listRenderLimit}件）
+                      </button>
+                    )}
                   </div>
                 )}
 
@@ -8275,9 +8369,14 @@ export default function App() {
                     )}
 
                     {Object.keys(entriesByStatus).length === 0 && (
-                      <div className="text-center text-slate-400 py-10">
-                        データはありません
-                      </div>
+                      <ListEmptyMessage
+                        hasAnyData={hasAnyEntries}
+                        isFiltered={isListSearchActive}
+                        emptyTitle="エントリーシートがありません"
+                        emptyDescription={
+                          "新規作成するか、右上のアップロードボタンからJSONを読み込んでください。"
+                        }
+                      />
                     )}
                     {ES_STATUSES.map((status) => {
                         const entries = entriesByStatus[status];
@@ -8297,12 +8396,15 @@ export default function App() {
                               <div className="flex items-center gap-2">
                                 <StatusBadge status={status} />
                                 <span className="text-xs text-slate-400 font-bold">
-                                  {entries.length}社
+                                  {entries.length}件
                                 </span>
                               </div>
                               <button
+                                type="button"
                                 onClick={() => toggleStatusCollapse(status)}
                                 className="text-slate-400 hover:text-slate-600 px-1 transition-transform"
+                                aria-expanded={!isCollapsed}
+                                aria-label={`${status}の一覧を${isCollapsed ? "展開" : "折りたたむ"}`}
                               >
                                 {isCollapsed ? (
                                   <ChevronDown size={18} />
@@ -8311,14 +8413,8 @@ export default function App() {
                                 )}
                               </button>
                             </div>
-                            <div
-                              className={`grid transition-[grid-template-rows,opacity] duration-300 ease-in-out ${
-                                !isCollapsed
-                                  ? "grid-rows-[1fr] opacity-100"
-                                  : "grid-rows-[0fr] opacity-0"
-                              }`}
-                            >
-                              <div className="overflow-hidden space-y-6">
+                            {!isCollapsed && (
+                              <div className="space-y-6">
                                 {entries.map((entry) => {
                                   const cData =
                                     companyData[entry.company] || {};
@@ -8332,13 +8428,13 @@ export default function App() {
                                       onEdit={startEdit}
                                       onDelete={handleDelete}
                                       companyUrl={cData.myPageUrl}
-                                      highlight={searchQuery}
+                                      highlight={debouncedSearchQuery}
                                       appSettings={appSettings}
                                     />
                                   );
                                 })}
                               </div>
-                            </div>
+                            )}
                           </div>
                         );
                     })}
@@ -8361,12 +8457,15 @@ export default function App() {
                               <h3 className="text-sm font-bold text-slate-600 px-1 flex items-center gap-2">
                                 {status}
                                 <span className="text-xs text-slate-400 font-normal">
-                                  {entries.length}社
+                                  {entries.length}件
                                 </span>
                               </h3>
                               <button
+                                type="button"
                                 onClick={() => toggleStatusCollapse(status)}
                                 className="text-slate-400 hover:text-slate-600 px-1 transition-transform"
+                                aria-expanded={!isCollapsed}
+                                aria-label={`${status}の一覧を${isCollapsed ? "展開" : "折りたたむ"}`}
                               >
                                 {isCollapsed ? (
                                   <ChevronDown size={18} />
@@ -8406,13 +8505,23 @@ export default function App() {
                 {viewMode === "question" && (
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                     {flattenedQAs.length === 0 && (
-                      <div className="col-span-2 text-center text-slate-400 py-10">
-                        該当する質問はありません
+                      <div className="col-span-2">
+                        <ListEmptyMessage
+                          hasAnyData={hasAnyEntries}
+                          isFiltered={isListSearchActive}
+                          emptyTitle="表示できる質問がありません"
+                          emptyDescription={
+                            "回答が入力された質問がここに表示されます。"
+                          }
+                          filteredTitle="該当する質問がありません"
+                        />
                       </div>
                     )}
-                    {flattenedQAs.map((item, idx) => (
+                    {flattenedQAs
+                      .slice(0, listRenderLimit)
+                      .map((item) => (
                       <QAItemDisplay
-                        key={`${item.entryId}-${idx}`}
+                        key={`${item.entryId}-${item.id}`}
                         qa={item}
                         tags={item.tagsArray}
                         companyName={item.companyName}
@@ -8420,10 +8529,24 @@ export default function App() {
                         selectionType={item.selectionType}
                         showCompanyInfo={true}
                         onEdit={handleEditById}
-                        highlight={searchQuery}
+                        highlight={debouncedSearchQuery}
                         appSettings={appSettings}
                       />
                     ))}
+                    {flattenedQAs.length > listRenderLimit && (
+                      <div className="col-span-full">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setListRenderLimit((n) => n + LIST_RENDER_BATCH)
+                          }
+                          className="w-full py-3 text-sm font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-xl border border-indigo-100 transition-colors"
+                        >
+                          さらに表示（残り{" "}
+                          {flattenedQAs.length - listRenderLimit}件）
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -8489,9 +8612,15 @@ export default function App() {
                     )}
 
                     {Object.keys(tagGroups).length === 0 && (
-                      <div className="text-center text-slate-400 py-10">
-                        タグ付けされた質問はありません
-                      </div>
+                      <ListEmptyMessage
+                        hasAnyData={hasAnyEntries}
+                        isFiltered={isListSearchActive}
+                        emptyTitle="表示できる質問がありません"
+                        emptyDescription={
+                          "回答とタグが設定された質問がここに表示されます。"
+                        }
+                        filteredTitle="該当する質問がありません"
+                      />
                     )}
                     {Object.entries(tagGroups).map(([tagName, items]) => {
                       const isCollapsed = collapsedTags[tagName];
@@ -8513,8 +8642,11 @@ export default function App() {
                               </span>
                             </h3>
                             <button
+                              type="button"
                               onClick={() => toggleTagCollapse(tagName)}
                               className="text-slate-400 hover:text-slate-600 px-1 transition-transform"
+                              aria-expanded={!isCollapsed}
+                              aria-label={`#${tagName}の一覧を${isCollapsed ? "展開" : "折りたたむ"}`}
                             >
                               {isCollapsed ? (
                                 <ChevronDown size={18} />
@@ -8523,18 +8655,11 @@ export default function App() {
                               )}
                             </button>
                           </div>
-                          <div
-                            className={`grid transition-[grid-template-rows,opacity] duration-300 ease-in-out ${
-                              !isCollapsed
-                                ? "grid-rows-[1fr] opacity-100"
-                                : "grid-rows-[0fr] opacity-0"
-                            }`}
-                          >
-                            <div className="overflow-hidden">
+                          {!isCollapsed && (
                               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                                {items.map((item, idx) => (
+                                {items.map((item) => (
                                   <QAItemDisplay
-                                    key={`${item.entryId}-${idx}`}
+                                    key={`${item.entryId}-${item.id}-${tagName}`}
                                     qa={item}
                                     tags={item.tagsArray}
                                     companyName={item.companyName}
@@ -8542,13 +8667,12 @@ export default function App() {
                                     selectionType={item.selectionType}
                                     showCompanyInfo={true}
                                     onEdit={handleEditById}
-                                    highlight={searchQuery}
+                                    highlight={debouncedSearchQuery}
                                     appSettings={appSettings}
                                   />
                                 ))}
                               </div>
-                            </div>
-                          </div>
+                          )}
                         </div>
                       );
                     })}
@@ -8726,7 +8850,7 @@ export default function App() {
                                     content = (
                                       <HighlightText
                                         text={company}
-                                        highlight={searchQuery}
+                                        highlight={debouncedSearchQuery}
                                       />
                                     );
                                   } else if (col.id === "myPageUrl") {
@@ -9171,13 +9295,15 @@ export default function App() {
           </div>
         </main>
 
-        <ReferenceSidebar
-          isOpen={isRefPanelOpen}
-          onClose={() => setIsRefPanelOpen(false)}
-          entries={enrichedEntries}
-          editingId={editingId}
-          appSettings={appSettings}
-        />
+        {isRefPanelOpen && !isMemoMode && (
+          <ReferenceSidebar
+            isOpen={isRefPanelOpen}
+            onClose={() => setIsRefPanelOpen(false)}
+            entries={enrichedEntries}
+            editingId={editingId}
+            appSettings={appSettings}
+          />
+        )}
       </div>
 
       <SettingsModal
@@ -9240,8 +9366,12 @@ export default function App() {
       )}
 
       {toast && (
-        <div className="fixed bottom-4 right-4 z-[100] animate-in slide-in-from-bottom-2 fade-in duration-300">
-          <div className="bg-slate-800 text-white px-4 py-2 rounded-lg shadow-lg text-sm font-bold">
+        <div
+          className="fixed bottom-20 sm:bottom-4 right-4 left-4 sm:left-auto z-[100] animate-in slide-in-from-bottom-2 fade-in duration-300 flex justify-end"
+          role="status"
+          aria-live="polite"
+        >
+          <div className="bg-slate-800 text-white px-4 py-2 rounded-lg shadow-lg text-sm font-bold max-w-md">
             {toast}
           </div>
         </div>

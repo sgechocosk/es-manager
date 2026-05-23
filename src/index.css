@@ -17,6 +17,12 @@
   animation: spin-always 1s linear infinite;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .always-spin {
+    animation: none;
+  }
+}
+
 body {
   margin: 0;
   height: 100dvh;
