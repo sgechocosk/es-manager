@@ -3098,8 +3098,7 @@ const AutoResizeTextarea = ({
 
 const StatusBadge = ({ status }) => {
   const displayStatus = normalizeEsStatus(status);
-  const colorClass =
-    STATUS_COLORS[displayStatus] || STATUS_COLORS["未提出"];
+  const colorClass = STATUS_COLORS[displayStatus] || STATUS_COLORS["未提出"];
   return (
     <span
       className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wide border border-transparent whitespace-nowrap ${colorClass}`}
@@ -3530,8 +3529,6 @@ const ReferenceSidebar = ({
     }
   }, [isOpen]);
 
-  if (!isOpen) return null;
-
   const filteredQAs = useMemo(() => {
     let allItems = [];
     entries.forEach((entry) => {
@@ -3581,127 +3578,137 @@ const ReferenceSidebar = ({
 
   return (
     <>
-      <button
-        type="button"
-        className="fixed inset-0 z-30 bg-slate-900/30 lg:hidden"
-        aria-label="参照パネルを閉じる"
-        onClick={onClose}
-      />
+      {isOpen && (
+        <button
+          type="button"
+          className="fixed inset-0 z-30 bg-slate-900/30 lg:hidden"
+          aria-label="参照パネルを閉じる"
+          onClick={onClose}
+        />
+      )}
       <aside
         onClick={(e) => e.stopPropagation()}
-        className="fixed right-0 w-full sm:w-96 bg-white shadow-2xl z-40 border-l border-slate-200 flex flex-col translate-x-0"
+        className={`fixed right-0 w-full sm:w-96 bg-white shadow-2xl z-40 border-l border-slate-200 transform transition-transform duration-300 ease-in-out flex flex-col ${
+          isOpen ? "translate-x-0" : "translate-x-full"
+        }`}
         style={{
           top: HEADER_HEIGHT,
           height: `calc(100vh - ${HEADER_HEIGHT})`,
         }}
       >
-      <div className="flex items-center justify-between p-4 border-b border-slate-100 bg-slate-50/80 backdrop-blur-sm shrink-0">
-        <h3 className="font-bold text-slate-700 flex items-center gap-2">
-          <BookOpen size={18} className="text-indigo-600" />
-          ES参照
-        </h3>
-        <button
-          type="button"
-          onClick={onClose}
-          className="text-slate-400 hover:text-slate-600 p-1 rounded-md hover:bg-slate-200/50 transition-colors"
-          title="閉じる"
-          aria-label="参照パネルを閉じる"
-        >
-          <PanelRightClose size={20} />
-        </button>
-      </div>
-
-      <div className="p-4 border-b border-slate-100 bg-white shrink-0">
-        <div className="relative">
-          <Search
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-            size={14}
-          />
-          <input
-            ref={searchInputRef}
-            type="text"
-            placeholder="企業、質問、タグ、回答を検索..."
-            className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-indigo-500 bg-slate-50 focus:bg-white transition-colors"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/30 scrollbar-thin scrollbar-thumb-slate-200">
-        {filteredQAs.length === 0 && (
-          <div className="text-center text-slate-400 text-sm py-10">
-            {search ? "該当する回答がありません" : "データがありません"}
-          </div>
-        )}
-        {filteredQAs.map((item) => (
-          <div
-            key={item.uniqueId}
-            className="bg-white p-3 rounded-xl border border-slate-200 hover:border-indigo-300 hover:shadow-sm transition-all group"
+        <div className="flex items-center justify-between p-4 border-b border-slate-100 bg-slate-50/80 backdrop-blur-sm shrink-0">
+          <h3 className="font-bold text-slate-700 flex items-center gap-2">
+            <BookOpen size={18} className="text-indigo-600" />
+            ES参照
+          </h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-slate-400 hover:text-slate-600 p-1 rounded-md hover:bg-slate-200/50 transition-colors"
+            title="閉じる"
+            aria-label="参照パネルを閉じる"
           >
-            <div className="flex justify-between items-start mb-2 gap-2">
-              <div>
-                <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
-                  <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded truncate max-w-[140px] block">
-                    <HighlightText text={item.company} highlight={search} />
-                  </span>
-                  <StatusBadge status={item.status} />
-                  {item.selectionType && (
-                    <span className="text-[10px] text-slate-400 border border-slate-100 px-1.5 py-0.5 rounded">
+            <PanelRightClose size={20} />
+          </button>
+        </div>
+
+        <div className="p-4 border-b border-slate-100 bg-white shrink-0">
+          <div className="relative">
+            <Search
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+              size={14}
+            />
+            <input
+              ref={searchInputRef}
+              type="text"
+              placeholder="企業、質問、タグ、回答を検索..."
+              className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-indigo-500 bg-slate-50 focus:bg-white transition-colors"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/30 scrollbar-thin scrollbar-thumb-slate-200">
+          {filteredQAs.length === 0 && (
+            <div className="text-center text-slate-400 text-sm py-10">
+              {search ? "該当する回答がありません" : "データがありません"}
+            </div>
+          )}
+          {filteredQAs.map((item) => (
+            <div
+              key={item.uniqueId}
+              className="bg-white p-3 rounded-xl border border-slate-200 hover:border-indigo-300 hover:shadow-sm transition-all group"
+            >
+              <div className="flex justify-between items-start mb-2 gap-2">
+                <div>
+                  <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
+                    <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded truncate max-w-[140px] block">
+                      <HighlightText text={item.company} highlight={search} />
+                    </span>
+                    <StatusBadge status={item.status} />
+                    {item.selectionType && (
+                      <span className="text-[10px] text-slate-400 border border-slate-100 px-1.5 py-0.5 rounded">
+                        <HighlightText
+                          text={item.selectionType}
+                          highlight={search}
+                        />
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs font-bold text-slate-800 leading-tight">
+                    <HighlightText text={item.question} highlight={search} />
+                  </p>
+                </div>
+                <div className="shrink-0">
+                  <CopyButton
+                    text={item.answer}
+                    ctrlText={`Q.${item.question} ${item.charLimit ? `(${item.charLimit}文字)` : ""}\n　${item.answer}`}
+                  />
+                </div>
+              </div>
+
+              <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap max-h-[200px] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-100 pr-1">
+                <HighlightText
+                  text={item.answer}
+                  highlight={search}
+                  writingStyle={
+                    appSettings?.showChecksInList
+                      ? appSettings.writingStyle
+                      : ""
+                  }
+                  checkNgWords={
+                    appSettings?.showChecksInList
+                      ? appSettings.checkNgWords
+                      : false
+                  }
+                />
+              </p>
+
+              <div className="mt-2 flex flex-wrap justify-between items-end gap-2">
+                <div className="flex flex-wrap gap-1">
+                  {item.tags.map((tag, i) => (
+                    <span
+                      key={i}
+                      className="text-[9px] px-1.5 py-0.5 bg-indigo-50 text-indigo-600 rounded border border-indigo-100"
+                    >
+                      #
                       <HighlightText
-                        text={item.selectionType}
+                        text={tag}
                         highlight={search}
+                        isTag={true}
                       />
                     </span>
-                  )}
+                  ))}
                 </div>
-                <p className="text-xs font-bold text-slate-800 leading-tight">
-                  <HighlightText text={item.question} highlight={search} />
-                </p>
-              </div>
-              <div className="shrink-0">
-                <CopyButton
-                  text={item.answer}
-                  ctrlText={`Q.${item.question} ${item.charLimit ? `(${item.charLimit}文字)` : ""}\n　${item.answer}`}
-                />
+                <div className="text-[10px] font-mono text-slate-400 bg-slate-50 px-2 py-0.5 rounded border border-slate-100 shrink-0">
+                  {item.answer ? item.answer.length : 0}文字
+                </div>
               </div>
             </div>
-
-            <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap max-h-[200px] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-100 pr-1">
-              <HighlightText
-                text={item.answer}
-                highlight={search}
-                writingStyle={
-                  appSettings?.showChecksInList ? appSettings.writingStyle : ""
-                }
-                checkNgWords={
-                  appSettings?.showChecksInList
-                    ? appSettings.checkNgWords
-                    : false
-                }
-              />
-            </p>
-
-            <div className="mt-2 flex flex-wrap justify-between items-end gap-2">
-              <div className="flex flex-wrap gap-1">
-                {item.tags.map((tag, i) => (
-                  <span
-                    key={i}
-                    className="text-[9px] px-1.5 py-0.5 bg-indigo-50 text-indigo-600 rounded border border-indigo-100"
-                  >
-                    #
-                    <HighlightText text={tag} highlight={search} isTag={true} />
-                  </span>
-                ))}
-              </div>
-              <div className="text-[10px] font-mono text-slate-400 bg-slate-50 px-2 py-0.5 rounded border border-slate-100 shrink-0">
-                {item.answer ? item.answer.length : 0}文字
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </aside>
+          ))}
+        </div>
+      </aside>
     </>
   );
 };
@@ -5421,30 +5428,30 @@ const QAEditor = ({
         </div>
 
         {isActive && (
-        <AIAssistant
-          question={qa.question}
-          answer={currentText}
-          charLimit={qa.charLimit}
-          company={formData.company}
-          industry={formData.industry}
-          selectionType={formData.selectionType}
-          note={qa.note}
-          onApply={(text) =>
-            handleAnswerChange(
-              text,
-              isComparisonMode ? (viewMode === "main" ? 0 : 1) : null,
-            )
-          }
-          allEntries={enrichedEntries}
-          entryId={editingId}
-          qaId={qa.id}
-          writingStyle={appSettings.writingStyle}
-          keepInstruction={appSettings.keepInstruction}
-          showPromptMode={appSettings.showPromptMode}
-          showModelName={appSettings.showModelName}
-          isActive={isActive}
-          appSettings={appSettings}
-        />
+          <AIAssistant
+            question={qa.question}
+            answer={currentText}
+            charLimit={qa.charLimit}
+            company={formData.company}
+            industry={formData.industry}
+            selectionType={formData.selectionType}
+            note={qa.note}
+            onApply={(text) =>
+              handleAnswerChange(
+                text,
+                isComparisonMode ? (viewMode === "main" ? 0 : 1) : null,
+              )
+            }
+            allEntries={enrichedEntries}
+            entryId={editingId}
+            qaId={qa.id}
+            writingStyle={appSettings.writingStyle}
+            keepInstruction={appSettings.keepInstruction}
+            showPromptMode={appSettings.showPromptMode}
+            showModelName={appSettings.showModelName}
+            isActive={isActive}
+            appSettings={appSettings}
+          />
         )}
       </div>
 
@@ -5633,7 +5640,10 @@ const ESEntryDisplay = ({
           </div>
         ) : (
           qas.map((qa, idx) => (
-            <div key={qa.id || idx} className="p-5 hover:bg-white transition-colors">
+            <div
+              key={qa.id || idx}
+              className="p-5 hover:bg-white transition-colors"
+            >
               <div className="flex justify-between items-start gap-4 mb-2">
                 <div className="flex gap-2 flex-1">
                   <span className="text-indigo-600 font-black text-sm">Q.</span>
@@ -6498,10 +6508,9 @@ export default function App() {
               "Failed to parse saved data in worker",
               result.errorMessage,
             );
-            setToast(
+            showToast(
               "保存データの読み込みに失敗しました。エクスポートしたJSONから復元してください。",
             );
-            setTimeout(() => setToast(null), 6000);
           }
           finishInitialization();
         }
@@ -6511,10 +6520,9 @@ export default function App() {
 
       worker.onerror = (error) => {
         console.error("Data loader worker error", error);
-        setToast(
+        showToast(
           "データの読み込み中にエラーが発生しました。ページを再読み込みするか、JSONをインポートしてください。",
         );
-        setTimeout(() => setToast(null), 6000);
         cleanup();
         finishInitialization();
       };
@@ -7172,13 +7180,7 @@ export default function App() {
   };
 
   const handleLogoClick = () => {
-    if (view === "list") {
-      scrollToTop("smooth");
-      setViewMode("company");
-      setSearchQuery("");
-    } else {
-      handleCancel("auto");
-    }
+    window.location.reload();
   };
 
   // --- Handler: Save Draft ---
@@ -7352,8 +7354,7 @@ export default function App() {
 
       const completedStatuses = new Set(COMPLETED_STATUSES);
       const oldStatusIsCompleted =
-        oldEntry &&
-        completedStatuses.has(normalizeEsStatus(oldEntry.status));
+        oldEntry && completedStatuses.has(normalizeEsStatus(oldEntry.status));
       const newStatusIsCompleted = completedStatuses.has(
         normalizeEsStatus(entryData.status),
       );
@@ -8252,38 +8253,38 @@ export default function App() {
                     {processedCompanyEntries
                       .slice(0, listRenderLimit)
                       .map((entry, index) => {
-                      const cData = companyData[entry.company] || {};
-                      return (
-                        <div key={entry.id} className="relative">
-                          <ESEntryDisplay
-                            entry={{ ...entry, industry: cData.industry }}
-                            onEdit={startEdit}
-                            onDelete={handleDelete}
-                            companyUrl={cData.myPageUrl}
-                            highlight={debouncedSearchQuery}
-                            appSettings={appSettings}
-                          />
-                          {index === 0 && showFeatureUnlockTooltip && (
-                            <div className="absolute top-full left-1/2 -translate-x-1/2 mt-3 w-max bg-white border border-slate-200 rounded-xl shadow-xl p-4 z-[100] animate-in fade-in slide-in-from-top-2 duration-500 cursor-default">
-                              <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-white border-t border-l border-slate-200 transform rotate-45"></div>
-                              <button
-                                onClick={handleCloseFeatureUnlockTooltip}
-                                className="absolute top-2 right-2 z-20 text-slate-400 hover:text-slate-600 p-1 transition-colors"
-                              >
-                                <X size={14} />
-                              </button>
-                              <div className="relative z-10 pr-4 pt-0.5">
-                                <p className="text-sm font-bold text-slate-700 leading-relaxed text-center whitespace-nowrap">
-                                  素晴らしいです！
-                                  <br />
-                                  この画面で確認できるようになりました！
-                                </p>
+                        const cData = companyData[entry.company] || {};
+                        return (
+                          <div key={entry.id} className="relative">
+                            <ESEntryDisplay
+                              entry={{ ...entry, industry: cData.industry }}
+                              onEdit={startEdit}
+                              onDelete={handleDelete}
+                              companyUrl={cData.myPageUrl}
+                              highlight={debouncedSearchQuery}
+                              appSettings={appSettings}
+                            />
+                            {index === 0 && showFeatureUnlockTooltip && (
+                              <div className="absolute top-full left-1/2 -translate-x-1/2 mt-3 w-max bg-white border border-slate-200 rounded-xl shadow-xl p-4 z-[100] animate-in fade-in slide-in-from-top-2 duration-500 cursor-default">
+                                <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-white border-t border-l border-slate-200 transform rotate-45"></div>
+                                <button
+                                  onClick={handleCloseFeatureUnlockTooltip}
+                                  className="absolute top-2 right-2 z-20 text-slate-400 hover:text-slate-600 p-1 transition-colors"
+                                >
+                                  <X size={14} />
+                                </button>
+                                <div className="relative z-10 pr-4 pt-0.5">
+                                  <p className="text-sm font-bold text-slate-700 leading-relaxed text-center whitespace-nowrap">
+                                    素晴らしいです！
+                                    <br />
+                                    この画面で確認できるようになりました！
+                                  </p>
+                                </div>
                               </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
+                            )}
+                          </div>
+                        );
+                      })}
                     {processedCompanyEntries.length > listRenderLimit && (
                       <button
                         type="button"
@@ -8314,55 +8315,54 @@ export default function App() {
                         <div className="p-1.5 bg-white/80 backdrop-blur-md rounded-full shadow-lg border border-slate-200 overflow-hidden">
                           <div className="flex items-center justify-start gap-1 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                             {ES_STATUSES.concat(
-                                Object.keys(entriesByStatus).filter(
-                                  (s) => !ES_STATUSES.includes(s),
-                                ),
-                              )
-                              .map((status, _, array) => {
-                                const count = entriesByStatus[status]?.length;
-                                if (!count) return null;
+                              Object.keys(entriesByStatus).filter(
+                                (s) => !ES_STATUSES.includes(s),
+                              ),
+                            ).map((status, _, array) => {
+                              const count = entriesByStatus[status]?.length;
+                              if (!count) return null;
 
-                                const isFirst =
-                                  array.find(
-                                    (s) => entriesByStatus[s]?.length > 0,
-                                  ) === status;
+                              const isFirst =
+                                array.find(
+                                  (s) => entriesByStatus[s]?.length > 0,
+                                ) === status;
 
-                                return (
-                                  <button
-                                    key={`nav-${status}`}
-                                    onClick={() => {
-                                      isAutoScrolling.current = true;
-                                      setIsMobileNavVisible(true);
+                              return (
+                                <button
+                                  key={`nav-${status}`}
+                                  onClick={() => {
+                                    isAutoScrolling.current = true;
+                                    setIsMobileNavVisible(true);
 
-                                      if (isFirst) {
-                                        scrollToTop("smooth");
-                                      } else {
-                                        const el = document.getElementById(
-                                          `status-section-${status}`,
-                                        );
-                                        if (el && mainRef.current) {
-                                          const mainEl = mainRef.current;
-                                          const y =
-                                            el.getBoundingClientRect().top -
-                                            mainEl.getBoundingClientRect().top +
-                                            mainEl.scrollTop -
-                                            20;
-                                          mainEl.scrollTo({
-                                            top: y,
-                                            behavior: "smooth",
-                                          });
-                                        }
+                                    if (isFirst) {
+                                      scrollToTop("smooth");
+                                    } else {
+                                      const el = document.getElementById(
+                                        `status-section-${status}`,
+                                      );
+                                      if (el && mainRef.current) {
+                                        const mainEl = mainRef.current;
+                                        const y =
+                                          el.getBoundingClientRect().top -
+                                          mainEl.getBoundingClientRect().top +
+                                          mainEl.scrollTop -
+                                          20;
+                                        mainEl.scrollTo({
+                                          top: y,
+                                          behavior: "smooth",
+                                        });
                                       }
-                                    }}
-                                    className="flex items-center gap-1.5 px-3 sm:px-4 py-2 text-xs font-bold text-slate-600 rounded-full hover:bg-slate-100 hover:text-indigo-600 transition-colors whitespace-nowrap shrink-0 group"
-                                  >
-                                    {status}
-                                    <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full font-mono group-hover:bg-indigo-100 group-hover:text-indigo-600 transition-colors">
-                                      {count}
-                                    </span>
-                                  </button>
-                                );
-                              })}
+                                    }
+                                  }}
+                                  className="flex items-center gap-1.5 px-3 sm:px-4 py-2 text-xs font-bold text-slate-600 rounded-full hover:bg-slate-100 hover:text-indigo-600 transition-colors whitespace-nowrap shrink-0 group"
+                                >
+                                  {status}
+                                  <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full font-mono group-hover:bg-indigo-100 group-hover:text-indigo-600 transition-colors">
+                                    {count}
+                                  </span>
+                                </button>
+                              );
+                            })}
                           </div>
                         </div>
                       </div>
@@ -8379,64 +8379,63 @@ export default function App() {
                       />
                     )}
                     {ES_STATUSES.map((status) => {
-                        const entries = entriesByStatus[status];
-                        if (!entries || entries.length === 0) return null;
-                        const isCollapsed = collapsedStatuses[status];
-                        return (
+                      const entries = entriesByStatus[status];
+                      if (!entries || entries.length === 0) return null;
+                      const isCollapsed = collapsedStatuses[status];
+                      return (
+                        <div
+                          key={status}
+                          id={`status-section-${status}`}
+                          className={`bg-slate-50/50 rounded-xl border border-slate-200 scroll-mt-40 sm:scroll-mt-32 transition-all duration-300 ease-in-out px-4 last:mb-0 ${
+                            !isCollapsed ? "py-4 mb-8" : "py-3 mb-3"
+                          }`}
+                        >
                           <div
-                            key={status}
-                            id={`status-section-${status}`}
-                            className={`bg-slate-50/50 rounded-xl border border-slate-200 scroll-mt-40 sm:scroll-mt-32 transition-all duration-300 ease-in-out px-4 last:mb-0 ${
-                              !isCollapsed ? "py-4 mb-8" : "py-3 mb-3"
-                            }`}
+                            className={`flex items-center justify-between transition-[margin] duration-300 ease-in-out ${!isCollapsed ? "mb-4" : "mb-0"}`}
                           >
-                            <div
-                              className={`flex items-center justify-between transition-[margin] duration-300 ease-in-out ${!isCollapsed ? "mb-4" : "mb-0"}`}
-                            >
-                              <div className="flex items-center gap-2">
-                                <StatusBadge status={status} />
-                                <span className="text-xs text-slate-400 font-bold">
-                                  {entries.length}件
-                                </span>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => toggleStatusCollapse(status)}
-                                className="text-slate-400 hover:text-slate-600 px-1 transition-transform"
-                                aria-expanded={!isCollapsed}
-                                aria-label={`${status}の一覧を${isCollapsed ? "展開" : "折りたたむ"}`}
-                              >
-                                {isCollapsed ? (
-                                  <ChevronDown size={18} />
-                                ) : (
-                                  <ChevronUp size={18} />
-                                )}
-                              </button>
+                            <div className="flex items-center gap-2">
+                              <StatusBadge status={status} />
+                              <span className="text-xs text-slate-400 font-bold">
+                                {entries.length}件
+                              </span>
                             </div>
-                            {!isCollapsed && (
-                              <div className="space-y-6">
-                                {entries.map((entry) => {
-                                  const cData =
-                                    companyData[entry.company] || {};
-                                  return (
-                                    <ESEntryDisplay
-                                      key={entry.id}
-                                      entry={{
-                                        ...entry,
-                                        industry: cData.industry,
-                                      }}
-                                      onEdit={startEdit}
-                                      onDelete={handleDelete}
-                                      companyUrl={cData.myPageUrl}
-                                      highlight={debouncedSearchQuery}
-                                      appSettings={appSettings}
-                                    />
-                                  );
-                                })}
-                              </div>
-                            )}
+                            <button
+                              type="button"
+                              onClick={() => toggleStatusCollapse(status)}
+                              className="text-slate-400 hover:text-slate-600 px-1 transition-transform"
+                              aria-expanded={!isCollapsed}
+                              aria-label={`${status}の一覧を${isCollapsed ? "展開" : "折りたたむ"}`}
+                            >
+                              {isCollapsed ? (
+                                <ChevronDown size={18} />
+                              ) : (
+                                <ChevronUp size={18} />
+                              )}
+                            </button>
                           </div>
-                        );
+                          {!isCollapsed && (
+                            <div className="space-y-6">
+                              {entries.map((entry) => {
+                                const cData = companyData[entry.company] || {};
+                                return (
+                                  <ESEntryDisplay
+                                    key={entry.id}
+                                    entry={{
+                                      ...entry,
+                                      industry: cData.industry,
+                                    }}
+                                    onEdit={startEdit}
+                                    onDelete={handleDelete}
+                                    companyUrl={cData.myPageUrl}
+                                    highlight={debouncedSearchQuery}
+                                    appSettings={appSettings}
+                                  />
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
                     })}
                     {Object.keys(entriesByStatus)
                       .filter((s) => !ES_STATUSES.includes(s))
@@ -8517,9 +8516,7 @@ export default function App() {
                         />
                       </div>
                     )}
-                    {flattenedQAs
-                      .slice(0, listRenderLimit)
-                      .map((item) => (
+                    {flattenedQAs.slice(0, listRenderLimit).map((item) => (
                       <QAItemDisplay
                         key={`${item.entryId}-${item.id}`}
                         qa={item}
@@ -8656,22 +8653,22 @@ export default function App() {
                             </button>
                           </div>
                           {!isCollapsed && (
-                              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                                {items.map((item) => (
-                                  <QAItemDisplay
-                                    key={`${item.entryId}-${item.id}-${tagName}`}
-                                    qa={item}
-                                    tags={item.tagsArray}
-                                    companyName={item.companyName}
-                                    status={item.status}
-                                    selectionType={item.selectionType}
-                                    showCompanyInfo={true}
-                                    onEdit={handleEditById}
-                                    highlight={debouncedSearchQuery}
-                                    appSettings={appSettings}
-                                  />
-                                ))}
-                              </div>
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                              {items.map((item) => (
+                                <QAItemDisplay
+                                  key={`${item.entryId}-${item.id}-${tagName}`}
+                                  qa={item}
+                                  tags={item.tagsArray}
+                                  companyName={item.companyName}
+                                  status={item.status}
+                                  selectionType={item.selectionType}
+                                  showCompanyInfo={true}
+                                  onEdit={handleEditById}
+                                  highlight={debouncedSearchQuery}
+                                  appSettings={appSettings}
+                                />
+                              ))}
+                            </div>
                           )}
                         </div>
                       );
@@ -9295,7 +9292,7 @@ export default function App() {
           </div>
         </main>
 
-        {isRefPanelOpen && !isMemoMode && (
+        {!isMemoMode && (
           <ReferenceSidebar
             isOpen={isRefPanelOpen}
             onClose={() => setIsRefPanelOpen(false)}
