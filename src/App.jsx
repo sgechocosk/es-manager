@@ -4465,10 +4465,19 @@ const AIAssistant = ({
   const [isInitialUIVisible, setIsInitialUIVisible] = useState(true);
 
   if (!hasApiKey) {
-    if (!isActive) return null;
     return (
-      <div className="mt-3 p-3 rounded-lg border border-dashed border-slate-200 bg-slate-50 text-xs text-slate-500 leading-relaxed">
-        AI機能を使うには、設定画面で Gemini API キーを登録してください。
+      <div
+        className={`grid transition-[grid-template-rows,opacity,margin] duration-300 ease-in-out ${
+          isActive
+            ? "grid-rows-[1fr] opacity-100 mt-3"
+            : "grid-rows-[0fr] opacity-0 mt-0"
+        }`}
+      >
+        <div className="overflow-hidden">
+          <div className="p-3 rounded-lg border border-dashed border-slate-200 bg-slate-50 text-xs text-slate-500 leading-relaxed">
+            AI機能を使うには、設定画面で Gemini API キーを登録してください。
+          </div>
+        </div>
       </div>
     );
   }
@@ -5427,32 +5436,30 @@ const QAEditor = ({
           </div>
         </div>
 
-        {isActive && (
-          <AIAssistant
-            question={qa.question}
-            answer={currentText}
-            charLimit={qa.charLimit}
-            company={formData.company}
-            industry={formData.industry}
-            selectionType={formData.selectionType}
-            note={qa.note}
-            onApply={(text) =>
-              handleAnswerChange(
-                text,
-                isComparisonMode ? (viewMode === "main" ? 0 : 1) : null,
-              )
-            }
-            allEntries={enrichedEntries}
-            entryId={editingId}
-            qaId={qa.id}
-            writingStyle={appSettings.writingStyle}
-            keepInstruction={appSettings.keepInstruction}
-            showPromptMode={appSettings.showPromptMode}
-            showModelName={appSettings.showModelName}
-            isActive={isActive}
-            appSettings={appSettings}
-          />
-        )}
+        <AIAssistant
+          question={qa.question}
+          answer={currentText}
+          charLimit={qa.charLimit}
+          company={formData.company}
+          industry={formData.industry}
+          selectionType={formData.selectionType}
+          note={qa.note}
+          onApply={(text) =>
+            handleAnswerChange(
+              text,
+              isComparisonMode ? (viewMode === "main" ? 0 : 1) : null,
+            )
+          }
+          allEntries={enrichedEntries}
+          entryId={editingId}
+          qaId={qa.id}
+          writingStyle={appSettings.writingStyle}
+          keepInstruction={appSettings.keepInstruction}
+          showPromptMode={appSettings.showPromptMode}
+          showModelName={appSettings.showModelName}
+          isActive={isActive}
+          appSettings={appSettings}
+        />
       </div>
 
       <div
